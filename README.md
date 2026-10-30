@@ -20,8 +20,8 @@ Cần Internet để lấy nguồn, gọi Gemini/LLM và Edge TTS. Nên có tố
 ## 2. Clone và chạy bằng Docker
 
 ```bash
-git clone https://github.com/NguyenTho2005/LC-auto-video-gen.git
-cd LC-auto-video-gen
+git clone https://github.com/MaiPhuc1506/AutoGen_ver2.git
+cd AutoGen_ver2
 cp .env.example .env.local
 docker compose up -d --build
 ```
