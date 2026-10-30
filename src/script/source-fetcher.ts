@@ -1,5 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
-import axios from "axios";
+import {publicGet,accessMessage,publicUrl} from '../ingest/public-http.js';
+import {fetchPlatformSource,SourceAccessError} from './platform-source.js';
+import {fetchGithubContext} from "./github-context.js";
 import type { SourceContent } from "./types.js";
 import { log } from "../utils/logger.js";
 
@@ -51,35 +53,36 @@ export function extractMetaFromHtml(html: string): { title: string; ogImage: str
 /**
  * Fetches content from an input string (URL, local file, or raw topic).
  */
-export async function fetchSourceContent(input: string): Promise<SourceContent> {
+export async function fetchSourceContent(input: string, depth=0): Promise<SourceContent> {
   const trimmed = input.trim();
 
   // 1. URL mode
   if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-    log.info(`Fetching source content from URL: ${trimmed}`);
-    const urlObj = new URL(trimmed);
+    const urlObj = new URL(publicUrl(trimmed));
+    log.info(`Fetching source content from URL: ${urlObj.origin}${urlObj.pathname}`);
     const domain = urlObj.hostname.replace(/^www\./, "");
 
-    const response = await axios.get(trimmed, {
-      timeout: 15000,
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      },
-    });
+    if(domain === "github.com")return fetchGithubContext(trimmed);
 
-    const html = String(response.data);
+    try {
+    if(depth>2)throw new SourceAccessError('Quá nhiều liên kết chuyển tiếp giữa các nguồn.');
+    const platform=await fetchPlatformSource(trimmed,{readArticle:url=>fetchSourceContent(url,depth+1)});
+    if(platform)return platform;
+    const html=String(await publicGet(trimmed));
     const { title: metaTitle, ogImage } = extractMetaFromHtml(html);
-    const cleanContent = extractCleanTextFromHtml(html);
+    const body=html.match(/<article\b[^>]*>([\s\S]*)<\/article>/i)?.[1]||html.match(/<main\b[^>]*>([\s\S]*)<\/main>/i)?.[1]||html;
+    const cleanContent = extractCleanTextFromHtml(body.replace(/<(?:nav|footer|header|aside)\b[^>]*>[\s\S]*?<\/(?:nav|footer|header|aside)>/gi,' '));
+    if(cleanContent.length<120||/^(?:just a moment|access denied|verify you are human)/i.test(metaTitle))throw new SourceAccessError('Trang không cung cấp đủ văn bản công khai, cần đăng nhập hoặc chỉ tải nội dung qua JavaScript. Hãy nhập bài gốc hoặc văn bản bạn có quyền sử dụng.');
     const title = metaTitle || cleanContent.slice(0, 80) || "Tin tức công nghệ";
 
     return {
       title,
-      content: cleanContent,
+      content: cleanContent.slice(0,80000),
       url: trimmed,
       domain,
       ogImage,
     };
+    } catch(error){if(error instanceof SourceAccessError)throw error;throw new SourceAccessError(accessMessage(error));}
   }
 
   // 2. Local file mode

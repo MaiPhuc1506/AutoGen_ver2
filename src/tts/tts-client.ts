@@ -30,10 +30,13 @@ import type { Config } from "../config.js";
 import { EdgeTtsClient } from "./edge-tts-client.js";
 import { LucylabClient } from "./lucylab-client.js";
 import { ElevenLabsClient } from "./elevenlabs-client.js";
+import { ZeroTtsClient } from "./zerotts-client.js";
 import { VbeeClient } from "./vbee-client.js";
 
 export function createTtsClient(cfg: Config): TtsClient {
   switch (cfg.ttsProvider) {
+    case "zerotts":
+      return new ZeroTtsClient({voice:cfg.zeroTtsVoice});
     case "edge-tts":
       return new EdgeTtsClient({
         voice: cfg.edgeTtsVoice,

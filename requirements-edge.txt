@@ -1,0 +1,2 @@
+# Word-boundary speech helper used by the default Edge TTS provider.
+edge-tts==7.3.1

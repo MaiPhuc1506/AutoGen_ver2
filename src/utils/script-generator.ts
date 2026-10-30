@@ -1,3 +1,7 @@
+import {applyReferenceDefaults} from '../render/reference-design.js';
+import {channelOutroVoice} from "../script/channel-outro.js";
+import {DEFAULT_VOICE_SPEED,DEFAULT_BGM,DEFAULT_VOICE} from '../channel-defaults.js';
+import { buildHookSuggestions, sourceFacts, compactText } from "../script/hooks.js";
 import type { Script } from "../render/script-schema.js";
 
 /**
@@ -26,12 +30,7 @@ export function normalizeVietnameseForTts(text: string): string {
   res = res.replace(/\$(\d+)/g, "$1 đô la");
   res = res.replace(/\b(\d+)\s*tr(?:iệu)?\s*đ(?:ồng)?\b/gi, "$1 triệu đồng");
 
-  // Common English tech acronyms in Vietnamese speech
-  res = res.replace(/\bAI\b/g, "ây ai");
-  res = res.replace(/\bAPI\b/g, "ây pi ai");
-  res = res.replace(/\bUI\b/g, "giao diện");
-  res = res.replace(/\bUX\b/g, "trải nghiệm");
-
+  // Keep English terms and product names in their original spelling.
   // Remove unsupported punctuation & symbols
   res = res.replace(/[#@$%^&*_+=\\~<>[\]{}|]/g, " ");
   res = res.replace(/\s+/g, " ").trim();
@@ -51,26 +50,6 @@ export interface GenerateScriptOptions {
   speed?: number;
 }
 
-function limitToSentences(text: string, maxChars = 160): string {
-  if (!text) return "";
-  // Split into sentences
-  const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
-  let res = "";
-  for (const s of sentences) {
-    const trimmed = s.trim();
-    if ((res + " " + trimmed).trim().length <= maxChars) {
-      res = (res + " " + trimmed).trim();
-    } else {
-      break;
-    }
-  }
-  if (!res) {
-    res = text.slice(0, maxChars).trim();
-    if (!/[.!?]$/.test(res)) res += ".";
-  }
-  return res;
-}
-
 /**
  * Generates a valid Script JSON compliant with ScriptSchema.
  */
@@ -81,42 +60,28 @@ export async function generateScriptFromContent(opts: GenerateScriptOptions): Pr
     url = "local",
     domain = "local",
     image = null,
-    channel = "Tin Tức AI 24h",
+    channel = "DevPeek36",
     voiceProvider = "edge-tts",
     voiceId = "vi-VN-NamMinhNeural",
-    speed = 1.0,
+    speed = DEFAULT_VOICE_SPEED,
   } = opts;
 
-  // Split content into clean chunks
-  const cleanLines = content
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter((l) => l.length > 20 && !l.includes("{") && !l.includes("}"));
-
-  // Extract concise sentences for each body scene
-  const lead = limitToSentences(cleanLines[0] || title, 160);
-  const second = limitToSentences(
-    cleanLines[1] || "Công nghệ mới mang lại nhiều cải tiến đột phá so với các thế hệ trước.",
-    160
-  );
-  const third = limitToSentences(
-    cleanLines[2] || "Dự kiến sẽ tác động mạnh mẽ đến thị trường và người dùng trong thời gian tới.",
-    160
-  );
-
-  // Hook headline and subhead (respecting schema limits: max 40 chars)
-  const hookHeadline = (title.length > 38 ? title.slice(0, 38).trim() : title) || "Tin Nóng Công Nghệ";
-  const hookSubhead = "Cập Nhật Mới Nhất!";
-
-  const hookVoice = normalizeVietnameseForTts(
-    title.length > 80 ? title.slice(0, 80).trim() + "." : (title.endsWith(".") || title.endsWith("!") ? title : `${title}!`)
-  );
-
-  const body1Voice = normalizeVietnameseForTts(lead);
-  const body2Voice = normalizeVietnameseForTts(second);
-  const body3Voice = normalizeVietnameseForTts(third);
+  const facts = sourceFacts(content, title);
+  const hook = buildHookSuggestions(title, content)[0];
+  const evidence = facts.find(f => /\d/.test(f)) || facts[0];
+  const detailFacts = facts.filter(f => f !== evidence).slice(0, 3);
+  const details = detailFacts.length ? detailFacts : [facts[0]];
+  const lastFact = facts[facts.length - 1];
+  const number = evidence.match(/\d[\d.,]*(?:\s*(?:%|GB|TB|MP|mAh|triệu|nghìn|bảng màu|phong cách))?/iu)?.[0];
+  const hookHeadline = hook.headline;
+  const hookSubhead = hook.subhead;
+  const hookVoice = normalizeVietnameseForTts(hook.voiceText);
+  const body1Voice = normalizeVietnameseForTts(evidence);
+  const body2Voice = normalizeVietnameseForTts(details.join(' '));
+  const body3Voice = normalizeVietnameseForTts(lastFact);
 
   const script: Script = {
+    bgm: {...DEFAULT_BGM},
     version: "1.0",
     metadata: {
       title,
@@ -140,6 +105,7 @@ export async function generateScriptFromContent(opts: GenerateScriptOptions): Pr
         templateData: {
           template: "hook",
           headline: hookHeadline.slice(0, 40),
+          hero:{name:compactText(title,40),category:"TECH EXPLAINER"},
           subhead: hookSubhead.slice(0, 40),
           kenBurns: "zoom-in",
         },
@@ -148,12 +114,12 @@ export async function generateScriptFromContent(opts: GenerateScriptOptions): Pr
         id: "body-1",
         type: "body",
         voiceText: body1Voice,
-        templateData: {
+        templateData: number ? {
           template: "stat-hero",
-          value: "NỔI BẬT",
-          label: (title.slice(0, 36) + (title.length > 36 ? "..." : "")).slice(0, 40),
-          context: "Bước tiến công nghệ mới nhất",
-        },
+          value: compactText(number, 20),
+          label: compactText(evidence.replace(number, '').replace(/^[\s,.:;-]+/, ''), 40) || compactText(title,40),
+          context: compactText(title,50),
+        } : { template: "callout", statement: compactText(evidence,80), tag: "ĐIỂM CHÍNH" },
       },
       {
         id: "body-2",
@@ -161,12 +127,8 @@ export async function generateScriptFromContent(opts: GenerateScriptOptions): Pr
         voiceText: body2Voice,
         templateData: {
           template: "feature-list",
-          title: "Các Điểm Đột Phá",
-          bullets: [
-            "Tối ưu hiệu năng vượt trội",
-            "Trải nghiệm mượt mà hiện đại",
-            "Tự động hoá quy trình thông minh",
-          ],
+          title: "Những điểm cần biết",
+          bullets: details.map(f => compactText(f,50)),
           icon: "spark",
         },
       },
@@ -176,17 +138,17 @@ export async function generateScriptFromContent(opts: GenerateScriptOptions): Pr
         voiceText: body3Voice,
         templateData: {
           template: "callout",
-          statement: second.slice(0, 75) + (second.length > 75 ? "..." : ""),
-          tag: "Đánh Giá",
+          statement: compactText(lastFact,80),
+          tag: "CHI TIẾT",
         },
       },
       {
         id: "outro",
         type: "outro",
-        voiceText: `Theo dõi ${channel} để xem bản tin mới mỗi ngày.`,
+        voiceText: channelOutroVoice(channel),
         templateData: {
           template: "outro",
-          ctaTop: "Xem bản tin mới mỗi ngày",
+          ctaTop: "Hẹn gặp lại!",
           channelName: channel.slice(0, 30),
           source: `Nguồn: ${domain}`.slice(0, 40),
         },
@@ -194,5 +156,6 @@ export async function generateScriptFromContent(opts: GenerateScriptOptions): Pr
     ],
   };
 
-  return script;
+  if(!opts.voiceProvider&&!opts.voiceId)script.voice={...script.voice,...DEFAULT_VOICE};
+  return applyReferenceDefaults(script);
 }

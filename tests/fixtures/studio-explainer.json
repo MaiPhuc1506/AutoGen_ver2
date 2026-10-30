@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 2,
+  "visualStyle": "tech-editorial",
+  "motionPreset": "dynamic",
+  "soundDesign": true,
+  "captions": {
+    "enabled": true,
+    "style": "minimal"
+  },
+  "metadata": {
+    "title": "GitHub, screenshot và workflow",
+    "source": {
+      "url": "https://github.com/Vincentwei1021/mg-styles-15",
+      "domain": "github.com",
+      "image": null
+    },
+    "channel": "LC STUDIO"
+  },
+  "voice": {
+    "provider": "edge-tts",
+    "voiceId": "vi-VN-NamMinhNeural",
+    "speed": 1.1,
+    "settingsSource": "script",
+    "pronunciation": "original"
+  },
+  "scenes": [
+    {
+      "id": "hook",
+      "type": "hook",
+      "voiceText": "Giữ nguyên AI, API và GitHub trong hook.",
+      "templateData": {
+        "template": "hook",
+        "headline": "AI, API, GitHub. Giữ nguyên.",
+        "subhead": "Thuật ngữ đúng. Hình ảnh thật."
+      }
+    },
+    {
+      "id": "stat",
+      "type": "body",
+      "voiceText": "Screenshot và ảnh README làm rõ nội dung.",
+      "templateData": {
+        "template": "callout",
+        "statement": "Screenshot & ảnh README",
+        "tag": "TƯ LIỆU THẬT"
+      }
+    },
+    {
+      "id": "features",
+      "type": "body",
+      "voiceText": "Chọn ảnh, sửa từng cảnh, rồi render.",
+      "templateData": {
+        "template": "workflow",
+        "title": "Một workflow rõ ràng",
+        "steps": [
+          {
+            "label": "Chọn tư liệu",
+            "detail": "Screenshot, ảnh README hoặc logo"
+          },
+          {
+            "label": "Sửa từng cảnh",
+            "detail": "Lời đọc, bố cục và chuyển cảnh"
+          },
+          {
+            "label": "Render",
+            "detail": "Duyệt bố cục trước khi xuất"
+          }
+        ]
+      }
+    },
+    {
+      "id": "callout",
+      "type": "body",
+      "voiceText": "Code hiển thị được giữ nguyên.",
+      "templateData": {
+        "template": "code-window",
+        "title": "Giữ nguyên code & thuật ngữ",
+        "language": "TypeScript",
+        "code": "const source = \"GitHub\";\nconst terms = [\"AI\", \"API\", \"prompt\"];\n// Ví dụ minh họa bố cục code",
+        "note": "Code minh họa · không tự thực thi"
+      }
+    },
+    {
+      "id": "outro",
+      "type": "outro",
+      "voiceText": "Duyệt bố cục trước khi render.",
+      "templateData": {
+        "template": "outro",
+        "ctaTop": "Duyệt trước khi xuất",
+        "channelName": "LC STUDIO",
+        "source": "Bản kiểm tra tính năng"
+      }
+    }
+  ],
+  "colorTheme": "midnight"
+}

@@ -1,10 +1,9 @@
 import { EdgeTTS, createSRT } from "edge-tts-universal";
 import { writeFile } from "node:fs/promises";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
+import {spawn} from "node:child_process";
+import {fileURLToPath} from "node:url";
 import type { TtsClient, TtsTimingResult, WordTiming } from "./tts-client.js";
 
-const execFileAsync = promisify(execFile);
 
 export interface EdgeTtsOpts {
   voice: string;         // e.g. "vi-VN-HoaiMyNeural" or "vi-VN-NamMinhNeural"
@@ -25,36 +24,22 @@ export class EdgeTtsClient implements TtsClient {
   constructor(private cfg: EdgeTtsOpts) {}
 
   async generate(text: string, audioOutPath: string, srtOutPath?: string): Promise<TtsTimingResult> {
+    // The Python client handles the current Edge handshake more reliably.
+    if(!process.env.VITEST){for(let attempt=0;attempt<2;attempt++){const python=await this.tryPythonEdgeTts(text,audioOutPath,srtOutPath);if(python)return python;if(attempt===0)await sleep(1000);}}
     return await this.synthesizeWithRetry(text, audioOutPath, srtOutPath);
   }
 
-  private async tryPythonEdgeTts(
-    text: string,
-    audioOutPath: string,
-    srtOutPath?: string,
-  ): Promise<boolean> {
-    try {
-      const args = [
-        "-m",
-        "edge_tts",
-        "--voice",
-        this.cfg.voice,
-        "--text",
-        text,
-        "--write-media",
-        audioOutPath,
-        "--no-progress",
-      ];
-      if (this.cfg.rate && this.cfg.rate !== "+0%") args.push("--rate", this.cfg.rate);
-      if (this.cfg.pitch && this.cfg.pitch !== "+0Hz") args.push("--pitch", this.cfg.pitch);
-      if (this.cfg.volume && this.cfg.volume !== "+0%") args.push("--volume", this.cfg.volume);
-      if (srtOutPath) args.push("--write-subtitles", srtOutPath);
-
-      await execFileAsync("python3", args);
-      return true;
-    } catch {
-      return false;
-    }
+  private async tryPythonEdgeTts(text:string,audioOutPath:string,srtOutPath?:string):Promise<TtsTimingResult|undefined>{
+    try{
+      return await new Promise<TtsTimingResult>((resolve,reject)=>{
+        const child=spawn('python3',[fileURLToPath(new URL('../../scripts/edge-word-speech.py',import.meta.url))],{stdio:['pipe','pipe','pipe']});
+        let output='';const timer=setTimeout(()=>{child.kill();reject(new Error('Edge TTS timeout'));},20000);
+        child.stdout.on('data',c=>{output+=c.toString();});child.stderr.on('data',()=>{});
+        child.on('error',err=>{clearTimeout(timer);reject(err);});
+        child.on('close',code=>{clearTimeout(timer);try{if(code!==0)throw Error();const result=JSON.parse(output);if(!Array.isArray(result.words))throw Error();resolve(result);}catch{reject(new Error('Edge TTS word timing unavailable'));}});
+        child.stdin.on('error',()=>{});child.stdin.end(JSON.stringify({text,audio:audioOutPath,srt:srtOutPath,...this.cfg}));
+      });
+    }catch{return undefined;}
   }
 
   private async synthesizeWithRetry(
@@ -62,10 +47,10 @@ export class EdgeTtsClient implements TtsClient {
     audioOutPath: string,
     srtOutPath?: string,
   ): Promise<TtsTimingResult> {
-    const delays = [1000, 2000, 4000];
+    const delays = [1000];
     let lastErr: unknown;
 
-    for (let attempt = 0; attempt < 4; attempt++) {
+    for (let attempt = 0; attempt <= delays.length; attempt++) {
       try {
         const tts = new EdgeTTS(text, this.cfg.voice, {
           rate: this.cfg.rate ?? "+0%",
@@ -73,12 +58,10 @@ export class EdgeTtsClient implements TtsClient {
           volume: this.cfg.volume ?? "+0%",
         });
 
-        // Timeout of 3500ms to detect dead websocket / 403 hang in edge-tts-universal
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("EdgeTTS synthesize timeout")), 3500)
-        );
-
-        const result = await Promise.race([tts.synthesize(), timeoutPromise]);
+        let timer:ReturnType<typeof setTimeout>|undefined;
+        const timeoutPromise=new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(new Error('EdgeTTS synthesize timeout')),12000);});
+        let result:Awaited<ReturnType<EdgeTTS['synthesize']>>;
+        try{result=await Promise.race([tts.synthesize(),timeoutPromise]);}finally{clearTimeout(timer);}
         const buffer = Buffer.from(await result.audio.arrayBuffer());
         if (buffer.length === 0) {
           throw new Error("Edge TTS returned empty audio buffer");
@@ -109,11 +92,7 @@ export class EdgeTtsClient implements TtsClient {
         return { accuracy: "low", words: [] };
       } catch (e) {
         lastErr = e;
-        if (!process.env.VITEST) {
-          const pythonOk = await this.tryPythonEdgeTts(text, audioOutPath, srtOutPath);
-          if (pythonOk) return { accuracy: "low", words: [] };
-        }
-        if (attempt === delays.length) throw e;
+        if (attempt === delays.length) throw new Error(`EdgeTTS không tạo được audio: ${e instanceof Error?e.message:String(e)}`,{cause:e});
         await sleep(delays[attempt]);
       }
     }

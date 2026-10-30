@@ -537,3 +537,32 @@ Làm theo thứ tự: (1) viết test thất bại tái hiện lỗi; (2) tìm n
 ---
 
 **Gợi ý khi giao việc:** làm tuần tự, mở video thật sau mỗi milestone và xem bằng mắt (caption lệch, chữ tràn khung, âm lượng BGM) — test tự động không bắt được hết các lỗi hiển thị. Nếu agent báo một thông tin trong README không đúng với code, ưu tiên code và để M0 ghi lại.
+
+## Bổ sung đã thống nhất — Voice Studio (25/10/2026)
+
+Bản đầu mở rộng M5/M6: nhập voice MP3/WAV trên web; chọn provider/voice/speed và nghe thử; duyệt lời và chữ từng cảnh; một phong cách Tech Editorial 9:16 gần định hướng video mẫu. Không chuyển cả 15 demo trong giai đoạn này.
+
+Tiêu chí: upload được kiểm tra nội dung và giới hạn; giữ audio liên tục; mốc cảnh sửa được; có thể nhập SRT; timing ước lượng được thể hiện rõ; tốc độ tác động thật và không dùng cache cũ; JSON v1 vẫn chạy; TypeScript/test pass; render mới có video 1080×1920 và audio. Chi tiết quyết định ở docs/adr-voice-studio.md, hướng dẫn ở docs/huong-dan-voice-studio.md.
+
+### Bổ sung sau phản hồi hook/template
+
+Thêm lựa chọn hook trong bước duyệt và `motionPreset` tùy chọn Dynamic/Calm; hiệu ứng động seekable, sound design cục bộ bật/tắt. Fallback phải bám nguồn, không tự điền số liệu/tính năng quảng cáo; phân biệt AI với chế độ ghép nguồn. Script cũ không có trường mới giữ cách dựng trước đó. Nghiệm thu bằng test hồi quy, kiểm tra chọn hook trên browser và video render thật.
+
+
+### M5 bổ sung — tư liệu GitHub và bố cục chỉnh sửa (2026-10-26)
+- Tùy chọn voice.pronunciation original/lexicon, giữ nguyên thuật ngữ trong bản mới.
+- Thư viện raster/screenshot GitHub có provenance, logo người dùng chọn; đóng gói asset theo output.
+- Scene media presentation background/card/logo, workflow/code-window, palette midnight, catalogue và JSON editor từng bố cục, preview bố cục 3 giây/cảnh không voice.
+- Giữ HyperFrames; không tuyên bố nhập mọi repo Remotion. Xem docs/adr-visual-assets-and-templates.md.
+
+
+### M5 bổ sung — gallery phong cách và độ bao phủ kiến thức (2026-10-26)
+- Gallery 15 phong cách thích ứng từ mg-styles-15 + 2 native, poster nhẹ và một live preview renderer thực. Đổi pack giữ nguyên kịch bản.
+- Đọc README đầy đủ trong giới hạn, không cắt còn bốn câu, không bịa khi fetch thất bại.
+- Optional contentMode/targetDurationSec/coverage/templatePack; deep-dive tối đa 16 cảnh, legacy/overview vẫn tối đa 8.
+- Một hook chính, lựa chọn thay thế không bắt buộc số lượng. Coverage sáu khía cạnh và cảnh báo đối chiếu; không tuyên bố đã audit toàn bộ code.
+- Xem docs/adr-style-gallery.md và docs/huong-dan-chon-template.md.
+
+### Cập nhật theo yêu cầu chủ dự án — 2026-10-26
+
+Chế độ optional `directingMode: auto` cho 2–24 cảnh thay vì số cảnh cố định; checklist coverage không quyết định số cảnh. Thêm storyboard theo nguồn, native data-flow/worked-example/code highlight, đọc chọn lọc tài liệu repo, và `fitDuration` cân audio thật theo target. Mặc định Studio dùng từ điển, giữ nguyên chữ hiển thị, kênh DevPeek36 đọc “đép bít ba sáu”. Chi tiết: `docs/adr-repo-storyboard.md`.

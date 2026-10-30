@@ -1,3 +1,8 @@
+import {matchingGithubStars} from '../script/github-stars.js';
+import {renderReferenceScene} from './reference-scenes.js';
+import {referenceSettings,decorateReferenceBlocks} from './reference-design.js';
+import {sourceLabel} from "./source-label.js";
+import {packDecor,packVariables} from "./style-packs.js";
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,9 +22,9 @@ const VIGNETTE_HTML = `<div class="vignette"></div>`;
 
 // Default TikTok config (used if not passed)
 const DEFAULT_TIKTOK: TiktokConfig = {
-  displayName: "CườngIT",
-  handle: "@cuongit96",
-  followers: "2k followers",
+  displayName: "DevPeek36",
+  handle: "@DevPeek36",
+  followers: "",
 };
 
 export interface SceneAudio {
@@ -28,6 +33,8 @@ export interface SceneAudio {
 }
 
 export interface ComposeArgs {
+  /** Guides are editor-only. Omitted purpose always produces a clean export. */
+  purpose?: 'export' | 'preview';
   script: Script;
   sceneAudio: SceneAudio[];
   gapSec: number;
@@ -46,10 +53,13 @@ export interface ComposeArgs {
 }
 
 export function composeHtml(args: ComposeArgs): string {
-  const { script, sceneAudio, gapSec, bgImageRelPath, audioRelPath } = args;
+  const { sceneAudio, gapSec, bgImageRelPath, audioRelPath } = args;
+  const script:Script=args.script.templatePack || args.script.creative ? {...args.script,visualStyle:"tech-editorial",colorTheme:args.script.templatePack==="explainer"?"midnight":args.script.colorTheme} : args.script;
   const tiktok = args.tiktok ?? DEFAULT_TIKTOK;
   const tiktokAvatar = args.tiktokAvatarRelPath ?? "tiktok-avatar.jpg";
   const outroHoldSec = args.outroHoldSec ?? 3;
+  const logo = args.mediaMap?.__logo__;
+  const channelLogoPath = logo?.localRelPath || (script.metadata.channel.toLowerCase()==='devpeek36' ? tiktokAvatar : undefined);
 
   // Compute timing per scene. Outro scene gets extra HOLD seconds so the
   // TikTok follow card stays visible after the voice ends.
@@ -65,25 +75,52 @@ export function composeHtml(args: ComposeArgs): string {
   });
   const totalDuration = cursor;
 
+  const reference = referenceSettings(script);
+  const dynamic = !reference && script.visualStyle === "tech-editorial" && script.motionPreset === "dynamic";
+
   // Render scenes
-  const sceneHtml = timing.map(({ scene, start, duration }) => {
+  const sceneHtml = timing.map(({ scene, start, duration },sceneIndex) => {
+    scene={...scene,githubStarLeadIn:scene.templateData.template==='hook'&&Boolean(matchingGithubStars(script))};
     const mediaRecord = args.mediaMap?.[scene.id];
-    return renderScene(scene, start, duration, bgImageRelPath, tiktok, tiktokAvatar, mediaRecord);
+    const gallery=scene.templateData.template==='image-gallery'?scene.templateData.images.map((_,i)=>i===0&&mediaRecord?mediaRecord:args.mediaMap?.[`${scene.id}:gallery:${i}`]):[];
+    let sceneMarkup = reference ? renderReferenceScene({scene,start,duration,script,media:mediaRecord,gallery,channelLogoPath,tiktok}) : renderScene(scene, start, duration, bgImageRelPath, tiktok, tiktokAvatar, mediaRecord, script.visualStyle, dynamic, channelLogoPath,gallery);
+    if(!reference && script.templatePack && !['editorial','explainer'].includes(script.templatePack))sceneMarkup=sceneMarkup.replace(/(<div class="scene clip"[\s\S]*?>)/,'$1'+packDecor(script.templatePack));
+    if (dynamic) {
+      const index = sceneIndex;
+      const label = scene.type === 'hook' ? 'MỞ ĐẦU' : scene.type === 'outro' ? 'KẾT NỐI' : 'ĐIỂM CHÍNH';
+      const decor = `<div class="scene-kicker"><span class="kicker-dot"></span>${String(index+1).padStart(2,'0')} / ${String(script.scenes.length).padStart(2,'0')}<span class="kicker-label">${label}</span></div>
+        <div class="scene-ordinal">${String(index+1).padStart(2,'0')}</div><div class="motion-wipe"></div>
+        <div class="scene-progress"><div class="scene-progress-fill"></div></div>`;
+      sceneMarkup = sceneMarkup.replace(/(<div class="scene clip"[\s\S]*?>)/, '$1' + decor);
+    }
+    if(reference)sceneMarkup=decorateReferenceBlocks(sceneMarkup,scene,start,duration,args.captionCues||[],reference);
+    return sceneMarkup;
   }).join("\n");
 
+  // Optional user-selected logo is resolved locally by the media manager.
+  const logoHtml = channelLogoPath ? `<img class="project-logo" src="${escapeHtml(channelLogoPath)}" alt="Logo ${escapeHtml(script.metadata.channel)}" />` : '';
+
   // Persistent shell — uses tiktok handle in footer and avatar in header
-  const shellHtml = renderShell(script.metadata, tiktok, tiktokAvatar);
+  let shellHtml = script.visualStyle === 'tech-editorial'
+    ? `<div class="shell-bg"></div><div class="brand-shell-header">${logoHtml}<div class="brand-name">${escapeHtml(script.metadata.channel)}</div></div>${VIGNETTE_HTML}${GRAIN_OVERLAY_HTML}`
+    : renderShell(script.metadata, tiktok, logo?.localRelPath || tiktokAvatar);
+
+  if (dynamic) shellHtml += `<div class="motion-grid"></div><div class="motion-orb orb-one"></div><div class="motion-orb orb-two"></div>
+    <div class="motion-specks">${Array.from({length:12},(_,i)=>`<i style="left:${8+(i*29)%84}%;top:${15+(i*17)%66}%"></i>`).join('')}</div>
+    <div class="editorial-footer"><span>${escapeHtml(sourceLabel(script.metadata.source.domain))}</span><span>${escapeHtml(script.metadata.channel)}</span></div>`;
+
+  if(reference) shellHtml += `<div class="reference-specks" aria-hidden="true">${Array.from({length:36},(_,i)=>`<i style="left:${(i*37+5)%96}%;top:${(i*23+7)%96}%;width:${4+i%4*2}px;height:${4+i%4*2}px;--particle:${["#8ad8bf","#8a9fd0","#a48acb","#e3bc73"][i%4]}"></i>`).join('')}</div><div class="reference-topline"></div><div class="reference-footer">${escapeHtml(script.metadata.channel)}</div>`;
 
   // Render optional captions layer (M1)
   const captionsEnabled = script.captions?.enabled ?? false;
   let captionsHtml = "";
   if (captionsEnabled && args.captionCues && args.captionCues.length > 0) {
     const style = script.captions?.style ?? "tiktok-bold";
-    captionsHtml = renderCaptions(args.captionCues, style);
+    captionsHtml = renderCaptions(args.captionCues, style, script.captions?.highlightMode);
   }
 
-  // Render optional safe-zone overlay (M5)
-  const safeZoneHtml = script.metadata.safeZoneOverlay
+  // Saved/generated metadata must never burn editor guides into an MP4.
+  const safeZoneHtml = args.purpose === 'preview' && script.metadata.safeZoneOverlay
     ? `<div id="safe-zone-overlay">
   <div class="safe-zone-guide-label top">TOP SAFE (150px)</div>
   <div class="safe-zone-guide-label right">ACTIONS SAFE (120px)</div>
@@ -91,10 +128,17 @@ export function composeHtml(args: ComposeArgs): string {
 </div>`
     : "";
 
+  const referenceCss = reference ? `<style>${readFileSync(join(TPL_DIR,'styles.reference.css'),'utf8')}</style>` : '';
   const animJs = readFileSync(join(TPL_DIR, "animations.js"), "utf8");
 
   const tpl = readFileSync(join(TPL_DIR, "base.html.tmpl"), "utf8");
-  return tpl
+  const base = script.visualStyle === 'tech-editorial'
+    ? tpl.replace(/<link[^>]+(?:fonts.googleapis.com|fonts.gstatic.com)[^>]*>/g, '')
+      .replace('https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js', 'gsap.min.js')
+    : tpl;
+  return base.replace('</head>',referenceCss+'</head>')
+    .replace('<body>', script.visualStyle === 'tech-editorial' ? `<body class="tech-editorial${reference ? " reference-design" : ""}${dynamic ? " motion-dynamic" : ""}${script.colorTheme === "midnight" ? " theme-midnight" : ""}${script.templatePack ? " pack-active pack-"+script.templatePack : ""}">` : '<body>')
+    .replace('<body class="', script.templatePack ? `<body style="${packVariables(script.templatePack)}" class="` : '<body class="')
     .replace("{{TITLE}}", escapeHtml(script.metadata.title))
     .replace(/\{\{TOTAL_DURATION\}\}/g, totalDuration.toFixed(2))
     .replace("{{SHELL}}", shellHtml)
@@ -105,13 +149,13 @@ export function composeHtml(args: ComposeArgs): string {
 }
 
 // ── CAPTIONS LAYER (M1) ────────────────────────────────────────────────────
-function renderCaptions(cues: CaptionCue[], style: string): string {
+function renderCaptions(cues: CaptionCue[], style: string, highlightMode?:string): string {
   return `
 <!-- Captions layer (M1) -->
 <div class="captions-container caption-style-${escapeHtml(style)}">
   ${cues.map((cue) => {
     const cueDur = (cue.endSec - cue.startSec).toFixed(3);
-    return `  <div class="caption-cue clip" data-start="${cue.startSec.toFixed(3)}" data-duration="${cueDur}">
+    return `  <div class="caption-cue clip" data-start="${cue.startSec.toFixed(3)}" data-duration="${cueDur}" data-accuracy="${cue.accuracy ?? "low"}" data-highlight-mode="${highlightMode||"accurate-only"}">
     ${cue.words.map((w) => {
       const wStart = (w.startMs / 1000).toFixed(3);
       const wDur = Math.max(0.05, (w.endMs - w.startMs) / 1000).toFixed(3);
@@ -125,7 +169,7 @@ function renderCaptions(cues: CaptionCue[], style: string): string {
 // ── PERSISTENT SHELL ───────────────────────────────────────────────────────
 function renderShell(metadata: Script["metadata"], tiktok: TiktokConfig, avatarRelPath: string = "tiktok-avatar.jpg"): string {
   const channel = escapeHtml(metadata.channel);
-  const domain = escapeHtml(metadata.source.domain);
+  const domain = escapeHtml(sourceLabel(metadata.source.domain));
   const handle = escapeHtml(tiktok.handle);
   return `
 <!-- Shell: persistent brand elements (no data-start → always visible) -->
@@ -160,6 +204,10 @@ function renderScene(
   tiktok: TiktokConfig,
   tiktokAvatarRelPath: string,
   mediaRecord?: MediaAssetRecord,
+  visualStyle?: Script["visualStyle"],
+  dynamic = false,
+  channelLogoPath?: string,
+  galleryRecords: (MediaAssetRecord|undefined)[] = [],
 ): string {
   const td = scene.templateData;
 
@@ -167,8 +215,22 @@ function renderScene(
   let layoutName: string;
 
   switch (td.template) {
+    case "data-flow":
+      inner = `<div class="explainer-content semantic-content"><h2 class="explainer-title">${escapeHtml(td.title)}</h2><div class="semantic-flow">${td.nodes.map((node,i)=>`<div class="semantic-node"><span class="semantic-step">${String(i+1).padStart(2,'0')}</span><strong>${escapeHtml(node.label)}</strong><p>${escapeHtml(node.detail)}</p></div>${i<td.nodes.length-1?'<div class="semantic-link"><span>↓</span><i></i></div>':''}`).join('')}</div>${td.caption?`<p class="semantic-caption">${escapeHtml(td.caption)}</p>`:''}</div>`;
+      layoutName="data-flow";break;
+    case "worked-example":
+      inner = `<div class="explainer-content semantic-content"><h2 class="explainer-title">${escapeHtml(td.title)}</h2><div class="example-label">${td.basis==='conceptual'?'MINH HỌA KHÁI NIỆM':'VÍ DỤ TRONG TÀI LIỆU · CHƯA CHẠY KIỂM CHỨNG'}</div><div class="example-card semantic-node"><span>INPUT</span><pre>${escapeHtml(td.input)}</pre></div><div class="example-operation semantic-node">${escapeHtml(td.operation)}</div><div class="example-card semantic-node"><span>OUTPUT</span><pre>${escapeHtml(td.output)}</pre></div></div>`;
+      layoutName="worked-example";break;
+    case "workflow":
+      inner = `<div class="explainer-content"><h2 class="explainer-title">${escapeHtml(td.title)}</h2><div class="workflow-stack">${td.steps.map((step,i)=>`<div class="workflow-step"><span class="workflow-number">${String(i+1).padStart(2,'0')}</span><div><strong>${escapeHtml(step.label)}</strong><p>${escapeHtml(step.detail)}</p></div></div>${i<td.steps.length-1?'<div class="workflow-connector">↓</div>':''}`).join('')}</div></div>`;
+      layoutName = "workflow";
+      break;
+    case "code-window":
+      inner = `<div class="explainer-content"><h2 class="explainer-title">${escapeHtml(td.title)}</h2><div class="code-window"><div class="code-toolbar"><i></i><i></i><i></i><span>${escapeHtml(td.language)}</span></div><pre>${td.code.split('\n').map((line,i)=>`<span class="code-line${td.highlightLines?.includes(i+1)?" code-highlight":""}"><b>${i+1}</b><code>${escapeHtml(line)||' '}</code></span>`).join('')}</pre></div>${td.note?`<p class="code-note">${escapeHtml(td.note)}</p>`:''}</div>`;
+      layoutName = "code-window";
+      break;
     case "hook":
-      inner = renderHookInner(td, bgImageRelPath);
+      inner = renderHookInner(td, bgImageRelPath, dynamic);
       layoutName = "hook";
       break;
     case "comparison":
@@ -188,7 +250,7 @@ function renderScene(
       layoutName = "callout";
       break;
     case "outro":
-      inner = renderOutroInner(td, tiktok, tiktokAvatarRelPath);
+      inner = renderOutroInner(td, {...tiktok,displayName:td.channelName,handle:"@"+td.channelName.replace(/^@/,"")}, channelLogoPath);
       layoutName = "outro";
       break;
     case "spec-table":
@@ -208,11 +270,11 @@ function renderScene(
       layoutName = "price-tag";
       break;
     case "image-gallery":
-      inner = renderImageGalleryInner(td);
+      inner = renderImageGalleryInner(td,galleryRecords);
       layoutName = "image-gallery";
       break;
     case "phone-mockup":
-      inner = renderPhoneMockupInner(td);
+      inner = renderPhoneMockupInner(td,mediaRecord);
       layoutName = "phone-mockup";
       break;
     default: {
@@ -221,11 +283,21 @@ function renderScene(
     }
   }
 
-  return buildScene(scene, start, duration, layoutName, inner, mediaRecord);
+  if (dynamic && td.template === 'stat-hero') {
+    const valueTag = '<div class="stat-value shimmer-sweep-target">';
+    inner = inner.replace(valueTag + escapeHtml(td.value), valueTag + Array.from(td.value).map(c => `<span class="stat-digit">${escapeHtml(c)}</span>`).join(''));
+    inner += '<div class="stat-orbit orbit-a"></div><div class="stat-orbit orbit-b"></div>';
+  }
+  if (dynamic && td.template === 'feature-list') {
+    let index = 0;
+    inner = inner.replace(/<div class="feat-dot"><\/div>/g, () => `<div class="feature-index">${String(++index).padStart(2,'0')}</div>`);
+  }
+  if (dynamic && td.template === 'outro') inner += '<div class="out-arrow">↗</div>';
+  return buildScene(scene, start, duration, layoutName, inner, ['phone-mockup','image-gallery'].includes(td.template)?undefined:mediaRecord);
 }
 
 // ── HOOK SCENE ─────────────────────────────────────────────────────────────
-function renderHookInner(td: Extract<TemplateDataType, { template: "hook" }>, bgImageRelPath: string | null): string {
+function renderHookInner(td: Extract<TemplateDataType, { template: "hook" }>, bgImageRelPath: string | null, dynamic = false): string {
   // Background
   const hasImage = Boolean(td.bgSrc && bgImageRelPath);
   let bgHtml: string;
@@ -241,7 +313,8 @@ function renderHookInner(td: Extract<TemplateDataType, { template: "hook" }>, bg
   // black scrim on top of them just muddies the theme's colors (esp. light-pro).
   const overlayHtml = hasImage ? `<div class="overlay" style="opacity: 0.55"></div>` : "";
 
-  const headline = escapeHtml(td.headline);
+  const tokens = td.headline.trim().split(/\s+/);
+  const headline = dynamic ? tokens.map((word,i) => `<span class="hook-word${i >= tokens.length-2 ? ' word-accent' : ''}"><span class="hook-word-text">${escapeHtml(word)}</span>${i >= tokens.length-2 ? '<span class="word-swipe"></span>' : ''}</span>`).join(' ') : escapeHtml(td.headline);
   const subhead = td.subhead ? escapeHtml(td.subhead) : "";
 
   return `${bgHtml}
@@ -321,15 +394,16 @@ function renderCalloutInner(td: Extract<TemplateDataType, { template: "callout" 
 function renderOutroInner(
   td: Extract<TemplateDataType, { template: "outro" }>,
   tiktok: TiktokConfig,
-  avatarRelPath: string,
+  avatarRelPath: string | undefined,
+  showCard = true,
 ): string {
-  const ttCard = renderTiktokCard(tiktok, avatarRelPath);
+  const ttCard = showCard ? renderTiktokCard(tiktok, avatarRelPath) : "";
   return `
 <div class="layout-outro">
   <div class="out-cta-top">${escapeHtml(td.ctaTop)}</div>
   <div class="out-channel">${escapeHtml(td.channelName)}</div>
   <div class="out-underline"></div>
-  <div class="out-source">Nguồn: ${escapeHtml(td.source)}</div>
+  <div class="out-source">Nguồn: ${escapeHtml(sourceLabel(td.source))}</div>
 </div>
 ${ttCard}`.trim();
 }
@@ -412,7 +486,7 @@ function renderPriceTagInner(td: Extract<TemplateDataType, { template: "price-ta
 }
 
 // ── IMAGE GALLERY SCENE (M3) ───────────────────────────────────────────────
-function renderImageGalleryInner(td: Extract<TemplateDataType, { template: "image-gallery" }>): string {
+function renderImageGalleryInner(td: Extract<TemplateDataType, { template: "image-gallery" }>,records:(MediaAssetRecord|undefined)[]): string {
   const titleHtml = td.title ? `<div class="gallery-title">${escapeHtml(td.title)}</div>` : "";
   return `
 <div class="layout-image-gallery">
@@ -420,7 +494,7 @@ function renderImageGalleryInner(td: Extract<TemplateDataType, { template: "imag
   <div class="gallery-items count-${td.images.length}">
     ${td.images.map((img, idx) => `
     <div class="gallery-card gallery-card-${idx}">
-      <img class="gallery-img" src="${escapeHtml(img.src)}" alt="" />
+      ${records[idx]?`<img class="gallery-img" src="${escapeHtml(records[idx]!.localRelPath)}" alt="${escapeHtml(img.caption||td.title||'Ảnh minh họa')}" />`:'<div class="image-unavailable">Ảnh minh họa chưa sẵn sàng</div>'}
       ${img.caption ? `<div class="gallery-caption">${escapeHtml(img.caption)}</div>` : ""}
     </div>`).join("\n    ")}
   </div>
@@ -428,19 +502,22 @@ function renderImageGalleryInner(td: Extract<TemplateDataType, { template: "imag
 }
 
 // ── PHONE MOCKUP SCENE (M3) ────────────────────────────────────────────────
-function renderPhoneMockupInner(td: Extract<TemplateDataType, { template: "phone-mockup" }>): string {
+function renderPhoneMockupInner(td: Extract<TemplateDataType, { template: "phone-mockup" }>,record?:MediaAssetRecord): string {
   const titleHtml = td.title ? `<div class="mockup-title">${escapeHtml(td.title)}</div>` : "";
   const captionHtml = td.caption ? `<div class="mockup-caption">${escapeHtml(td.caption)}</div>` : "";
+  const wide=record?.width&&record?.height&&record.width>record.height;
+  const frameStyle=wide?` style="width:880px;height:${Math.max(300,Math.min(720,Math.round(880*record!.height!/record!.width!)))}px"`:'';
   return `
 <div class="layout-phone-mockup">
   ${titleHtml}
-  <div class="phone-frame">
+  <div class="phone-frame${wide?' desktop-frame':''}${!record?' image-unavailable':''}"${frameStyle}>
     <div class="phone-island"></div>
     <div class="phone-screen">
-      <img class="phone-screen-img" src="${escapeHtml(td.screenSrc)}" alt="" />
+      ${record?`<img class="phone-screen-img" src="${escapeHtml(record.localRelPath)}" alt="${escapeHtml(td.title||'Giao diện minh họa')}" />`:'<div class="image-unavailable">Ảnh minh họa chưa sẵn sàng</div>'}
     </div>
   </div>
   ${captionHtml}
+  ${record?.credit?`<p class="mockup-source">${escapeHtml(sourceLabel(record.credit))}</p>`:''}
 </div>`.trim();
 }
 
@@ -449,13 +526,13 @@ function renderPhoneMockupInner(td: Extract<TemplateDataType, { template: "phone
  * Slides up from bottom mid-outro. Animations are added by animations.js
  * targeting elements with id="tt-card", id="tt-follow-btn", etc.
  */
-function renderTiktokCard(tiktok: TiktokConfig, avatarRelPath: string): string {
+function renderTiktokCard(tiktok: TiktokConfig, avatarRelPath?: string): string {
   const followersHtml = tiktok.followers && tiktok.followers.trim() !== ""
     ? `\n    <div class="tt-followers">${escapeHtml(tiktok.followers)}</div>`
     : "";
   return `
 <div id="tt-card" class="tt-card">
-  <img class="tt-avatar" src="${escapeHtml(avatarRelPath)}" alt="${escapeHtml(tiktok.displayName)}" crossorigin="anonymous" />
+  ${avatarRelPath ? `<img class="tt-avatar tt-logo" src="${escapeHtml(avatarRelPath)}" alt="Logo ${escapeHtml(tiktok.displayName)}" />` : `<div class="tt-avatar tt-monogram" aria-label="Biểu tượng kênh">${escapeHtml(tiktok.displayName.slice(0,2).toUpperCase())}</div>`}
   <div class="tt-profile-info">
     <div class="tt-display-name">${escapeHtml(tiktok.displayName)}</div>
     <div class="tt-handle">${escapeHtml(tiktok.handle)}</div>${followersHtml}
@@ -463,10 +540,12 @@ function renderTiktokCard(tiktok: TiktokConfig, avatarRelPath: string): string {
   <div id="tt-follow-btn" class="tt-follow-btn">
     <span id="tt-btn-follow" class="tt-btn-text">Follow</span>
     <span id="tt-btn-following" class="tt-btn-text tt-btn-text-following">
-      <span>Following</span>
+      <span>Đã theo dõi</span>
       <span class="tt-check-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
     </span>
   </div>
+  <span class="tt-click-ring" aria-hidden="true"></span>
+  <svg class="tt-cursor" aria-hidden="true" viewBox="0 0 48 64"><path d="M5 3 L5 49 L17 38 L28 60 L38 55 L27 34 L44 33 Z" fill="#fff" stroke="#132333" stroke-width="4" stroke-linejoin="round"/></svg>
 </div>`.trim();
 }
 
@@ -498,8 +577,12 @@ function buildScene(
     }
   }
 
-  const creditHtml = mediaRecord?.credit
-    ? `<div class="media-credit-badge">Nguồn: ${escapeHtml(mediaRecord.credit)}</div>`
+  const presentation = mediaRecord?.presentation || 'background';
+  if (mediaRecord && presentation !== 'background') {
+    mediaHtml = `<div class="visual-asset visual-${presentation}"><div class="visual-browser-bar"><i></i><i></i><i></i><span>${escapeHtml(sourceLabel(mediaRecord.credit || mediaRecord.originalSrc || 'Tư liệu nguồn'))}</span></div><img src="${escapeHtml(mediaRecord.localRelPath)}" alt="Tư liệu minh họa" /></div>`;
+  }
+  const creditHtml = mediaRecord?.credit && !['card','logo'].includes(mediaRecord.presentation || 'background')
+    ? `<div class="media-credit-badge">Nguồn: ${escapeHtml(sourceLabel(mediaRecord.credit))}</div>`
     : "";
 
   const transType = scene.transition?.type || "cut";
@@ -508,7 +591,7 @@ function buildScene(
   return `
 <div class="scene clip" id="scene-${scene.id}"
      data-start="${start.toFixed(2)}" data-duration="${duration.toFixed(2)}" data-active="0"
-     data-layout="${layoutName}"
+     data-layout="${layoutName}" data-media="${presentation}"
      data-transition="${transType}"
      data-transition-duration="${transDur.toFixed(2)}">
   ${mediaHtml}

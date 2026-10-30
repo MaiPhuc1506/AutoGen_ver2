@@ -1,0 +1,283 @@
+--- /dev/null
++++ b/docs/adr-github-star-hook.md
+@@ -0,0 +1,26 @@
++# Hook mở bằng số sao GitHub
++
++Theo yêu cầu người dùng, hook repo mở bằng **số lượng sao GitHub**, không phải điểm đánh giá 5 sao.
++
++- Badge vàng xuất hiện ở 0,03 giây; ngôi sao xoay/bật sáng, tia sáng bật rồi tắt; số tăng qua 13 bước seek được, chốt khoảng 0,9 giây. Logo bắt đầu ở 0,9 giây, tên ở 1,05 giây, pill repo 1,15 và lợi ích 1,3 giây. Mốc chỉnh tay vẫn được ưu tiên.
++- Đọc `stargazers_count` từ `https://api.github.com/repos/owner/repo`; chỉ nhận số nguyên không âm và `full_name` khớp repo. Không lấy số trong README/badge hay câu trả lời của LLM.
++- Snapshot tùy chọn `metadata.githubStars={repoUrl,count,fetchedAt}` lưu nguồn và thời điểm. Số hiển thị rút gọn K/M, số gốc vẫn giữ trong JSON. Badge ghi ngày cập nhật.
++- Server tạo bản nháp và pipeline render đọc số thật. Render cập nhật snapshot trong script; rerender dùng snapshot đã lưu để tái lập video. Nếu API lỗi/rate limit hoặc nguồn không phải repo GitHub, ẩn badge; không bịa số.
++- `githubStarLeadIn` tùy chọn trên scene phục vụ block-plan; composer suy ra từ snapshot khớp repo, không tin cờ này để hiển thị số. Timing có ID `stars`, sửa được như các block khác.
++- Dự án không có snapshot giữ hook cũ. Không thêm dependency hoặc thay đổi stack. Lời đọc giữ cho người dùng biên tập; badge không tự chèn câu mới vào lời đã duyệt/audio tải lên.
++
++## Kiểm chứng
++
++`src/script/github-stars.test.ts`: HTTP reader giả kiểm tra count thật/0, sai repo, số âm/số lẻ/string, API lỗi và URL không hợp lệ; renderer kiểm tra snapshot đúng nguồn, count 12.3K, stable ID và badge trước tên, đường dựng legacy.
++
++Clip `output/github-stars-hook-validation/video.mp4` dùng repo GSAP với snapshot GitHub API lưu ở `github-stars.json`; đây là clip minh họa tính năng hook, không đổi nội dung video trước. Lời mở “Hơn 29 nghìn sao…” dựa vào snapshot 29.883 sao ngày 29/10/2026. Không coi giá trị này là số hiện tại cho mọi lần dựng sau.
++
++## Kết quả thực tế
++
++- `npx tsc --noEmit`: exit0.
++- `npm test`: 48 files / 231 tests passed, exit0 (16,94 giây).
++- Kiểm tra cú pháp JS và `git diff --check`: exit0.
++- MP4 cuối: 1080×1920, 30fps, có audio, 10,433333 giây; xác minh độc lập bằng ffprobe trước khi thay clip thử cũ.
++- Xem khung 0,2 / 0,55 / 0,95 / 1,6 giây: số tăng trước, sao sáng rồi tới logo/tên; đã sửa khoảng trống để count và nhãn không chồng chữ. Bằng chứng `star-animation.jpg`, `hook-3.png` cạnh MP4; tests.log/typecheck.log/render.log/ffprobe.json lưu cùng thư mục.
++- Lần render hai worker sau khi sửa CSS bị timeout khi khởi động Chrome ở một worker. Xuất lại bằng một worker thành công (80,1 giây). Đây là lỗi hạ tầng render đã khắc phục trong lần kiểm chứng, không tăng timeout hoặc bỏ kiểm tra.
++- Chưa nghe/duyệt độ khớp âm từng từ; provider trả timing low. Không thêm dependency, không commit. Diff lượt này: `docs/github-star-hook-changes.patch`.
+--- a/public/app.js
++++ b/public/app.js
+@@ -1034,7 +1034,7 @@
+         inspectorSceneType.textContent = scene.type;
+         inspectorVoiceText.value = scene.voiceText;
+         const timingHost=document.getElementById('inspectorBlockTiming');
+-        if(timingHost){const panel=document.createElement('div');timingHost.replaceChildren(panel);window.Studio?.blockTimingEditor(panel,scene).catch(err=>{panel.textContent=err.message;});}
++        if(timingHost){const panel=document.createElement('div');timingHost.replaceChildren(panel);window.Studio?.blockTimingEditor(panel,Object.assign(scene,{githubStarLeadIn:scene.type==='hook'&&Boolean(currentProject.script.metadata.githubStars)})).catch(err=>{panel.textContent=err.message;});}
+         inspectorTemplate.value = scene.templateData.template;
+         inspectorDuration.value = foundClip.duration.toFixed(1);
+         metaSceneId.textContent = scene.id;
+--- a/public/studio.js
++++ b/public/studio.js
+@@ -187,6 +187,7 @@
+   }
+   function showReview(script, callback) {
+     pending = script;
++    script.scenes.forEach(scene=>{if(scene.templateData.template==='hook')scene.githubStarLeadIn=Boolean(script.metadata.githubStars);});
+     el('studioPronunciationReview').hidden=Boolean(script.voice.uploadId);
+     el('studioPronunciationOverrides').value=JSON.stringify(script.voice.pronunciationOverrides||{},null,2);
+     if(!script.voice.uploadId)refreshPronunciation(script).catch(err=>{el('studioPronunciationReport').textContent=err.message;});
+@@ -202,6 +203,9 @@
+       const label=document.createElement('label');label.textContent='Nhấn từ phụ đề';
+       const select=document.createElement('select');select.add(new Option('Cho phép nhịp ước lượng khi TTS thiếu mốc từ','estimated'));select.add(new Option('Chỉ nhấn khi có mốc từ chính xác','accurate-only'));
+       select.value=script.captions?.highlightMode||'accurate-only';select.addEventListener('change',()=>{script.captions ||= {enabled:true,style:'minimal'};script.captions.highlightMode=select.value;});el('studioReviewList').append(label,select);
++    }
++    if(script.metadata.githubStars){
++      const stars=document.createElement('p');stars.className='hint';stars.textContent='★ '+script.metadata.githubStars.count.toLocaleString('vi-VN')+' sao GitHub · '+new Date(script.metadata.githubStars.fetchedAt).toLocaleDateString('vi-VN')+' · Huy hiệu sao hiện trước logo và tên sản phẩm. Số sao được lấy lại khi render.';el('studioReviewList').append(stars);
+     }
+     const weights = script.scenes.map(s => s.voiceText.split(/\s+/).length);
+     const total = weights.reduce((a,b) => a+b, 0);
+--- a/src/pipeline.ts
++++ b/src/pipeline.ts
+@@ -1,3 +1,4 @@
++import {hydrateGithubStars} from './script/github-stars.js';
+ import {referenceSettings} from './render/reference-design.js';
+ import {pronunciationReport} from "./tts/lexicon.js";
+ import {stripCssImports} from "./render/css.js";
+@@ -76,6 +77,12 @@
+       : cfg.vbeeVoiceCode;
+   }
+   const script: Script = ScriptSchema.parse(raw);
++  await hydrateGithubStars(script);
++  if(referenceSettings(script)){
++    if(script.metadata.githubStars)raw.metadata.githubStars=script.metadata.githubStars;else delete raw.metadata.githubStars;
++    for(const scene of raw.scenes)if(scene.templateData.template==='hook')scene.githubStarLeadIn=Boolean(script.metadata.githubStars);
++    await writeFile(scriptPath,JSON.stringify(raw,null,2));
++  }
+   script.bgm ??= {...DEFAULT_BGM};
+   if(referenceSettings(script))script.visualStyle='tech-editorial';
+   if(script.templatePack){script.visualStyle="tech-editorial";if(script.templatePack==="explainer")script.colorTheme="midnight";}
+--- a/src/render/html-composer.ts
++++ b/src/render/html-composer.ts
+@@ -1,3 +1,4 @@
++import {matchingGithubStars} from '../script/github-stars.js';
+ import {renderReferenceScene} from './reference-scenes.js';
+ import {referenceSettings,decorateReferenceBlocks} from './reference-design.js';
+ import {sourceLabel} from "./source-label.js";
+@@ -78,13 +79,14 @@
+   const dynamic = !reference && script.visualStyle === "tech-editorial" && script.motionPreset === "dynamic";
+ 
+   // Render scenes
+-  const sceneHtml = timing.map(({ scene, start, duration }) => {
++  const sceneHtml = timing.map(({ scene, start, duration },sceneIndex) => {
++    scene={...scene,githubStarLeadIn:scene.templateData.template==='hook'&&Boolean(matchingGithubStars(script))};
+     const mediaRecord = args.mediaMap?.[scene.id];
+     const gallery=scene.templateData.template==='image-gallery'?scene.templateData.images.map((_,i)=>i===0&&mediaRecord?mediaRecord:args.mediaMap?.[`${scene.id}:gallery:${i}`]):[];
+     let sceneMarkup = reference ? renderReferenceScene({scene,start,duration,script,media:mediaRecord,gallery,channelLogoPath,tiktok}) : renderScene(scene, start, duration, bgImageRelPath, tiktok, tiktokAvatar, mediaRecord, script.visualStyle, dynamic, channelLogoPath,gallery);
+     if(!reference && script.templatePack && !['editorial','explainer'].includes(script.templatePack))sceneMarkup=sceneMarkup.replace(/(<div class="scene clip"[\s\S]*?>)/,'$1'+packDecor(script.templatePack));
+     if (dynamic) {
+-      const index = script.scenes.indexOf(scene);
++      const index = sceneIndex;
+       const label = scene.type === 'hook' ? 'MỞ ĐẦU' : scene.type === 'outro' ? 'KẾT NỐI' : 'ĐIỂM CHÍNH';
+       const decor = `<div class="scene-kicker"><span class="kicker-dot"></span>${String(index+1).padStart(2,'0')} / ${String(script.scenes.length).padStart(2,'0')}<span class="kicker-label">${label}</span></div>
+         <div class="scene-ordinal">${String(index+1).padStart(2,'0')}</div><div class="motion-wipe"></div>
+--- a/src/render/reference-design.ts
++++ b/src/render/reference-design.ts
+@@ -37,6 +37,7 @@
+ export function sceneBlocks(scene:SceneType):SceneBlock[]{
+   const td=scene.templateData,blocks:SceneBlock[]=[];
+   const add=(id:string,selector:string,text:string,index=0)=>blocks.push({id,selector,index,text});
++  if(scene.githubStarLeadIn&&td.template==='hook')add('stars','ref-github-stars','Số sao GitHub');
+   switch(td.template){
+     case 'hook':add('heading','hook-headline',td.hero?.name||td.headline);if(td.hero?.after||td.hero?.before||td.subhead)add('benefit','hook-subhead',[td.hero?.before,td.hero?.after||td.subhead].filter(Boolean).join(' '));break;
+     case 'feature-list':add('heading','feat-title',td.title);td.bullets.forEach((s,i)=>add('item-'+i,'feat-bullet',s,i));break;
+@@ -65,14 +66,14 @@
+   const setting=scene.blockTiming?.[block.id];
+   const clamp=(sec:number)=>Math.max(0,Math.min(sec,Math.max(0,duration-profile.entranceSec-Math.min(.38,duration*.14))));
+   if(setting?.atSec!==undefined)return {atSec:clamp(setting.atSec),basis:'manual' as const};
+-  if(scene.type==='hook'&&scene.templateData.template==='hook'&&scene.templateData.hero&&!setting?.phrase)return {atSec:clamp(block.id==='heading'?.34:block.id==='benefit'?.55:.16),basis:'estimated' as const};
++  if(scene.type==='hook'&&scene.templateData.template==='hook'&&scene.templateData.hero&&!setting?.phrase)return {atSec:clamp(block.id==='stars'?.03:block.id==='heading'?(scene.githubStarLeadIn?1.05:.34):block.id==='benefit'?(scene.githubStarLeadIn?1.3:.55):(scene.githubStarLeadIn?.9:.16)),basis:'estimated' as const};
+   const words=cues.filter(c=>c.accuracy==='high').flatMap(c=>c.words).filter(w=>w.startMs>=start*1000&&w.startMs<(start+duration)*1000);
+   const tokens=words.map(w=>normalize(w.text));
+   const target=normalize(setting?.phrase||block.text).split(' ').filter(Boolean).slice(0,setting?.phrase?40:3);
+   if(target.length>=(setting?.phrase?1:2)){let seen=0;for(let i=0;i<tokens.length;i++){
+     if(target.every((t,k)=>tokens[i+k]===t)&&++seen===(setting?.occurrence||1))return {atSec:clamp(words[i].startMs/1000-start-0.04),basis:'word' as const};
+   }}
+-  if(scene.type==='hook')return {atSec:clamp(block.id==='heading'?.34:block.id==='benefit'?.55:.16),basis:'estimated' as const};
++  if(scene.type==='hook')return {atSec:clamp(block.id==='stars'?.03:block.id==='heading'?(scene.githubStarLeadIn?1.05:.34):block.id==='benefit'?(scene.githubStarLeadIn?1.3:.55):(scene.githubStarLeadIn?.9:.16)),basis:'estimated' as const};
+   return {atSec:clamp(block.id==='media'?0.08:index===0?0.04:Math.min(duration*.65,0.2+index*profile.fallbackStepSec)),basis:'estimated' as const};
+ }
+ 
+--- a/src/render/reference-scenes.ts
++++ b/src/render/reference-scenes.ts
+@@ -1,10 +1,11 @@
++import {matchingGithubStars,formatGithubStars} from '../script/github-stars.js';
+ import type {Script,SceneType} from './script-schema.js';
+ import type {MediaAssetRecord} from '../media/media-manager.js';
+ import type {TiktokConfig} from '../config.js';
+ import {sourceLabel} from './source-label.js';
+ const e=(s:string)=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+ const svg=(path:string)=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${path}</svg>`;
+-const icons={play:svg('<path d="m9 6 9 6-9 6Z"/>'),check:svg('<path d="m5 12 4 4L20 5"/>'),flow:svg('<rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/><path d="M14 6h4v8M6 10v8h8"/>'),bolt:svg('<path d="m13 2-9 12h7l-1 8 10-13h-7Z"/>'),code:svg('<path d="m8 6-6 6 6 6m8-12 6 6-6 6m-3-16-2 20"/>'),warn:svg('<path d="m12 3 10 18H2L12 3Z"/><path d="M12 9v4m0 4h.01"/>'),arrow:svg('<path d="M3 12h18m-6-6 6 6-6 6"/>')};
++const icons={star:svg('<path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8-6.2-3.2-6.2 3.2L7 14.2l-5-4.9 6.9-1L12 2Z"/>'),play:svg('<path d="m9 6 9 6-9 6Z"/>'),check:svg('<path d="m5 12 4 4L20 5"/>'),flow:svg('<rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/><path d="M14 6h4v8M6 10v8h8"/>'),bolt:svg('<path d="m13 2-9 12h7l-1 8 10-13h-7Z"/>'),code:svg('<path d="m8 6-6 6 6 6m8-12 6 6-6 6m-3-16-2 20"/>'),warn:svg('<path d="m12 3 10 18H2L12 3Z"/><path d="M12 9v4m0 4h.01"/>'),arrow:svg('<path d="M3 12h18m-6-6 6 6-6 6"/>')};
+ const heading=(cls:string,text:string)=>`<h2 class="ref-section-title ${cls}">${e(text)}</h2>`;
+ const row=(cls:string,label:string,detail:string,index:number,tone='mint')=>`<div class="ref-row ${cls} ref-${tone}"><span class="ref-row-icon">${index===0?icons.flow:index===1?icons.check:icons.bolt}</span><div class="ref-row-copy"><strong>${e(label)}</strong>${detail?`<p>${e(detail)}</p>`:''}</div><span class="ref-status"><i></i>${String(index+1).padStart(2,'0')}</span></div>`;
+ const cell=(cls:string,label:string,value:string,tone='mint')=>`<div class="ref-cell ${cls} ref-${tone}"><small>${e(label)}</small><strong>${e(value)}</strong></div>`;
+@@ -24,7 +25,9 @@
+  switch(td.template){
+  case 'hook':{
+   const hero=referenceHero(script,td),logo=media?.presentation==='logo'?media:undefined;
+-  inner=`<div class="ref-hook"><div class="ref-glass ${logo?'visual-asset':''}" data-ref-enter="0.16"><div class="ref-glass-halo"></div><i class="ref-scratch scratch-one"></i><i class="ref-scratch scratch-two"></i><i class="ref-scratch scratch-three"></i><div class="ref-product-icon">${logo?`<img src="${e(logo.localRelPath)}" alt="${e(hero.name)}"/>`:`<div class="ref-original-mark"><i></i><i></i><span>${icons.play}</span></div>`}</div><span class="ref-category">${e(hero.category)}</span></div><h1 class="ref-product-name hook-headline">${e(hero.name)}</h1>${hero.repository?`<div class="ref-repo-pill" data-ref-enter="0.5">${icons.code}<span>${e(hero.repository)}</span></div>`:''}${hero.after||hero.before?`<div class="ref-benefit hook-subhead">${hero.before?`<span>${e(hero.before)}</span><b>${icons.arrow}</b>`:''}<strong>${e(hero.after||'')}</strong></div>`:''}${media&&!logo?`<span class="visual-asset ref-hook-source" data-ref-enter=".6">${e(sourceLabel(media.credit||media.originalSrc))}</span>`:''}</div>`;
++  const stars=matchingGithubStars(script);
++  const badge=stars?`<div class="ref-github-stars" data-count="${stars.count}" data-ref-enter=".03"><span class="ref-star-icon">${icons.star}</span><div class="ref-star-copy"><strong class="ref-star-number">${Array.from({length:13},(_,i)=>`<span data-star-step="${i}">${formatGithubStars(Math.round(stars.count*(1-Math.pow(1-i/12,3))))}</span>`).join('')}</strong><span>SAO TRÊN GITHUB</span></div><span class="ref-star-date">${e(new Date(stars.fetchedAt).toLocaleDateString('vi-VN',{timeZone:'UTC'}))}</span><i class="ref-star-spark spark-a">✦</i><i class="ref-star-spark spark-b">✦</i><i class="ref-star-spark spark-c">✦</i></div>`:'';
++  inner=`<div class="ref-hook${stars?' ref-star-first':''}">${badge}<div class="ref-glass ${logo?'visual-asset':''}" data-ref-enter="${stars?.count!==undefined?.9:.16}"><div class="ref-glass-halo"></div><i class="ref-scratch scratch-one"></i><i class="ref-scratch scratch-two"></i><i class="ref-scratch scratch-three"></i><div class="ref-product-icon">${logo?`<img src="${e(logo.localRelPath)}" alt="${e(hero.name)}"/>`:`<div class="ref-original-mark"><i></i><i></i><span>${icons.play}</span></div>`}</div><span class="ref-category">${e(hero.category)}</span></div><h1 class="ref-product-name hook-headline">${e(hero.name)}</h1>${hero.repository?`<div class="ref-repo-pill" data-ref-enter="${stars?.count!==undefined?1.15:.5}">${icons.code}<span>${e(hero.repository)}</span></div>`:''}${hero.after||hero.before?`<div class="ref-benefit hook-subhead">${hero.before?`<span>${e(hero.before)}</span><b>${icons.arrow}</b>`:''}<strong>${e(hero.after||'')}</strong></div>`:''}${media&&!logo?`<span class="visual-asset ref-hook-source" data-ref-enter=".6">${e(sourceLabel(media.credit||media.originalSrc))}</span>`:''}</div>`;
+   break;
+  }
+  case 'workflow':case 'data-flow':{
+--- a/src/render/script-schema.ts
++++ b/src/render/script-schema.ts
+@@ -209,6 +209,7 @@
+   id: z.string().min(1).max(80).regex(/^[a-zA-Z0-9_-]+$/, "ID cảnh chỉ gồm chữ, số, gạch ngang và gạch dưới"),
+   type: z.enum(["hook", "body", "outro"]),
+   voiceText: z.string().min(1),
++  githubStarLeadIn:z.boolean().optional(),
+   blockTiming: BlockTiming.optional(),
+   /** Extra source-backed blocks accumulate beneath a reference board. */
+   referenceBoard:z.object({
+@@ -291,6 +292,7 @@
+   preset: z.enum(["short_30", "news_45", "review_60"]).optional(),
+   timeline: TimelineSpec.optional(),
+   metadata: z.object({
++    githubStars:z.object({repoUrl:z.url(),count:z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),fetchedAt:z.iso.datetime()}).optional(),
+     title: z.string().min(1),
+     logoAssetId: z.string().uuid().optional(),
+     source: z.object({
+--- a/src/render/templates/animations.js
++++ b/src/render/templates/animations.js
+@@ -173,6 +173,22 @@
+       const entrance=Math.min(Number(el.dataset.revealDuration)||(scene.dataset.layout==='hook'?.55:.42),dur/4);
+       tl.fromTo(el,{opacity:0,y:20,scale:el.classList.contains('ref-glass')?.8:.97,filter:'blur(14px)'},{opacity:1,y:0,scale:1,filter:'blur(0px)',duration:entrance,ease:'power3.out'},at);
+     });
++    const starBadge=scene.querySelector('.ref-github-stars');
++    if(starBadge){
++      const beat=start+Number(starBadge.dataset.revealAt??starBadge.dataset.refEnter??.03);
++      const steps=starBadge.querySelectorAll('[data-star-step]');
++      steps.forEach((el,i)=>{
++        tl.set(el,{opacity:0},0);
++        tl.set(el,{opacity:1},beat+.08+i*.065);
++        if(i<steps.length-1)tl.set(el,{opacity:0},beat+.08+(i+1)*.065);
++      });
++      tl.fromTo(starBadge.querySelector('.ref-star-icon'),{rotation:-100,scale:.25},{rotation:0,scale:1,duration:.7,ease:'back.out(1.6)'},beat);
++      starBadge.querySelectorAll('.ref-star-spark').forEach((el,i)=>{
++        tl.fromTo(el,{opacity:0,scale:0,rotation:-35},{opacity:1,scale:1,rotation:30,duration:.22},beat+.35+i*.09);
++        tl.to(el,{opacity:0,scale:.3,duration:.32},beat+.7+i*.09);
++      });
++      tl.fromTo(starBadge,{boxShadow:'0 0 0px #e9b84c00'},{boxShadow:'0 0 65px #e9b84c30',duration:.45,yoyo:true,repeat:1},beat+.2);
++    }
+     const name=scene.querySelector('.ref-product-name');
+     if(name){
+       const cycles=Math.max(1,Math.floor(dur/2));
+--- a/src/render/templates/styles.reference.css
++++ b/src/render/templates/styles.reference.css
+@@ -53,3 +53,7 @@
+ /* Neutral video-tool mark. Uploaded product logos replace it in the same tile. */
+ .ref-original-mark>i:first-child{top:10px;left:0;width:220px;height:24px;border-radius:7px;background:repeating-linear-gradient(90deg,#8c9eaa 0 26px,transparent 26px 40px)}.ref-original-mark>i:nth-child(2){top:auto;bottom:10px;left:0;width:220px;height:24px;border-radius:7px;background:repeating-linear-gradient(90deg,#8c9eaa 0 26px,transparent 26px 40px)}.ref-original-mark>span{left:50px;top:62px;width:120px;height:96px;border-radius:25px;background:linear-gradient(125deg,#f0d38a,#b5e0c6)}
+ .ref-flow-many{gap:12px}.ref-flow-many .ref-connector{width:30px}.ref-flow-many .ref-connector i{display:none}.ref-flow-many .ref-connector svg{width:30px!important}.ref-flow-many .ref-mini-node{padding:17px!important;min-height:200px!important}body.reference-design .ref-flow-many .ref-mini-node strong{font-size:25px!important}.ref-flow-many .ref-mini-node small{font-size:21px}body.reference-design .ref-mechanism:has(.ref-flow-many){height:auto!important}
++/* GitHub popularity lead-in: a count, never a five-star quality rating. */
++.ref-github-stars{position:absolute;top:168px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:23px;min-width:510px;padding:20px 30px;border:2px solid #f5cc715e;border-radius:34px;background:linear-gradient(115deg,#8c692a38,#14202ae8);box-shadow:0 0 65px #e9b84c18;color:#ffe2a0}.ref-star-icon{display:grid;place-items:center;width:65px;height:65px;color:#ffd576;filter:drop-shadow(0 0 13px #ffc35c55)}.ref-star-icon svg{width:60px!important;height:60px!important;fill:#ffd576}.ref-star-copy{display:flex;align-items:center;gap:18px;white-space:nowrap}.ref-star-number{position:relative;display:grid;font:800 51px/1.1 'Editorial VN',sans-serif;min-width:70px}.ref-star-number>span{grid-area:1/1;opacity:0}.ref-star-copy>span{font:800 23px/1.2 'Editorial VN',sans-serif;max-width:155px;white-space:normal}.ref-star-date{font-size:18px;color:#c6b989;align-self:flex-end;white-space:nowrap}.ref-star-spark{position:absolute;font-size:25px;color:#ffe6ac;opacity:0}.spark-a{left:-22px;top:4px}.spark-b{right:-18px;top:-20px}.spark-c{right:20px;bottom:-16px}
++/* Reserve the final count width throughout the count-up so its label never overlaps. */
++.ref-github-stars{width:760px;min-width:0;justify-content:center}.ref-star-copy{flex:0 0 auto;gap:24px}.ref-star-number{flex:0 0 190px;width:190px;min-width:190px;text-align:right;font-variant-numeric:tabular-nums}.ref-star-copy>span{flex:0 0 130px;width:130px;max-width:130px}.ref-star-date{flex-shrink:0}
+--- /dev/null
++++ b/src/script/github-stars.test.ts
+@@ -0,0 +1,26 @@
++import {it,expect,vi} from 'vitest';
++import {readFile} from 'node:fs/promises';
++import {fetchGithubStars,matchingGithubStars,formatGithubStars} from './github-stars.js';
++import {ScriptSchema} from '../render/script-schema.js';
++import {applyReferenceDefaults} from '../render/reference-design.js';
++import {composeHtml} from '../render/html-composer.js';
++it('gets exact stars including zero from the matching GitHub API repo, refusing fabricated or unavailable counts',async()=>{
++ const get=vi.fn(async()=>({full_name:'owner/repo',stargazers_count:12345}));
++ const stars=await fetchGithubStars('https://github.com/owner/repo',get);
++ expect(stars?.count).toBe(12345);expect(stars?.repoUrl).toBe('https://github.com/owner/repo');expect(Date.parse(stars!.fetchedAt)).toBeGreaterThan(0);
++ expect(get).toHaveBeenCalledWith('https://api.github.com/repos/owner/repo');
++ expect((await fetchGithubStars('https://github.com/owner/repo',async()=>({full_name:'owner/repo',stargazers_count:0})))?.count).toBe(0);
++ for(const data of [{full_name:'wrong/repo',stargazers_count:12000},{full_name:'owner/repo',stargazers_count:'12k'},{full_name:'owner/repo',stargazers_count:-1},{full_name:'owner/repo',stargazers_count:2.5}])expect(await fetchGithubStars('https://github.com/owner/repo',async()=>data)).toBeUndefined();
++ expect(await fetchGithubStars('https://github.com/owner/repo',async()=>{throw Error('rate limited');})).toBeUndefined();
++ get.mockClear();expect(await fetchGithubStars('http://127.0.0.1/repo',get)).toBeUndefined();expect(get).not.toHaveBeenCalled();
++});
++it('renders a deterministic star count first, scopes it to the source repo, and preserves legacy hooks',async()=>{
++ const script=applyReferenceDefaults(ScriptSchema.parse(JSON.parse(await readFile('tests/fixtures/studio-explainer.json','utf8'))));
++ script.metadata.source.url='https://github.com/owner/repo';script.metadata.githubStars={repoUrl:script.metadata.source.url,count:12345,fetchedAt:'2026-10-29T00:00:00Z'};
++ const hook=script.scenes[0];if(hook.templateData.template==='hook')hook.templateData.hero={name:'Repo'};
++ const args={script,sceneAudio:script.scenes.map(s=>({id:s.id,durationSec:5})),gapSec:0,bgImageRelPath:null,audioRelPath:'voice.mp3'};
++ const html=composeHtml(args);expect(html).toContain('data-count="12345"');expect(html).toContain('data-star-step="12">12.3K');expect(html).toContain('data-block-id="stars" data-reveal-at="0.030"');expect(html).toContain('data-block-id="heading" data-reveal-at="1.050"');expect(html).toContain('SAO TRÊN GITHUB');expect(html).not.toContain('onUpdate:');
++ script.metadata.githubStars.repoUrl='https://github.com/other/repo';expect(matchingGithubStars(script)).toBeUndefined();expect(composeHtml(args)).not.toContain('class="ref-github-stars"');
++ script.metadata.githubStars.repoUrl=script.metadata.source.url;delete script.creative;delete script.templatePack;expect(composeHtml(args)).not.toContain('class="ref-github-stars"');
++ expect(formatGithubStars(999)).toBe('999');expect(formatGithubStars(1200000)).toBe('1.2M');
++});
+--- /dev/null
++++ b/src/script/github-stars.ts
+@@ -0,0 +1,26 @@
++import axios from 'axios';
++import type {Script} from '../render/script-schema.js';
++import {parseRepoUrl} from './github-source.js';
++export type GithubStars=NonNullable<Script['metadata']['githubStars']>;
++/** GitHub is authoritative; README badges and LLM-generated numbers are ignored. */
++export async function fetchGithubStars(input:string,get:(url:string)=>Promise<unknown>=async url=>(await axios.get(url,{timeout:6000,maxContentLength:1000000,headers:{Accept:'application/vnd.github+json'}})).data):Promise<GithubStars|undefined>{
++ try{
++  const repo=parseRepoUrl(input);
++  const data=await get(`https://api.github.com/repos/${repo.owner}/${repo.repo}`) as {stargazers_count?:unknown;full_name?:unknown};
++  if(!Number.isSafeInteger(data?.stargazers_count)||Number(data.stargazers_count)<0)return;
++  if(typeof data.full_name!=='string'||data.full_name.toLowerCase()!==`${repo.owner}/${repo.repo}`.toLowerCase())return;
++  return {repoUrl:repo.url,count:Number(data.stargazers_count),fetchedAt:new Date().toISOString()};
++ }catch{return;}
++}
++export async function hydrateGithubStars(script:Script):Promise<void>{
++ if(script.templatePack!=='reference'&&!script.creative)return;
++ const stars=await fetchGithubStars(script.metadata.source.url);
++ // A failed refresh does not lend credibility to imported/LLM numbers.
++ if(stars)script.metadata.githubStars=stars;else delete script.metadata.githubStars;
++ for(const scene of script.scenes)if(scene.templateData.template==='hook')scene.githubStarLeadIn=Boolean(stars);
++}
++/** Only a snapshot for this exact source repo can appear on the hook. */
++export function matchingGithubStars(script:Script):GithubStars|undefined{
++ try{const source=parseRepoUrl(script.metadata.source.url),snapshot=script.metadata.githubStars;return snapshot&&parseRepoUrl(snapshot.repoUrl).url.toLowerCase()===source.url.toLowerCase()?snapshot:undefined;}catch{return;}
++}
++export const formatGithubStars=(count:number)=>new Intl.NumberFormat('en',{notation:'compact',maximumFractionDigits:1}).format(count);
+--- a/src/server.ts
++++ b/src/server.ts
+@@ -1,3 +1,4 @@
++import {hydrateGithubStars} from './script/github-stars.js';
+ import {applyReferenceDefaults,CreativeOptions} from './render/reference-design.js';
+ import {z} from "zod";
+ import {defaultCaption} from './channel-defaults.js';
+@@ -509,6 +510,7 @@
+     if(templatePack)script.visualStyle="tech-editorial";
+     if(req.body.visualStyle==='classic'){delete script.templatePack;delete script.creative;}
+     else applyReferenceDefaults(script,creative);
++    await hydrateGithubStars(script);
+     res.json(ScriptSchema.parse(script));
+   } catch (err: any) {
+     res.status(400).json({ error: err.message });

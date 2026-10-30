@@ -1,0 +1,30 @@
+services:
+  app:
+    build: .
+    init: true
+    ports:
+      - "127.0.0.1:${WEB_PORT:-3000}:3000"
+    env_file:
+      - path: .env.local
+        required: false
+    environment:
+      PORT: "3000"
+    shm_size: "1gb"
+    restart: unless-stopped
+    volumes:
+      - app-config:/app/config
+      - app-output:/app/output
+      - app-uploads:/app/.uploads
+      - app-cache:/app/.cache
+      - zerotts-venv:/app/.zerotts-venv
+      - zerotts-models:/app/.zerotts-models
+      - zerotts-runtime:/app/.zerotts-runtime
+
+volumes:
+  app-config:
+  app-output:
+  app-uploads:
+  app-cache:
+  zerotts-venv:
+  zerotts-models:
+  zerotts-runtime:

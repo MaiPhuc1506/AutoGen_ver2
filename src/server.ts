@@ -1,3 +1,20 @@
+import {NarrationAudioError} from './script/measured-hook.js';
+import {fetchSourceContent} from './script/source-fetcher.js';
+import {SourceAccessError} from './script/platform-source.js';
+import {createRadar,filterRadar,RADAR_CATEGORIES} from './ingest/radar.js';
+import {EXPLANATION_LEVELS} from './studio/explanation-level.js';
+import {ensureRepositoryHero} from './studio/repository-hero.js';
+import {measureNarration} from './studio/narration-timing.js';
+import {DEFAULT_VOICE} from './channel-defaults.js';
+import {mergePronunciationOverrides} from './tts/lexicon.js';
+import {hydrateGithubStars,applySpokenGithubHook} from './script/github-stars.js';
+import {applyReferenceDefaults,CreativeOptions} from './render/reference-design.js';
+import {z} from "zod";
+import {defaultCaption} from './channel-defaults.js';
+import {ensureVideoThumbnail} from './ingest/thumbnail.js';
+import {assignAutomaticVisuals} from './studio/visual-policy.js';
+import {readVisual} from "./studio/visuals.js";
+import { stylePack } from "./render/style-packs.js";
 import express, { Request, Response } from "express";
 import { config } from "dotenv";
 config({ path: ".env.local" });
@@ -8,6 +25,12 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 import axios from "axios";
+import { randomUUID } from "node:crypto";
+import { buildHookSuggestions } from "./script/hooks.js";
+import { normalizeVietnameseForTts } from "./utils/script-generator.js";
+import { studioRouter } from "./studio/routes.js";
+import { voiceConfig, studioTts, cachedSpeech } from "./studio/voice.js";
+import { readUpload, importedCues, importedBoundaries, assignImportedNarration } from "./studio/uploads.js";
 import { runPipeline } from "./pipeline.js";
 import { loadConfig } from "./config.js";
 import { toSlug } from "./utils/slug.js";
@@ -24,7 +47,7 @@ import {
 } from "./timeline/index.js";
 import { getDurationSec, concatWithSilence } from "./assets/audio-tools.js";
 import { createTtsClient } from "./tts/index.js";
-import { applyLexicon } from "./tts/lexicon.js";
+import { applyLexicon, resetLexiconCache, validateLexicon } from "./tts/lexicon.js";
 import { loadFeedsConfig, fetchFeedItems } from "./ingest/feed-collector.js";
 import { BatchQueue } from "./ingest/batch-queue.js";
 import { generatePublishChecklist } from "./ingest/publish-kit.js";
@@ -37,6 +60,7 @@ const OUTPUT_DIR = join(PROJECT_ROOT, "output");
 
 export const app = express();
 app.use(express.json({ limit: "10mb" }));
+app.use("/api/studio", studioRouter);
 app.use(
   express.static(PUBLIC_DIR, {
     etag: false,
@@ -111,6 +135,7 @@ app.get("/api/config", (req, res) => {
         { id: "vi-VN-HoaiMyNeural", label: "Hoài My (Nữ - Giọng chuẩn miền Bắc)", gender: "Nữ" },
       ],
       providers: [
+        { id: "zerotts", name: "ZeroTTS (Local · không cần API key)", free: true },
         { id: "edge-tts", name: "Microsoft Edge TTS (Miễn phí 100%, 0đ)", free: true },
         { id: "lucylab", name: "LucyLab Voice Clone", free: false },
         { id: "vbee", name: "Vbee Báo chí", free: false },
@@ -313,122 +338,19 @@ app.post("/api/llm/test", async (req, res) => {
 
 // ── API: Extract URL ─────────────────────────────────────────────────────────
 app.post("/api/extract-url", async (req, res) => {
-  const { url } = req.body;
-  if (!url || !url.startsWith("http")) {
-    return res.status(400).json({ error: "URL không hợp lệ. Phải bắt đầu bằng http:// hoặc https://" });
-  }
+  const parsed=z.object({url:z.string().url().max(2048).regex(/^https?:\/\//i)}).safeParse(req.body);
+  if(!parsed.success)return res.status(400).json({error:'URL HTTP(S) không hợp lệ.'});
+  try{
+    const source=await fetchSourceContent(parsed.data.url);
+    res.json({...source,paragraphCount:source.content.split(/\n\s*\n/).length});
+  }catch(error){res.status(error instanceof SourceAccessError?error.status:422).json({error:error instanceof Error?error.message:'Không thể đọc URL.'});}
+});
 
-  try {
-    const urlObj = new URL(url);
-    const domain = urlObj.hostname.replace("www.", "");
-
-    // 1. Specialized GitHub Repo Handler
-    if (domain === "github.com") {
-      const parts = urlObj.pathname.split("/").filter(Boolean);
-      if (parts.length >= 2) {
-        const owner = parts[0];
-        const repo = parts[1];
-        const title = `${repo} — Công cụ AI mã nguồn mở của ${owner}`;
-
-        // Fetch raw README to get real article text without React JSON bloat
-        let readme = "";
-        for (const branch of ["main", "master"]) {
-          try {
-            const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/README.md`;
-            const rawRes = await axios.get(rawUrl, { timeout: 8000 });
-            if (rawRes.data && typeof rawRes.data === "string") {
-              readme = rawRes.data;
-              break;
-            }
-          } catch {}
-        }
-
-        // Clean markdown: remove code blocks, tags, badges, tables
-        const cleanMarkdown = readme
-          .replace(/```[\s\S]*?```/g, " ")
-          .replace(/<[^>]+>/g, " ")
-          .replace(/!\[.*?\]\(.*?\)/g, " ")
-          .replace(/\[(.*?)\]\(.*?\)/g, "$1")
-          .replace(/[#*`_~|]/g, " ")
-          .replace(/\s+/g, " ")
-          .trim();
-
-        const sentences = cleanMarkdown
-          .split(/(?<=[.!?])\s+/)
-          .map((s) => s.trim())
-          .filter((s) => s.length > 25 && s.length < 200 && !s.includes("http") && !s.includes("git clone"));
-
-        const content = sentences.slice(0, 4).join(". ") || `${repo} là giải pháp công nghệ mã nguồn mở đột phá vừa được công bố trên GitHub.`;
-        const ogImage = `https://opengraph.githubassets.com/1/${owner}/${repo}`;
-
-        return res.json({
-          title,
-          domain: "github.com",
-          ogImage,
-          content,
-          paragraphCount: sentences.length,
-        });
-      }
-    }
-
-    // 2. Standard Web Article Handler
-    const response = await axios.get(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      },
-      timeout: 15000,
-    });
-
-    let html: string = typeof response.data === "string" ? response.data : String(response.data);
-
-    // Strip script, style, svg, nav, footer, header
-    html = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, " ");
-    html = html.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, " ");
-    html = html.replace(/<svg\b[^<]*(?:(?!<\/svg>)<[^<]*)*<\/svg>/gi, " ");
-    html = html.replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gi, " ");
-    html = html.replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gi, " ");
-
-    // Extract title
-    const ogTitleMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i);
-    const titleTagMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-    const title = (ogTitleMatch ? ogTitleMatch[1] : titleTagMatch ? titleTagMatch[1] : urlObj.pathname)
-      .replace(/ - [^|]+$/i, "")
-      .replace(/ \| [^|]+$/i, "")
-      .trim();
-
-    // Extract og:image
-    const ogImageMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i);
-    const ogImage = ogImageMatch ? ogImageMatch[1] : null;
-
-    // Extract clean text paragraphs
-    const paragraphs: string[] = [];
-    const pMatches = html.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi);
-    for (const match of pMatches) {
-      const cleanP = match[1]
-        .replace(/<[^>]+>/g, " ")
-        .replace(/&nbsp;/g, " ")
-        .replace(/&amp;/g, "&")
-        .replace(/&quot;/g, '"')
-        .replace(/\s+/g, " ")
-        .trim();
-      if (cleanP.length > 40 && cleanP.length < 300 && !cleanP.includes("javascript:") && !cleanP.includes("{")) {
-        paragraphs.push(cleanP);
-      }
-    }
-
-    const content = paragraphs.slice(0, 4).join("\n\n");
-
-    res.json({
-      title,
-      domain,
-      ogImage,
-      content: content || title,
-      paragraphCount: paragraphs.length,
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: `Không thể đọc URL: ${err.message}` });
-  }
+const radar=createRadar();
+app.get('/api/radar',async(req,res)=>{
+ const query=z.object({source:z.string().max(80).optional(),category:z.enum(RADAR_CATEGORIES).optional(),sort:z.enum(['newest','trending']).optional(),q:z.string().max(200).optional()}).safeParse(req.query);
+ if(!query.success)return res.status(400).json({error:'Bộ lọc Radar không hợp lệ.'});
+ try{res.json(filterRadar(await radar.snapshot(),query.data));}catch{res.status(503).json({error:'Không thể tải Radar. Vui lòng thử lại.'});}
 });
 
 // ── API: Generate Script ────────────────────────────────────────────────────
@@ -436,23 +358,47 @@ app.post("/api/generate-script", async (req, res) => {
   try {
     const { title, content, url, domain, image, channel, voiceProvider, voiceId, speed, preset } = req.body;
     if (!title) return res.status(400).json({ error: "Tiêu đề không được để trống" });
+    if (req.body.voice) {
+      const voice = ScriptSchema.shape.voice.parse(req.body.voice);
+      if (voice.uploadId) await readUpload(voice.uploadId);
+      else voiceConfig(voice);
+    }
 
+
+    const creative=CreativeOptions.parse(req.body.creative||{});
+    const directingMode=ScriptSchema.shape.directingMode.parse(req.body.directingMode);
+    const visualIds=z.array(z.string().uuid()).max(20).parse(req.body.visualAssetIds||[]);
+    const visualAssets=await Promise.all(visualIds.map(id=>readVisual(id)));
+    const fitDuration=ScriptSchema.shape.fitDuration.parse(req.body.fitDuration);
+    const explanationLevel=ScriptSchema.shape.explanationLevel.parse(req.body.explanationLevel);
+    const contentMode=explanationLevel?(explanationLevel==='quick'?'overview':'deep-dive'):req.body.contentMode===undefined?undefined:ScriptSchema.shape.contentMode.parse(req.body.contentMode);
+    const targetDurationSec=explanationLevel?EXPLANATION_LEVELS[explanationLevel].preferredSec:req.body.targetDurationSec===undefined?undefined:ScriptSchema.shape.targetDurationSec.parse(req.body.targetDurationSec);
+    const templatePack=req.body.templatePack===undefined?undefined:ScriptSchema.shape.templatePack.parse(req.body.templatePack);
     const { provider: llmInstance, info: llmInfo } = await getEffectiveLlmProvider();
 
     let script: Script | null = null;
-    if (llmInstance) {
+    let usedAi = false;
+    if (llmInstance && !req.body.voice?.uploadId) {
       try {
         log.info(`[Server] Generating script with configured LLM (${llmInfo.provider} / ${llmInfo.model})...`);
         const llmPreset = preset === "review_60" ? "review_60" : "news_short";
         const result = await generateScript({
-          input: url || `${title}\n\n${content}`,
+          input: content ? `${title}\n\n${content}` : url || title,
           preset: llmPreset,
-          channelName: channel || "Công Nghệ 24h",
+          voice:req.body.voice?ScriptSchema.shape.voice.parse(req.body.voice):{...DEFAULT_VOICE},
+          measureNarration:targetDurationSec?measureNarration:undefined,
+          creative, explanationLevel, contentMode, targetDurationSec, directingMode, visualAssets:visualAssets.map(({id,label,source,kind})=>({id,label,source,kind})),
+          source: content ? {title,content,url:url||'manual',domain:domain||'manual',ogImage:image||null} : undefined,
+          channelName: channel || "DevPeek36",
           llmProvider: llmInstance,
         });
         script = result.script;
+        usedAi = true;
+        script.metadata.source = { url: url || "local", domain: domain || "local", image: image || null };
       } catch (err: any) {
-        log.warn(`LLM script generation failed (${err.message}), falling back to offline generator`);
+        if(err instanceof NarrationAudioError){log.warn(err.message);return res.status(503).json({error:err.message,stage:"voice",retryable:true});}
+        log.warn(`LLM script generation failed (${err.message})`);
+        return res.status(502).json({ error: `AI chưa tạo được kịch bản hợp lệ. Hệ thống đã tự thử sửa; chưa có bản đạt yêu cầu nên chưa chuyển sang render. Chi tiết: ${err.message}` });
       }
     }
 
@@ -463,16 +409,79 @@ app.post("/api/generate-script", async (req, res) => {
         url,
         domain,
         image,
-        channel: channel || "Công Nghệ 24h",
+        channel: channel || "DevPeek36",
         voiceProvider,
         voiceId,
         speed,
       });
     }
 
-    res.json(script);
+    script.generation = {
+      mode: req.body.voice?.uploadId ? 'imported' : usedAi ? 'ai' : 'source-only',
+      message: req.body.voice?.uploadId ? 'Giữ nguyên lời đọc của audio bạn tải lên.' : usedAi
+        ? script.narrationTiming ? 'Đã tự biên tập hook, đo lời đọc và cân thời lượng. Bạn có thể xuất hoặc chỉnh thêm nếu muốn.' : 'Kịch bản được tạo bằng AI; có thể xem lại thông tin theo nguồn.'
+        : 'Đang dựng từ câu có trong nguồn. Chưa dùng AI để biên tập hook; có thể bật AI trong Cấu hình LLM.'
+    };
+    if (!req.body.voice?.uploadId) {
+      const alternatives = usedAi ? (script.hookSuggestions || []) : buildHookSuggestions(title, content || title,creative.hookType||'problem-solution').map(h => ({ ...h, voiceText: normalizeVietnameseForTts(h.voiceText) }));
+      const current = script.scenes[0];
+      if(!usedAi&&alternatives[0]&&current.templateData.template==='hook'){
+        current.voiceText=alternatives[0].voiceText;current.templateData.headline=alternatives[0].headline;current.templateData.subhead=alternatives[0].subhead;
+      }
+      script.hookSuggestions = current.templateData.template === 'hook'
+        ? [{ label: usedAi ? 'Hook AI đã chọn' : 'Hook đang dùng', headline: current.templateData.headline,
+            subhead: current.templateData.subhead || '', voiceText: current.voiceText }, ...alternatives.filter(h=>h.voiceText!==current.voiceText)].slice(0,4)
+        : alternatives;
+    }
+    if(directingMode && usedAi){
+      script.directingMode=directingMode;
+    }
+    assignAutomaticVisuals(script,visualAssets);
+    await ensureRepositoryHero(script,visualAssets);
+    if((fitDuration || script.narrationTiming) && !script.voice.uploadId)script.fitDuration=true;
+    if (contentMode)script.contentMode=contentMode;
+    if (targetDurationSec&&!explanationLevel)script.targetDurationSec=targetDurationSec;
+    if(explanationLevel)script.explanationLevel=explanationLevel;
+    if (templatePack) {
+      const pack=stylePack(templatePack);script.templatePack=templatePack;script.visualStyle='tech-editorial';
+      script.motionPreset=req.body.motionPreset||'dynamic';script.colorTheme=pack.id==='explainer'?'midnight':'teal';
+    }
+    if (req.body.colorTheme) script.colorTheme = req.body.colorTheme;
+    if (req.body.motionPreset) script.motionPreset = req.body.motionPreset;
+    if (req.body.soundDesign !== undefined) script.soundDesign = req.body.soundDesign;
+
+    // Apply explicit Studio choices after either LLM or offline generation.
+    if (req.body.voice) {
+      const selected=ScriptSchema.shape.voice.parse(req.body.voice);
+      script.voice={...selected,pronunciationOverrides:mergePronunciationOverrides(script.voice.pronunciationOverrides,selected.pronunciationOverrides)};
+    }
+    else script.voice={...script.voice,...DEFAULT_VOICE};
+    if (req.body.visualStyle) script.visualStyle = req.body.visualStyle;
+    if (req.body.captions) script.captions = req.body.captions;
+    if (req.body.preset) script.preset = req.body.preset;
+    if (req.body.bgm) script.bgm = ScriptSchema.shape.bgm.parse(req.body.bgm);
+    if (req.body.useOgImage !== undefined) script.metadata.useOgImage = req.body.useOgImage;
+    if (script.voice.uploadId) {
+      const upload = await readUpload(script.voice.uploadId);
+      assignImportedNarration(script, content || '', upload.durationSec);
+    }
+    if(templatePack)script.visualStyle="tech-editorial";
+    if(req.body.visualStyle==='classic'){delete script.templatePack;delete script.creative;}
+    else applyReferenceDefaults(script,creative);
+    script.renderSettings=req.body.renderSettings?ScriptSchema.shape.renderSettings.parse(req.body.renderSettings):{fps:24,workers:2,quality:'standard'};
+    await hydrateGithubStars(script);
+    if(!script.voice.uploadId){
+      applySpokenGithubHook(script);
+      const hook=script.scenes.find(scene=>scene.type==='hook');
+      if(hook)for(const suggestion of script.hookSuggestions||[]){
+        const preview={...script,scenes:[{...hook,voiceText:suggestion.voiceText}]};
+        applySpokenGithubHook(preview);
+        suggestion.voiceText=preview.scenes[0].voiceText;
+      }
+    }
+    res.json(ScriptSchema.parse(script));
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    res.status(400).json({ error: err.message });
   }
 });
 
@@ -495,11 +504,19 @@ app.post("/api/render", async (req, res) => {
           const llmResult = await generateScript({
             input: url || `${title}\n\n${content}`,
             preset: llmPreset,
-            channelName: channel || "Công Nghệ 24h",
+            voice:req.body.voice?ScriptSchema.shape.voice.parse(req.body.voice):{...DEFAULT_VOICE},
+            measureNarration:(req.body.targetDurationSec||req.body.explanationLevel)&&!req.body.voice?.uploadId?measureNarration:undefined,
+            directingMode: ScriptSchema.shape.directingMode.parse(req.body.directingMode),
+            explanationLevel: ScriptSchema.shape.explanationLevel.parse(req.body.explanationLevel),
+            contentMode: ScriptSchema.shape.contentMode.parse(req.body.contentMode),
+            targetDurationSec: ScriptSchema.shape.targetDurationSec.parse(req.body.targetDurationSec),
+            source: content ? {title,content,url:url||'manual',domain:domain||'manual',ogImage:image||null} : undefined,
+            channelName: channel || "DevPeek36",
             llmProvider: llmInstance,
           });
           scriptData = llmResult.script;
         } catch (llmErr: any) {
+          if(req.body.directingMode==='auto')return res.status(502).json({error:'AI chưa dựng được storyboard hợp lệ. Hãy thử lại hoặc đổi model; chưa render nội dung thay thế.'});
           log.warn(`[Server] LLM generation failed (${llmErr.message}), falling back to offline generator...`);
         }
       }
@@ -518,12 +535,33 @@ app.post("/api/render", async (req, res) => {
       }
     }
 
+    if (!req.body.script) {
+      applyReferenceDefaults(scriptData,CreativeOptions.parse(req.body.creative||{}));
+      if(req.body.fitDuration)scriptData.fitDuration=true;
+      if (req.body.templatePack) scriptData.templatePack=req.body.templatePack;
+      if (req.body.contentMode) scriptData.contentMode=req.body.contentMode;
+      if (req.body.targetDurationSec&&!req.body.explanationLevel) scriptData.targetDurationSec=req.body.targetDurationSec;
+      if(req.body.explanationLevel)scriptData.explanationLevel=ScriptSchema.shape.explanationLevel.parse(req.body.explanationLevel);
+      if (req.body.voice) scriptData.voice = {...req.body.voice,pronunciationOverrides:mergePronunciationOverrides(scriptData.voice?.pronunciationOverrides,req.body.voice.pronunciationOverrides)};
+      if (req.body.visualStyle) scriptData.visualStyle = req.body.visualStyle;
+      if (req.body.motionPreset) scriptData.motionPreset = req.body.motionPreset;
+      if (req.body.soundDesign !== undefined) scriptData.soundDesign = req.body.soundDesign;
+      if (req.body.captions) scriptData.captions = req.body.captions;
+      if (req.body.preset) scriptData.preset = req.body.preset;
+      if (req.body.bgm) scriptData.bgm = req.body.bgm;
+      if (req.body.useOgImage !== undefined) scriptData.metadata.useOgImage = req.body.useOgImage;
+    }
     // Validate script schema
     const validatedScript = ScriptSchema.parse(scriptData);
+    if (validatedScript.voice.uploadId) {
+      const upload = await readUpload(validatedScript.voice.uploadId);
+      importedBoundaries(validatedScript, upload.durationSec);
+      importedCues(validatedScript, upload.durationSec);
+    } else { voiceConfig(validatedScript.voice); }
 
     // Create unique slug & output directory
     const slug = toSlug(validatedScript.metadata.title);
-    const timestamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 12);
+    const timestamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14) + "-" + randomUUID().slice(0, 8);
     const outputDir = join(OUTPUT_DIR, `${slug}-${timestamp}`);
     await mkdir(outputDir, { recursive: true });
 
@@ -552,9 +590,7 @@ app.post("/api/render", async (req, res) => {
         await runPipeline(scriptPath);
 
         // Generate caption.txt for TikTok
-        const captionLine = `${validatedScript.metadata.title}! Xem ngay để không bỏ lỡ xu hướng công nghệ mới. 🔥`;
-        const hashtags = "#congnghe #thuthuat #cuongit #xuhuong";
-        const captionText = `${captionLine}\n\n${hashtags}`;
+        const captionText = defaultCaption(validatedScript.metadata.title);
         await writeFile(join(outputDir, "caption.txt"), captionText, "utf8");
 
         job.status = "completed";
@@ -602,6 +638,8 @@ app.get("/api/progress/:jobId", (req, res) => {
       step: job.step,
       totalSteps: job.totalSteps,
       status: job.status,
+      slug: job.slug,
+      error: job.error,
       logs: job.logs,
       videoUrl: job.videoUrl,
       caption: job.caption,
@@ -669,6 +707,7 @@ app.get("/api/videos", async (req, res) => {
           videoSizeMb: (videoSize / (1024 * 1024)).toFixed(1),
           videoUrl: hasVideo ? `/api/videos/${ent.name}/file/video.mp4` : null,
           audioUrl: existsSync(voiceFile) ? `/api/videos/${ent.name}/file/voice.mp3` : null,
+          thumbnailUrl: hasVideo ? `/api/videos/${encodeURIComponent(ent.name)}/thumbnail?v=${mtime.getTime()}` : null,
           caption,
           mtime,
           sceneCount: scriptData?.scenes?.length || 0,
@@ -683,6 +722,33 @@ app.get("/api/videos", async (req, res) => {
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// Bundled font used by HTML composition previews.
+app.get('/api/videos/:slug/file/fonts/:filename', (req, res) => {
+  if (!/^[a-zA-Z0-9_-]+$/.test(String(req.params.slug)) || req.params.filename !== 'BeVietnamPro-Bold.ttf') return res.sendStatus(404);
+  res.sendFile(join(OUTPUT_DIR, String(req.params.slug), 'fonts', 'BeVietnamPro-Bold.ttf'));
+});
+
+// Self-contained assets used by project preview/timeline.
+app.get('/api/videos/:slug/file/media/:filename', (req,res)=>{
+  const {slug,filename}=req.params;
+  if(!/^[a-zA-Z0-9_-]+$/.test(String(slug)) || !/^[a-zA-Z0-9_.-]+$/.test(String(filename)) || String(filename).includes('..'))return res.sendStatus(404);
+  res.sendFile(join(OUTPUT_DIR,String(slug),'media',String(filename)));
+});
+
+// Shared by library posters and downloadable full-size PNG covers.
+app.get('/api/videos/:slug/thumbnail',async(req,res)=>{
+  const slug=String(req.params.slug);
+  if(!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,180}$/.test(slug))return res.status(400).json({error:'Tên video không hợp lệ.'});
+  const folder=join(OUTPUT_DIR,slug),video=join(folder,'video.mp4');
+  if(!existsSync(video))return res.status(404).json({error:'Video chưa render xong.'});
+  try{
+    const cover=await ensureVideoThumbnail(video,join(folder,'cover.png'));
+    res.set('Cache-Control','no-cache');
+    if(req.query.download==='1')return res.download(cover,`${slug}-cover.png`);
+    res.type('png').sendFile(cover);
+  }catch{res.status(500).json({error:'Chưa tạo được thumbnail. Hãy thử tải lại video.'});}
 });
 
 // ── API: File Streaming with Range support ───────────────────────────────────
@@ -864,7 +930,11 @@ app.get("/api/projects/:slug", async (req, res) => {
     const captionsFile = join(folder, "captions.json");
     if (existsSync(captionsFile)) {
       try {
-        captionCues = JSON.parse(await readFile(captionsFile, "utf8"));
+        captionCues = JSON.parse(await readFile(captionsFile, "utf8")).map((c: any) => ({
+          start: c.start ?? c.startSec ?? c.startMs / 1000,
+          end: c.end ?? c.endSec ?? c.endMs / 1000,
+          text: c.text,
+        })).filter((c: any) => Number.isFinite(c.start) && Number.isFinite(c.end) && c.end > c.start);
       } catch {}
     }
 
@@ -945,7 +1015,8 @@ app.post("/api/projects/:slug/re-tts/:sceneId", async (req, res) => {
       return res.status(404).json({ error: `Không tìm thấy scene có id '${sceneId}'` });
     }
 
-    const cfg = loadConfig();
+    if (script.voice.uploadId) return res.status(400).json({ error: "Dự án dùng voice tải lên. Sửa file audio/SRT và tạo bản mới; Re-TTS không áp dụng." });
+    const cfg = voiceConfig(script.voice);
     const voiceDir = join(folder, "voice");
     await mkdir(voiceDir, { recursive: true });
 
@@ -955,11 +1026,11 @@ app.post("/api/projects/:slug/re-tts/:sceneId", async (req, res) => {
     }
 
     // 1. Áp dụng Lexicon nếu có
-    const processedText = applyLexicon(scene.voiceText);
+    // Pronunciation preference is applied consistently inside cachedSpeech.
 
     // 2. Gọi TTS Client
-    const ttsClient = createTtsClient(cfg);
-    await ttsClient.generate(processedText, sceneAudioPath);
+    const ttsClient = studioTts(cfg, script.voice);
+    await cachedSpeech(scene.voiceText, sceneAudioPath, cfg, script.voice.speed, ttsClient, script.voice.pronunciation, script.voice.pronunciationOverrides);
 
     // 3. Tính duration mới của scene
     const newDuration = await getDurationSec(sceneAudioPath);
@@ -978,6 +1049,8 @@ app.post("/api/projects/:slug/re-tts/:sceneId", async (req, res) => {
       await concatWithSilence(audioFiles, 0.3, voiceMp3);
     }
 
+    // Audio changed: invalidate global captions and rendered preview until full render.
+    for (const file of ['captions.json', 'captions.srt', 'video.mp4', 'index.html']) await rm(join(folder, file), { force: true });
     // 5. Cập nhật duration vào script.timeline
     if (!script.timeline) {
       script.timeline = { scenes: {}, captionCues: [] };
@@ -1053,7 +1126,9 @@ app.post("/api/lexicon", async (req, res) => {
     if (!lexicon || typeof lexicon !== "object") {
       return res.status(400).json({ error: "Dữ liệu lexicon không hợp lệ" });
     }
+    validateLexicon(lexicon);
     await writeFile(LEXICON_FILE, JSON.stringify(lexicon, null, 2), "utf-8");
+    resetLexiconCache();
     res.json({ success: true, lexicon });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

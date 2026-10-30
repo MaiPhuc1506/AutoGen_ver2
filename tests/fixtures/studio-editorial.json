@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 2,
+  "visualStyle": "tech-editorial",
+  "captions": {"enabled": true, "style": "minimal"},
+  "metadata": {"title": "Thiết kế theo nhịp lời đọc", "source": {"url": "local", "domain": "Video demo", "image": null}, "channel": "STUDIO CỦA BẠN"},
+  "voice": {"provider": "edge-tts", "voiceId": "vi-VN-NamMinhNeural", "speed": 1.1, "settingsSource": "script"},
+  "scenes": [
+    {"id":"hook","type":"hook","voiceText":"Một câu mô tả. Một giao diện rõ ràng.","templateData":{"template":"hook","headline":"Ý tưởng thành\ngiao diện.","subhead":"Bắt đầu từ một câu mô tả"},"sfx":{"name":"none"}},
+    {"id":"speed","type":"body","voiceText":"Chọn giọng đọc và tốc độ ngay trên web.","templateData":{"template":"stat-hero","value":"1.10×","label":"Nhịp đọc của bạn","context":"Nghe thử trước khi render"},"sfx":{"name":"none"}},
+    {"id":"features","type":"body","voiceText":"Chọn giọng. Duyệt nội dung. Xuất video.","templateData":{"template":"feature-list","title":"Ba bước gọn gàng","bullets":["Chọn giọng","Duyệt nội dung","Xuất video"]},"sfx":{"name":"none"}},
+    {"id":"callout","type":"body","voiceText":"Chữ xuất hiện theo nhịp của lời đọc.","templateData":{"template":"callout","statement":"Đúng lời.\nĐúng nhịp.","tag":"VOICE → MOTION"},"sfx":{"name":"none"}},
+    {"id":"outro","type":"outro","voiceText":"Video của bạn, theo phong cách của bạn.","templateData":{"template":"outro","ctaTop":"Sẵn sàng cho ý tưởng tiếp theo","channelName":"Studio của bạn","source":"Bản minh họa"},"sfx":{"name":"none"}}
+  ]
+}

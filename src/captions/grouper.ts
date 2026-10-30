@@ -6,10 +6,12 @@ export interface GroupingOptions {
   maxWordsPerCue?: number;
   minDurationMs?: number;
   maxCharsPerCue?: number;
+  maxGapMs?:number;
 }
 
 const DEFAULT_OPTIONS: Required<GroupingOptions> = {
   sceneStartMs: 0,
+  maxGapMs:300,
   minWordsPerCue: 2,
   maxWordsPerCue: 5,
   minDurationMs: 400, // 0.4s minimum duration per cue
@@ -80,6 +82,7 @@ export function groupWordsIntoCues(
 
   for (let i = 0; i < words.length; i++) {
     const word = words[i];
+    if(currentGroup.length&&word.startMs-currentGroup[currentGroup.length-1].endMs>config.maxGapMs)flushGroup();
     currentGroup.push(word);
 
     const groupText = currentGroup.map((w) => w.text).join(" ");
@@ -93,7 +96,7 @@ export function groupWordsIntoCues(
     // 2. Reached maxWordsPerCue
     // 3. Exceeded maxCharsPerCue
     const shouldBreak =
-      (isPunctuationEnding && (wordCount >= config.minWordsPerCue || i === words.length - 1)) ||
+      isPunctuationEnding ||
       wordCount >= config.maxWordsPerCue ||
       (groupText.length >= config.maxCharsPerCue && wordCount >= config.minWordsPerCue) ||
       i === words.length - 1;

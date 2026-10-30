@@ -3,14 +3,14 @@ import { writeFile, mkdtemp, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 
-function run(cmd: string, args: string[]): Promise<string> {
+function run(cmd: string, args: string[], capture: 'stdout'|'stderr' = 'stdout'): Promise<string> {
   return new Promise((resolve, reject) => {
     const proc = spawn(cmd, args);
     let out = "", err = "";
     proc.stdout.on("data", (d) => (out += d.toString()));
     proc.stderr.on("data", (d) => (err += d.toString()));
     proc.on("close", (code) => {
-      if (code === 0) resolve(out);
+      if (code === 0) resolve(capture === 'stderr' ? err : out);
       else reject(new Error(`${cmd} failed (exit ${code}): ${err}`));
     });
     proc.on("error", reject);
@@ -209,6 +209,15 @@ export interface BgmMixOptions {
   duck?: boolean;
   /** Ducked volume when speech is active (default 0.06) */
   duckVolume?: number;
+  /** Extend the bed through the final visual hold, without cutting narration. */
+  durationSec?: number;
+}
+
+async function meanVolumeDb(path: string): Promise<number> {
+  const report = await run('ffmpeg', ['-hide_banner','-nostats','-i',path,'-af','volumedetect','-vn','-sn','-dn','-f','null','-'], 'stderr');
+  const value = report.match(/mean_volume:\s*(-?[\d.]+|-inf)\s*dB/);
+  if (!value) throw new Error('Không đo được mức âm thanh để cân nhạc nền.');
+  return Number(value[1]);
 }
 
 /**
@@ -227,8 +236,17 @@ export async function mixBgmWithVoice(
   const baseVolume = opts.volume ?? 0.18;
   const duck = opts.duck ?? true;
 
-  const totalDur = await getDurationSec(voicePath);
+  const voiceDur = await getDurationSec(voicePath);
+  const totalDur = Math.max(voiceDur, opts.durationSec ?? voiceDur);
   const fadeOutStart = Math.max(0, totalDur - 1.5);
+  // Match source levels before applying the user's quiet music ratio. A loud
+  // replacement track cannot unexpectedly drown out a quiet narrator.
+  const [voiceDb, musicDb] = await Promise.all([meanVolumeDb(voicePath), meanVolumeDb(bgmPath)]);
+  if (!Number.isFinite(musicDb)) throw new Error('File nhạc nền không có âm thanh.');
+  const levelGain = Number.isFinite(voiceDb) ? Math.min(64, Math.pow(10, (voiceDb-musicDb)/20)) : 0;
+  const duckVolume = Math.min(baseVolume, Math.max(0, opts.duckVolume ?? 0.06));
+  const musicFilter = `[1:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo,volume=${levelGain},afade=t=in:st=0:d=1.0,afade=t=out:st=${fadeOutStart.toFixed(3)}:d=1.5`;
+  const voiceFilter = `[0:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo,apad,atrim=duration=${totalDur}`;
 
   const ffArgs: string[] = [
     "-y",
@@ -240,16 +258,18 @@ export async function mixBgmWithVoice(
   let filterGraph: string;
   if (duck) {
     filterGraph = [
-      `[1:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo,volume=${baseVolume},afade=t=in:st=0:d=1.0,afade=t=out:st=${fadeOutStart.toFixed(2)}:d=1.5[bgm_raw]`,
-      `[0:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo,asplit=2[voice_main][voice_side]`,
-      `[bgm_raw][voice_side]sidechaincompress=threshold=0.03:ratio=5:attack=50:release=350[bgm_ducked]`,
-      `[voice_main][bgm_ducked]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[out]`,
+      `${musicFilter},asplit=2[music_floor_source][music_duck_source]`,
+      `[music_floor_source]volume=${duckVolume}[music_floor]`,
+      `[music_duck_source]volume=${baseVolume-duckVolume}[music_dynamic]`,
+      `${voiceFilter},asplit=2[voice_main][voice_side]`,
+      `[music_dynamic][voice_side]sidechaincompress=threshold=0.015:ratio=12:attack=10:release=350[bgm_ducked]`,
+      `[voice_main][music_floor][bgm_ducked]amix=inputs=3:duration=first:dropout_transition=0:normalize=0,alimiter=limit=0.95:level=false:latency=true[out]`,
     ].join(";");
   } else {
     filterGraph = [
-      `[1:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo,volume=${baseVolume},afade=t=in:st=0:d=1.0,afade=t=out:st=${fadeOutStart.toFixed(2)}:d=1.5[bgm_raw]`,
-      `[0:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[voice_raw]`,
-      `[voice_raw][bgm_raw]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[out]`,
+      `${musicFilter},volume=${baseVolume}[bgm_raw]`,
+      `${voiceFilter}[voice_raw]`,
+      `[voice_raw][bgm_raw]amix=inputs=2:duration=first:dropout_transition=0:normalize=0,alimiter=limit=0.95:level=false:latency=true[out]`,
     ].join(";");
   }
 

@@ -92,6 +92,7 @@ describe("Audio Polish, Motion & Preset (M5)", () => {
       ];
 
       const html = composeHtml({
+        purpose: 'preview',
         script: baseScriptJson as any,
         sceneAudio,
         gapSec: 0.3,
@@ -114,10 +115,10 @@ describe("Audio Polish, Motion & Preset (M5)", () => {
   describe("Brand Configuration (M5)", () => {
     it("loads branding from config/brand.json", () => {
       const cfg = loadConfig();
-      // Should read TechVN Studio from config/brand.json
-      expect(cfg.tiktok.displayName).toBe("TechVN Studio");
-      expect(cfg.tiktok.handle).toBe("@techvn_studio");
-      expect(cfg.tiktok.followers).toBe("250K");
+      // Read the user-configured default channel without invented follower counts.
+      expect(cfg.tiktok.displayName).toBe("DevPeek36");
+      expect(cfg.tiktok.handle).toBe("@DevPeek36");
+      expect(cfg.tiktok.followers).toBe("");
     });
   });
 

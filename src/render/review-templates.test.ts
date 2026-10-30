@@ -212,6 +212,7 @@ describe("Review Templates (M3)", () => {
         gapSec: 0.3,
         bgImageRelPath: null,
         audioRelPath: "voice.mp3",
+        mediaMap: {'scene-7':{sceneId:'scene-7',type:'image',originalSrc:'screen-mockup.png',localRelPath:'media/screen-mockup.png',fit:'contain',fx:'none'}},
       });
 
       // spec-table

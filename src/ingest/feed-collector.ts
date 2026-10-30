@@ -32,7 +32,7 @@ export function cleanText(input: string): string {
 }
 
 /** Parse XML tag value using regex */
-function extractTag(xml: string, tagName: string): string {
+export function extractTag(xml: string, tagName: string): string {
   const cdataRegex = new RegExp(`<${tagName}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tagName}>`, "i");
   const cdataMatch = xml.match(cdataRegex);
   if (cdataMatch) return cdataMatch[1].trim();
@@ -57,8 +57,10 @@ export function parseRssFeed(xmlText: string, defaultSourceName?: string): FeedI
 
     // Atom style <link href="..." />
     if (!rawLink) {
-      const hrefMatch = block.match(/<link\b[^>]*\bhref=["']([^"']+)["']/i);
-      if (hrefMatch) rawLink = hrefMatch[1];
+      const links=block.match(/<link\b[^>]*>/gi)||[];
+      const alternate=links.find(link=>!/\brel=["'](?:self|enclosure)["']/i.test(link));
+      const hrefMatch=alternate?.match(/\bhref=["']([^"']+)["']/i);
+      if(hrefMatch)rawLink=hrefMatch[1];
     }
 
     const rawGuid = extractTag(block, "guid") || extractTag(block, "id") || rawLink;
@@ -66,7 +68,8 @@ export function parseRssFeed(xmlText: string, defaultSourceName?: string): FeedI
     const rawDesc = extractTag(block, "description") || extractTag(block, "summary") || extractTag(block, "content");
 
     const title = cleanText(rawTitle);
-    const link = rawLink.trim();
+    const link = decodeXmlEntities(rawLink.trim());
+    if (!/^https?:\/\//i.test(link)) continue;
     if (!title || !link) continue;
 
     let domain = "";
@@ -101,6 +104,9 @@ export function normalizeUrl(rawUrl: string): string {
       }
     });
     paramsToDelete.forEach((key) => urlObj.searchParams.delete(key));
+    urlObj.hash="";
+    urlObj.searchParams.sort();
+    urlObj.pathname=urlObj.pathname.replace(/\/$/, "")||"/";
     return urlObj.toString();
   } catch {
     return rawUrl.trim();

@@ -111,3 +111,12 @@ describe("EdgeTtsClient", () => {
     expect(existsSync(audioOut)).toBe(true);
   });
 });
+
+it('clears the websocket timeout after successful synthesis',async()=>{
+ vi.useFakeTimers();
+ try{
+  mockSynthesizeImpl=vi.fn().mockResolvedValue({audio:new Blob([new Uint8Array([1,2,3])]),subtitle:[]});
+  await new EdgeTtsClient({voice:'vi-VN-NamMinhNeural'}).generate('Kiểm tra',join(tmpDir,'timer.mp3'));
+  expect(vi.getTimerCount()).toBe(0);
+ }finally{vi.useRealTimers();}
+});

@@ -1,0 +1,138 @@
+{
+  "schemaVersion": 2,
+  "visualStyle": "tech-editorial",
+  "motionPreset": "dynamic",
+  "soundDesign": false,
+  "captions": {
+    "enabled": true,
+    "style": "minimal"
+  },
+  "metadata": {
+    "title": "Storyboard DevPeek36 · kiểm tra 30 giây",
+    "source": {
+      "url": "local",
+      "domain": "Bản minh họa",
+      "image": null
+    },
+    "channel": "DevPeek36"
+  },
+  "voice": {
+    "provider": "edge-tts",
+    "voiceId": "vi-VN-NamMinhNeural",
+    "speed": 1.1,
+    "settingsSource": "script",
+    "pronunciation": "lexicon"
+  },
+  "scenes": [
+    {
+      "id": "open",
+      "type": "hook",
+      "voiceText": "Dán link GitHub, rồi biến kiến thức thành hình minh họa. Mỗi cảnh được chọn theo điều đang giải thích.",
+      "templateData": {
+        "template": "hook",
+        "headline": "Kiến thức thành hình",
+        "subhead": "Storyboard theo nội dung"
+      },
+      "storyboard": {
+        "intent": "Giải thích pipeline minh họa",
+        "visualBrief": "Dựng minh họa theo lời đọc",
+        "basis": "conceptual",
+        "evidence": "Internal fixture",
+        "transitionReason": "Nối các bước của luồng",
+        "status": "source-matched"
+      },
+      "transition": {
+        "type": "fade",
+        "duration": 0.25
+      }
+    },
+    {
+      "id": "flow",
+      "type": "body",
+      "voiceText": "Ví dụ với luồng tạo video: tài liệu cung cấp kiến thức, kịch bản sắp xếp lời đọc, rồi renderer dựng các cảnh theo thứ tự.",
+      "templateData": {
+        "template": "data-flow",
+        "title": "Từ tài liệu đến video",
+        "nodes": [
+          {
+            "label": "Tài liệu repo",
+            "detail": "Kiến thức và ví dụ có nguồn"
+          },
+          {
+            "label": "Kịch bản",
+            "detail": "Lời đọc và storyboard"
+          },
+          {
+            "label": "Renderer",
+            "detail": "Hình ảnh, chuyển cảnh và audio"
+          }
+        ],
+        "caption": "Minh họa luồng xử lý"
+      },
+      "storyboard": {
+        "intent": "Giải thích pipeline minh họa",
+        "visualBrief": "Dựng minh họa theo lời đọc",
+        "basis": "conceptual",
+        "evidence": "Internal fixture",
+        "transitionReason": "Nối các bước của luồng",
+        "status": "source-matched"
+      },
+      "transition": {
+        "type": "slide",
+        "duration": 0.25
+      }
+    },
+    {
+      "id": "example",
+      "type": "body",
+      "voiceText": "Ở ví dụ này, input là một câu ngắn, thao tác là tạo giọng và output là audio minh họa. Đây là sơ đồ khái niệm, chưa phải demo chạy thật.",
+      "templateData": {
+        "template": "worked-example",
+        "title": "Ví dụ input và output",
+        "input": "Xin chào developer!",
+        "operation": "Text → giọng đọc",
+        "output": "Audio minh họa",
+        "basis": "conceptual"
+      },
+      "storyboard": {
+        "intent": "Giải thích pipeline minh họa",
+        "visualBrief": "Dựng minh họa theo lời đọc",
+        "basis": "conceptual",
+        "evidence": "Internal fixture",
+        "transitionReason": "Nối các bước của luồng",
+        "status": "source-matched"
+      },
+      "transition": {
+        "type": "fade",
+        "duration": 0.25
+      }
+    },
+    {
+      "id": "end",
+      "type": "outro",
+      "voiceText": "Bạn có thể duyệt từng cảnh trước khi render. Theo dõi DevPeek36 để khám phá thêm những công cụ hữu ích.",
+      "templateData": {
+        "template": "outro",
+        "ctaTop": "Khám phá công cụ cùng",
+        "channelName": "DevPeek36",
+        "source": "Bản kiểm tra nội bộ"
+      },
+      "storyboard": {
+        "intent": "Giải thích pipeline minh họa",
+        "visualBrief": "Dựng minh họa theo lời đọc",
+        "basis": "conceptual",
+        "evidence": "Internal fixture",
+        "transitionReason": "Nối các bước của luồng",
+        "status": "source-matched"
+      },
+      "transition": {
+        "type": "fade",
+        "duration": 0.25
+      }
+    }
+  ],
+  "directingMode": "auto",
+  "fitDuration": true,
+  "targetDurationSec": 30,
+  "templatePack": "flat-vector"
+}

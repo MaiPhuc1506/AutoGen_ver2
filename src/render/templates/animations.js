@@ -43,10 +43,69 @@ window.__timelines["news-video"] = tl;
     }
     tl.set(scene, { opacity: 0 }, start + dur);
 
+    if(document.body.classList.contains('reference-design')){
+      animateReference(scene,tl,start,dur);
+      return;
+    }
+
+    // Adaptive pack motifs are part of the same seekable timeline as the narration.
+    const art=scene.querySelector('.pack-art');
+    if(art){
+      const packClass=Array.from(document.body.classList).find(c=>c.startsWith('pack-')&&c!=='pack-active')||'';
+      const stepped=/pixel|cel-boil/.test(packClass);
+      tl.fromTo(art,{opacity:0,y:35,scale:.85},{opacity:1,y:0,scale:1,duration:Math.min(.6,dur/3),ease:stepped?'steps(5)':'back.out(1.1)'},start+.03);
+      art.querySelectorAll('.pack-piece').forEach((piece,i)=>{
+        tl.fromTo(piece,{y:35,opacity:0,scale:.85},{y:0,opacity:1,scale:1,duration:.35,ease:stepped?'steps(4)':'back.out(1.2)'},start+.08+(i%8)*.045);
+      });
+      art.querySelectorAll('.pack-draw').forEach(path=>{
+        const length=path.getTotalLength();tl.fromTo(path,{strokeDasharray:length,strokeDashoffset:length},{strokeDashoffset:0,duration:Math.min(1.1,dur*.45),ease:'power1.inOut'},start+.12);
+      });
+      art.querySelectorAll('.pack-rotate,.pack-scan').forEach(el=>{
+        tl.fromTo(el,{rotation:0,svgOrigin:'350 350'},{rotation:packClass.includes('hud')?90:12,svgOrigin:'350 350',duration:dur,ease:'none'},start);
+      });
+      art.querySelectorAll('.pack-boil').forEach(el=>{
+        tl.fromTo(el,{x:-3,rotation:-.7},{x:3,rotation:.7,duration:.18,repeat:Math.max(0,Math.floor(dur/.18)-1),yoyo:true,ease:'steps(1)'},start);
+      });
+      art.querySelectorAll('.pack-morph').forEach(el=>{
+        tl.fromTo(el,{attr:{rx:30},rotation:0,svgOrigin:'350 350'},{attr:{rx:210},rotation:35,svgOrigin:'350 350',duration:Math.max(.3,dur-.3),ease:'sine.inOut'},start+.15);
+      });
+      if(/liquid|soft-3d|aurora-glass/.test(packClass))tl.to(art,{y:-32,rotation:4,duration:Math.max(.2,dur-.7),ease:'sine.inOut'},start+.65);
+      art.querySelectorAll('.pack-grid-lines').forEach(el=>tl.fromTo(el,{y:0},{y:38,duration:dur,ease:'none'},start));
+    }
+
+    // Seekable asset entrance and explainer steps, independent of colour/style.
+    scene.querySelectorAll('.visual-asset').forEach(el => {
+      tl.fromTo(el,{y:70,rotationX:8,scale:0.92,opacity:0},{y:0,rotationX:0,scale:1,opacity:1,duration:Math.min(0.5,dur/4),ease:'back.out(1.15)'},start+0.1);
+    });
+    scene.querySelectorAll('.workflow-step,.workflow-connector,.code-line').forEach((el,i) => {
+      tl.fromTo(el,{x:24,y:12,opacity:0},{x:0,y:0,opacity:1,duration:0.25},start+0.15+i*Math.min(0.25,dur/16));
+    });
+    const nodes=scene.querySelectorAll('.semantic-node');
+    nodes.forEach((node,i)=>tl.fromTo(node,{y:32,scale:.94,opacity:0},{y:0,scale:1,opacity:1,duration:Math.min(.4,dur/8),ease:'power2.out'},start+.15+i*Math.min(.7,dur/(nodes.length+2))));
+    scene.querySelectorAll('.semantic-link').forEach((link,i)=>{
+      const at=start+.45+i*Math.min(.7,dur/6);
+      tl.fromTo(link,{scaleY:0,opacity:0},{scaleY:1,opacity:1,duration:Math.min(.35,dur/10)},at);
+      const pulse=link.querySelector('i');if(pulse)tl.fromTo(pulse,{y:-12,opacity:0},{y:20,opacity:1,duration:Math.min(.5,dur/8)},at+.15);
+    });
+    scene.querySelectorAll('.code-highlight').forEach((line,i)=>tl.fromTo(line,{backgroundColor:'transparent'},{backgroundColor:'rgba(54,213,228,.23)',duration:.3},start+Math.min(dur*.5,.8+i*.35)));
+    const explainerTitle=scene.querySelector('.explainer-title');
+    if(explainerTitle) tl.fromTo(explainerTitle,{y:35,opacity:0},{y:0,opacity:1,duration:0.3},start+0.04);
+
     // Ken Burns animation for scene media (M2)
     const mediaImg = scene.querySelector(".scene-media-img.fx-kenburns");
     if (mediaImg) {
       tl.fromTo(mediaImg, { scale: 1.0, x: 0 }, { scale: 1.15, x: -25, duration: dur, ease: "none" }, start);
+    }
+
+    if(layout === "outro") animateFollowCard(scene,tl,start,dur);
+
+    if (document.body.classList.contains("motion-dynamic")) {
+      animateDynamic(scene, tl, start, dur);
+      return;
+    }
+    if (document.body.classList.contains("tech-editorial")) {
+      animateEditorial(scene, tl, start, dur);
+      return;
     }
 
     if (layout === "hook") {
@@ -75,6 +134,136 @@ window.__timelines["news-video"] = tl;
       animatePhoneMockup(scene, tl, start);
     }
   });
+
+  // All motion is seekable: no random values, intervals or wall-clock animation.
+  if (document.body.classList.contains('motion-dynamic')) {
+    const total = parseFloat(stage.dataset.duration);
+    tl.fromTo('.motion-grid', {x:0,y:0}, {x:-24,y:24,duration:total,ease:'none'},0);
+    tl.fromTo('.orb-one', {x:-40,y:-30,scale:0.9}, {x:60,y:40,scale:1.1,duration:total,ease:'none'},0);
+    tl.fromTo('.orb-two', {x:30,y:40}, {x:-80,y:-50,duration:total,ease:'none'},0);
+    stage.querySelectorAll('.motion-specks i').forEach((el,i)=>{
+      tl.fromTo(el,{y:0,opacity:0.12},{y:-40-(i%4)*20,opacity:0.55,duration:total,ease:'none'},0);
+    });
+  }
+  if(document.body.classList.contains('reference-design')){
+    const total=parseFloat(stage.dataset.duration);
+    stage.querySelectorAll('.reference-specks i').forEach((el,i)=>tl.fromTo(el,{y:0,opacity:.22+(i%3)*.06},{y:-24-(i%5)*13,opacity:.3+(i%3)*.07,duration:total,ease:'none'},0));
+    tl.fromTo('.reference-topline',{scaleX:0},{scaleX:1,duration:total,ease:'none',transformOrigin:'left center'},0);
+    document.fonts.ready.then(()=>{
+      stage.querySelectorAll('.ref-hook-identity').forEach(el=>{
+        const ratio=Math.min(1,430/Math.max(el.scrollHeight,1));
+        if(ratio<1){el.style.transformOrigin='top center';el.style.transform='scale('+ratio+')';}
+      });
+      stage.querySelectorAll('.ref-composition:not(.ref-hero-composition):not(.ref-outro-composition) .ref-board-canvas').forEach(el=>{
+        const ratio=Math.min(1,1000/Math.max(el.scrollHeight,1));
+        if(ratio<1){el.style.transformOrigin='top center';el.style.transform='scale('+ratio+')';}
+      });
+      stage.querySelectorAll('.scene [class^="layout-"],.scene .explainer-content').forEach(el=>{
+        const ratio=Math.min(1,el.clientHeight/Math.max(el.scrollHeight,1),el.clientWidth/Math.max(el.scrollWidth,1));
+        if(ratio<1){el.style.transformOrigin='top center';el.style.transform='scale('+ratio+')';}
+      });
+    });
+  }
+  function animateReference(scene,tl,start,dur){
+    // Seekable focus/reveal/exit: no CSS wall-clock animations in the renderer.
+    const composition=scene.querySelector('.ref-composition');
+    const exit=Math.min(.38,dur*.14);
+    if(composition){
+      tl.fromTo(composition,{filter:'blur(0px)',opacity:1,scale:1},{filter:'blur(12px)',opacity:0,scale:.975,duration:exit,ease:'power2.in'},start+dur-exit);
+    }
+    scene.querySelectorAll('[data-reveal-at],[data-ref-enter]').forEach(el=>{
+      const local=Number(el.dataset.revealAt ?? el.dataset.refEnter);
+      const at=start+(el.dataset.revealAt!==undefined?local:Math.min(local,Math.max(0,dur-exit-.55)));
+      const entrance=Math.min(Number(el.dataset.revealDuration)||(scene.dataset.layout==='hook'?.55:.42),dur/4);
+      tl.fromTo(el,{opacity:0,y:20,scale:el.classList.contains('ref-glass')?.8:.97,filter:'blur(14px)'},{opacity:1,y:0,scale:1,filter:'blur(0px)',duration:entrance,ease:'power3.out'},at);
+    });
+    const starBadge=scene.querySelector('.ref-github-stars');
+    if(starBadge){
+      const beat=start+Number(starBadge.dataset.revealAt??starBadge.dataset.refEnter??.03);
+      const steps=starBadge.querySelectorAll('[data-star-step]');
+      steps.forEach((el,i)=>{
+        tl.set(el,{opacity:0},0);
+        tl.set(el,{opacity:1},beat+.08+i*.065);
+        if(i<steps.length-1)tl.set(el,{opacity:0},beat+.08+(i+1)*.065);
+      });
+      tl.fromTo(starBadge.querySelector('.ref-star-icon'),{rotation:-100,scale:.25},{rotation:0,scale:1,duration:.7,ease:'back.out(1.6)'},beat);
+      starBadge.querySelectorAll('.ref-star-spark').forEach((el,i)=>{
+        tl.fromTo(el,{opacity:0,scale:0,rotation:-35},{opacity:1,scale:1,rotation:30,duration:.22},beat+.35+i*.09);
+        tl.to(el,{opacity:0,scale:.3,duration:.32},beat+.7+i*.09);
+      });
+      tl.fromTo(starBadge,{boxShadow:'0 0 0px #e9b84c00'},{boxShadow:'0 0 65px #e9b84c30',duration:.45,yoyo:true,repeat:1},beat+.2);
+    }
+    const name=scene.querySelector('.ref-product-name');
+    if(name){
+      const cycles=Math.max(1,Math.floor(dur/2));
+      tl.fromTo(name,{backgroundPosition:'100% 0%'},{backgroundPosition:'0% 0%',duration:dur/cycles,repeat:cycles-1,ease:'none'},start);
+      // Fit longer product names without moving the repository/benefit pills.
+      const count=name.textContent.length;
+      if(count>12)name.style.setProperty('font-size',Math.max(52,110*12/count)+'px','important');
+    }
+    scene.querySelectorAll('.ref-connector i,.ref-status i,.ref-code-status>i').forEach((el,i)=>{
+      tl.fromTo(el,{opacity:.4,scale:.8},{opacity:1,scale:1.12,duration:.7,repeat:Math.max(0,Math.floor(dur/.7)-1),yoyo:true,ease:'sine.inOut'},start+(i%2)*.1);
+    });
+  }
+  function animateDynamic(scene, tl, start, dur) {
+    animateEditorial(scene, tl, start, dur);
+    const entrance = Math.min(0.36,dur*0.18);
+    const layout = scene.querySelector('[class^="layout-"]');
+    if (layout) tl.fromTo(layout,{scale:0.96,y:30},{scale:1,y:0,duration:entrance,ease:'power3.out'},start);
+    const kicker = scene.querySelector('.scene-kicker');
+    if (kicker) tl.fromTo(kicker,{opacity:0,x:-25},{opacity:1,x:0,duration:0.25},start+0.04);
+    const ordinal = scene.querySelector('.scene-ordinal');
+    if (ordinal) tl.fromTo(ordinal,{opacity:0,x:30},{opacity:0.055,x:0,duration:0.5},start+0.12);
+    const progress = scene.querySelector('.scene-progress-fill');
+    if (progress) tl.fromTo(progress,{scaleX:0},{scaleX:1,duration:dur,ease:'none'},start);
+    const wipe=scene.querySelector('.motion-wipe');
+    if(wipe) {
+      tl.fromTo(wipe,{x:-140,opacity:0},{x:1150,opacity:0.3,duration:Math.min(0.46,dur/3),ease:'power2.out'},start);
+      tl.set(wipe,{opacity:0},start+Math.min(0.46,dur/3));
+    }
+    const words=scene.querySelectorAll('.hook-word');
+    words.forEach((word,i)=>{
+      const beat=start+0.06+i*Math.min(0.055,dur/(words.length*5));
+      tl.fromTo(word,{y:58,rotation:3,scale:0.9,opacity:0},{y:0,rotation:0,scale:1,opacity:1,duration:entrance,ease:'back.out(1.25)'},beat);
+      const swipe=word.querySelector('.word-swipe');
+      if(swipe) tl.fromTo(swipe,{scaleX:0},{scaleX:1,duration:0.28,ease:'power2.out'},beat+0.2);
+    });
+    scene.querySelectorAll('.stat-digit').forEach((digit,i)=>{
+      tl.fromTo(digit,{y:80,rotation:-10,opacity:0},{y:0,rotation:0,opacity:1,duration:0.32,ease:'back.out(1.3)'},start+0.08+i*0.045);
+    });
+    scene.querySelectorAll('.stat-orbit').forEach((orbit,i)=>{
+      tl.fromTo(orbit,{scale:0.5,rotation:-30,opacity:0},{scale:1,rotation:i?18:0,opacity:i?0.12:0.3,duration:0.5},start+0.08);
+      tl.to(orbit,{rotation:i?-12:20,duration:Math.max(0.1,dur-0.6),ease:'none'},start+0.6);
+    });
+    scene.querySelectorAll('.feature-index').forEach((el,i)=>{
+      tl.fromTo(el,{scale:0.5,rotation:-15},{scale:1,rotation:0,duration:0.3,ease:'back.out(1.5)'},start+0.2+i*0.22);
+    });
+    const arrow=scene.querySelector('.out-arrow');
+    if(arrow) tl.fromTo(arrow,{scale:0.5,rotation:-45,opacity:0},{scale:1,rotation:0,opacity:1,duration:0.4,ease:'back.out(1.2)'},start+0.2);
+  }
+
+  // Editorial: restrained, deterministic motion; reveal details on spoken phrases.
+  function animateEditorial(scene, tl, start, dur) {
+    const hero = scene.querySelector('.hook-headline,.stat-value,.feat-title,.callout-statement,.spec-header,.pros-cons-title,.verdict-product,.price-product,.gallery-title,.mockup-title,.out-cta-top');
+    if (hero) tl.fromTo(hero, { y: 24, opacity: 0 }, { y: 0, opacity: 1, duration: Math.min(0.25, dur / 4) }, start + 0.04);
+    const containers = scene.querySelectorAll('.feat-card,.callout-card,.pros-col,.cons-col,.phone-frame');
+    containers.forEach(el => tl.fromTo(el, { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.2 }, start + 0.04));
+    const norm = text => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9đ]+/g, ' ').trim();
+    const spoken = Array.from(stage.querySelectorAll('.caption-word')).filter(w => {
+      const t = parseFloat(w.dataset.wordStart);
+      return t >= start && t < start + dur;
+    });
+    const tokens = spoken.map(w => norm(w.querySelector('.word-text').textContent));
+    const details = scene.querySelectorAll('.hook-subhead,.stat-label,.stat-context,.feat-rule,.feat-bullet,.callout-tag,.spec-row,.pro-item,.con-item,.verdict-score-badge,.verdict-text,.verdict-summary,.price-main,.price-note,.gallery-card,.mockup-caption,.cmp-card,.cmp-vs,.out-channel,.out-source');
+    details.forEach((el, i) => {
+      const target = norm(el.textContent).split(' ').filter(Boolean).slice(0, 3);
+      const index = target.length >= 2 ? tokens.findIndex((_, j) => target.every((t, k) => tokens[j + k] === t)) : -1;
+      const fallback = start + Math.min(dur * 0.65, 0.2 + i * Math.min(0.3, dur / (details.length + 3)));
+      const beat = index >= 0 ? Math.max(start + 0.08, parseFloat(spoken[index].dataset.wordStart) - 0.06) : fallback;
+      tl.fromTo(el, { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: Math.min(0.22, dur / 5) }, beat);
+    });
+
+  }
 
   // ── HOOK ──────────────────────────────────────────────────────────────
   function animateHook(scene, tl, start) {
@@ -184,165 +373,25 @@ window.__timelines["news-video"] = tl;
       tl.fromTo(source, { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.4 }, start + 1.3);
     }
 
-    // ── TikTok follow card animation (last ~3.5s of outro) ──────────────
-    // Adapted from HyperFrames `tiktok-follow` block.
-    // Card lives inside the outro scene (id="tt-card"); slide up + button click sequence.
-    const ttCard = scene.querySelector("#tt-card");
-    if (ttCard) {
-      const ttBtn      = scene.querySelector("#tt-follow-btn");
-      const ttFollow   = scene.querySelector("#tt-btn-follow");
-      const ttFollwing = scene.querySelector("#tt-btn-following");
-      const ttBase     = start + 1.6;  // start TikTok sequence 1.6s into outro
-
-      // Slide in from bottom + fade in
-      tl.fromTo(ttCard,
-        { opacity: 0, y: 300 },
-        { opacity: 1, y: 0, duration: 0.5 },
-        ttBase
-      );
-
-      // Button press (scale down)
-      if (ttBtn) {
-        tl.to(ttBtn, { scale: 0.92, duration: 0.15 }, ttBase + 0.9);
-        // Release with slight bounce (use scale up)
-        tl.to(ttBtn, { scale: 1, duration: 0.4 }, ttBase + 1.05);
-      }
-
-      // Swap "Follow" → "Following" (opacity)
-      if (ttFollow) {
-        tl.to(ttFollow, { opacity: 0, duration: 0.08 }, ttBase + 1.05);
-      }
-      if (ttFollwing) {
-        tl.to(ttFollwing, { opacity: 1, duration: 0.08 }, ttBase + 1.08);
-      }
-
-      // Hold + subtle zoom-in to focus viewer attention on the card.
-      // Slow zoom from scale 1 → 1.08 over the remaining outro duration.
-      const holdStart = ttBase + 1.3;             // after click animation
-      const holdEnd   = start + dur - 0.1;        // ends just before scene ends
-      const holdLen   = Math.max(0.5, holdEnd - holdStart);
-      tl.to(ttCard, { scale: 1.08, duration: holdLen }, holdStart);
-    }
   }
 
-  // ── SPEC TABLE (M3) ───────────────────────────────────────────────────
-  function animateSpecTable(scene, tl, start) {
-    const header = scene.querySelector(".spec-header");
-    if (header) {
-      tl.fromTo(header, { y: -30, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5 }, start + 0.15);
-      const mask = header.querySelector(".shimmer-mask");
-      if (mask) {
-        tl.fromTo(mask, { x: "-120%" }, { x: "120%", duration: 0.9 }, start + 0.65);
-      }
+  // One seekable follow sequence for Classic, Editorial and every style pack.
+  // All positions are fractions of scene duration, so a 3s preview also completes.
+  function animateFollowCard(scene,tl,start,dur){
+    const card=scene.querySelector('#tt-card');if(!card)return;
+    const cursor=card.querySelector('.tt-cursor'),ring=card.querySelector('.tt-click-ring');
+    const button=card.querySelector('#tt-follow-btn'),follow=card.querySelector('#tt-btn-follow'),following=card.querySelector('#tt-btn-following');
+    tl.fromTo(card,{opacity:0,y:90,scale:.94},{opacity:1,y:0,scale:1,duration:dur*.12,ease:'back.out(1.1)'},start+dur*.08);
+    if(cursor){
+      tl.fromTo(cursor,{opacity:0,x:145,y:145},{opacity:1,x:0,y:0,duration:dur*.19,ease:'power2.out'},start+dur*.25);
+      tl.to(cursor,{scale:.82,duration:dur*.035,transformOrigin:'5px 3px'},start+dur*.47);
+      tl.to(cursor,{scale:1,duration:dur*.055},start+dur*.505);
+      tl.to(cursor,{opacity:0,x:32,y:28,duration:dur*.12},start+dur*.73);
     }
-    const subtitle = scene.querySelector(".spec-subtitle");
-    if (subtitle) {
-      tl.fromTo(subtitle, { opacity: 0 }, { opacity: 1, duration: 0.4 }, start + 0.35);
-    }
-    const rows = scene.querySelectorAll(".spec-row");
-    rows.forEach((row, i) => {
-      tl.fromTo(row, { x: -40, opacity: 0 }, { x: 0, opacity: 1, duration: 0.4 }, start + 0.5 + i * 0.12);
-    });
-  }
-
-  // ── PROS CONS (M3) ────────────────────────────────────────────────────
-  function animateProsCons(scene, tl, start) {
-    const title = scene.querySelector(".pros-cons-title");
-    if (title) {
-      tl.fromTo(title, { y: -30, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4 }, start + 0.15);
-    }
-    const prosCol = scene.querySelector(".pros-col");
-    if (prosCol) {
-      tl.fromTo(prosCol, { x: -60, opacity: 0 }, { x: 0, opacity: 1, duration: 0.5 }, start + 0.3);
-    }
-    const consCol = scene.querySelector(".cons-col");
-    if (consCol) {
-      tl.fromTo(consCol, { x: 60, opacity: 0 }, { x: 0, opacity: 1, duration: 0.5 }, start + 0.45);
-    }
-    const proItems = scene.querySelectorAll(".pro-item");
-    proItems.forEach((item, i) => {
-      tl.fromTo(item, { scale: 0.8, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.35 }, start + 0.55 + i * 0.1);
-    });
-    const conItems = scene.querySelectorAll(".con-item");
-    conItems.forEach((item, i) => {
-      tl.fromTo(item, { scale: 0.8, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.35 }, start + 0.7 + i * 0.1);
-    });
-  }
-
-  // ── VERDICT SCORE (M3) ────────────────────────────────────────────────
-  function animateVerdictScore(scene, tl, start) {
-    const prod = scene.querySelector(".verdict-product");
-    if (prod) {
-      tl.fromTo(prod, { y: -30, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4 }, start + 0.15);
-    }
-    const badge = scene.querySelector(".verdict-score-badge");
-    if (badge) {
-      tl.fromTo(badge, { scale: 0.3, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.55 }, start + 0.35);
-      const mask = badge.querySelector(".shimmer-mask");
-      if (mask) {
-        tl.fromTo(mask, { x: "-120%" }, { x: "120%", duration: 0.9 }, start + 0.85);
-      }
-    }
-    const tag = scene.querySelector(".verdict-tag");
-    if (tag) {
-      tl.fromTo(tag, { y: 30, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4 }, start + 0.95);
-    }
-    const summary = scene.querySelector(".verdict-summary");
-    if (summary) {
-      tl.fromTo(summary, { y: 30, opacity: 0 }, { y: 0, opacity: 1, duration: 0.45 }, start + 1.2);
-    }
-  }
-
-  // ── PRICE TAG (M3) ────────────────────────────────────────────────────
-  function animatePriceTag(scene, tl, start) {
-    const prod = scene.querySelector(".price-product");
-    if (prod) {
-      tl.fromTo(prod, { y: -30, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4 }, start + 0.15);
-    }
-    const variant = scene.querySelector(".price-variant");
-    if (variant) {
-      tl.fromTo(variant, { opacity: 0 }, { opacity: 1, duration: 0.35 }, start + 0.35);
-    }
-    const heroBox = scene.querySelector(".price-hero-box");
-    if (heroBox) {
-      tl.fromTo(heroBox, { scale: 0.4, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.55 }, start + 0.45);
-      const mask = heroBox.querySelector(".shimmer-mask");
-      if (mask) {
-        tl.fromTo(mask, { x: "-120%" }, { x: "120%", duration: 0.9 }, start + 0.95);
-      }
-    }
-    const note = scene.querySelector(".price-note");
-    if (note) {
-      tl.fromTo(note, { y: 20, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4 }, start + 1.15);
-    }
-  }
-
-  // ── IMAGE GALLERY (M3) ────────────────────────────────────────────────
-  function animateImageGallery(scene, tl, start) {
-    const title = scene.querySelector(".gallery-title");
-    if (title) {
-      tl.fromTo(title, { y: -20, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4 }, start + 0.15);
-    }
-    const cards = scene.querySelectorAll(".gallery-card");
-    cards.forEach((card, i) => {
-      tl.fromTo(card, { y: 50, scale: 0.92, opacity: 0 }, { y: 0, scale: 1, opacity: 1, duration: 0.5 }, start + 0.35 + i * 0.18);
-    });
-  }
-
-  // ── PHONE MOCKUP (M3) ─────────────────────────────────────────────────
-  function animatePhoneMockup(scene, tl, start) {
-    const title = scene.querySelector(".mockup-title");
-    if (title) {
-      tl.fromTo(title, { y: -30, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4 }, start + 0.15);
-    }
-    const frame = scene.querySelector(".phone-frame");
-    if (frame) {
-      tl.fromTo(frame, { y: 150, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6 }, start + 0.35);
-    }
-    const caption = scene.querySelector(".mockup-caption");
-    if (caption) {
-      tl.fromTo(caption, { y: 20, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4 }, start + 0.85);
-    }
+    if(button){tl.to(button,{scale:.94,duration:dur*.035},start+dur*.47);tl.to(button,{scale:1,duration:dur*.07,ease:'back.out(1.5)'},start+dur*.505);}
+    if(follow)tl.fromTo(follow,{opacity:1},{opacity:0,duration:dur*.025},start+dur*.51);
+    if(following)tl.fromTo(following,{opacity:0},{opacity:1,duration:dur*.04},start+dur*.53);
+    if(ring)tl.fromTo(ring,{opacity:.9,scale:.1},{opacity:0,scale:1.5,duration:dur*.13},start+dur*.48);
   }
 
   // ── CAPTIONS ANIMATION (M1) ──────────────────────────────────────────────
@@ -361,6 +410,7 @@ window.__timelines["news-video"] = tl;
     // Word-level highlight
     const words = Array.from(cue.querySelectorAll(".caption-word"));
     words.forEach((w) => {
+      if (document.body.classList.contains('tech-editorial') && cue.dataset.accuracy !== 'high' && cue.dataset.highlightMode !== 'estimated') return;
       const wStart = parseFloat(w.dataset.wordStart || w.dataset.start || "0");
       const wDur   = parseFloat(w.dataset.wordDuration || w.dataset.duration || "0.2");
       const wEnd   = wStart + wDur;
@@ -371,7 +421,7 @@ window.__timelines["news-video"] = tl;
       if (highlight) tl.set(highlight, { opacity: 0 }, 0);
 
       // Active word state: scale up and reveal highlight
-      tl.set(w, { scale: 1.15 }, wStart);
+      tl.set(w, { scale: document.body.classList.contains('reference-design') ? 1 : 1.15 }, wStart);
       if (highlight) tl.set(highlight, { opacity: 1 }, wStart);
 
       // Finished word state: reset to normal

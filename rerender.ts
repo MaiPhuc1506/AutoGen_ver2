@@ -1,3 +1,6 @@
+import {referenceSettings} from './src/render/reference-design.js';
+import {stripCssImports} from './src/render/css.js';
+import {createRequire} from 'node:module';
 // One-off script: re-render the existing composition without re-running TTS.
 // Uses already-generated per-scene voice files in <outputDir>/voice/.
 //
@@ -7,12 +10,14 @@ import { config as dotenvConfig } from "dotenv";
 dotenvConfig({ path: ".env.local" });
 dotenvConfig();
 
-import { readFile, writeFile, copyFile } from "node:fs/promises";
+import { readFile, writeFile, copyFile, mkdir } from "node:fs/promises";
 import { join, dirname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ScriptSchema } from "./src/render/script-schema.js";
 import { loadConfig } from "./src/config.js";
-import { getDurationSec, concatWithSilence, mixSfxOntoVoice, type SfxMixSpec } from "./src/assets/audio-tools.js";
+import { getDurationSec, concatWithSilence, mixSfxOntoVoice, mixBgmWithVoice, type SfxMixSpec } from "./src/assets/audio-tools.js";
+import {DEFAULT_BGM} from './src/channel-defaults.js';
+import {ensureVideoThumbnail} from './src/ingest/thumbnail.js';
 import { indexSfxLibrary, pickSfxForScene, defaultPlayback } from "./src/assets/sfx-selector.js";
 import { existsSync } from "node:fs";
 import { composeHtml } from "./src/render/html-composer.js";
@@ -52,6 +57,13 @@ async function main() {
       : cfg.vbeeVoiceCode;
   }
   const script = ScriptSchema.parse(raw);
+  const fpsArg=process.argv.find(a=>a.startsWith('--fps='));
+  const fps=fpsArg?Number(fpsArg.slice(6)):(script.renderSettings?.fps??30);
+  if(![24,30,60].includes(fps))throw new Error('--fps chỉ hỗ trợ 24, 30 hoặc 60 theo HyperFrames.');
+  const reference=referenceSettings(script);
+  if(reference||script.templatePack)script.visualStyle='tech-editorial';
+  const gapSec=script.voice.uploadId?0:reference?.gapSec??(script.visualStyle==='tech-editorial'?.08:SCENE_GAP_SEC);
+  const outroHoldSec=reference?.outroHoldSec??(script.visualStyle==='tech-editorial'?.6:3);
 
   // Probe per-scene durations from existing voice files
   const sceneAudio = await Promise.all(
@@ -66,14 +78,14 @@ async function main() {
   // Re-concat voice (in case audio-tools fix changed encoding)
   const voiceRawMp3 = join(outputDir, "voice-raw.mp3");
   const voiceMp3 = join(outputDir, "voice.mp3");
-  await concatWithSilence(sceneAudio.map((a) => a.path), SCENE_GAP_SEC, voiceRawMp3);
+  await concatWithSilence(sceneAudio.map((a) => a.path), gapSec, voiceRawMp3);
 
   // Compute scene start times + collect SFX
   let cursor = 0;
   const sceneStarts: Record<string, number> = {};
   for (const a of sceneAudio) {
     sceneStarts[a.id] = cursor;
-    cursor += a.durationSec + SCENE_GAP_SEC;
+    cursor += a.durationSec + gapSec;
   }
   // Smart SFX selection — same 3-tier logic as pipeline
   const sfxIndex = indexSfxLibrary(SFX_DIR);
@@ -104,6 +116,12 @@ async function main() {
   }
   console.log(`mixing ${sfxList.length} SFX into voice.mp3`);
   await mixSfxOntoVoice(voiceRawMp3, sfxList, voiceMp3);
+
+  const bgm=script.bgm ?? DEFAULT_BGM;
+  if(bgm.enabled!==false && existsSync(bgm.src)){
+    const dry=join(outputDir,'voice-before-bgm.mp3');await copyFile(voiceMp3,dry);
+    await mixBgmWithVoice(dry,bgm.src,voiceMp3,{...bgm,durationSec:sceneAudio.reduce((n,a)=>n+a.durationSec+gapSec,0)+outroHoldSec});
+  }
 
   const totalDur = await getDurationSec(voiceMp3);
   console.log(`voice.mp3 total: ${totalDur.toFixed(2)}s`);
@@ -158,12 +176,12 @@ async function main() {
   const html = composeHtml({
     script,
     sceneAudio: sceneAudio.map((a) => ({ id: a.id, durationSec: a.durationSec })),
-    gapSec: SCENE_GAP_SEC,
+    gapSec,
     bgImageRelPath,
     audioRelPath: "voice.mp3",
     tiktok: cfg.tiktok,
     tiktokAvatarRelPath: ttAvatarFile,
-    outroHoldSec: 3,
+    outroHoldSec,
     captionCues,
     mediaMap,
   });
@@ -175,11 +193,19 @@ async function main() {
     createdAt: new Date().toISOString(),
   }, null, 2));
   await copyFile(join(TPL_DIR, "styles.css"),    join(outputDir, "styles.css"));
+  if(script.visualStyle==='tech-editorial'){
+    const base=stripCssImports(await readFile(join(TPL_DIR,'styles.css'),'utf8'));
+    await writeFile(join(outputDir,'styles.css'),base+'\n'+await readFile(join(TPL_DIR,'styles.tech-editorial.css'),'utf8')+'\n'+await readFile(join(TPL_DIR,'styles.follow-card.css'),'utf8'));
+    await mkdir(join(outputDir,'fonts'),{recursive:true});
+    await copyFile(join(__dirname,'assets/fonts/BeVietnamPro-Bold.ttf'),join(outputDir,'fonts/BeVietnamPro-Bold.ttf'));
+    await copyFile(createRequire(import.meta.url).resolve('gsap/dist/gsap.min.js'),join(outputDir,'gsap.min.js'));
+  }
   await copyFile(join(TPL_DIR, "animations.js"), join(outputDir, "animations.js"));
 
   // Render
   const videoPath = join(outputDir, "video.mp4");
-  await renderWithHyperframes({ compositionDir: outputDir, outputPath: videoPath });
+  await renderWithHyperframes({ compositionDir: outputDir, outputPath: videoPath, fps, workers:process.argv.includes('--workers=4')?4:process.argv.includes('--workers=1')?1:script.renderSettings?.workers??2, quality:process.argv.includes('--draft')?'draft':script.renderSettings?.quality??'standard' });
+  await ensureVideoThumbnail(videoPath,join(outputDir,'cover.png'));
   console.log(`\nDone: ${videoPath}`);
 }
 

@@ -55,6 +55,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Player Modal
   const playerModal = document.getElementById("playerModal");
   const activeVideoPlayer = document.getElementById("activeVideoPlayer");
+  let activePlayerSlug = null;
   const playerModalTitle = document.getElementById("playerModalTitle");
   const playerVideoTitle = document.getElementById("playerVideoTitle");
   const playerVideoMeta = document.getElementById("playerVideoMeta");
@@ -113,6 +114,8 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    currentExtractedData=null;extractedCard.style.display="none";
+    btnSubmitUrl.disabled=true;
     btnExtractUrl.disabled = true;
     btnExtractUrl.innerHTML = `<span class="modal-spinner" style="width:14px;height:14px;border-width:2px;"></span> Đang đọc...`;
 
@@ -126,9 +129,10 @@ document.addEventListener("DOMContentLoaded", () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Không thể quét dữ liệu từ URL");
 
-      currentExtractedData = data;
+      currentExtractedData = {...data,url};
       extractedDomain.textContent = data.domain || "website";
       extractedTitle.textContent = data.title || url;
+      document.getElementById('extractedScope').textContent = data.sourceScope ? `Nguồn: ${data.sourceScope.replace(/[.。]+$/, "")}${data.sections?.length ? ` · ${data.sections.length} đề mục` : ""}.` : '';
       extractedSnippet.textContent = data.content ? data.content.slice(0, 160) + "..." : "Đã đọc nội dung thành công.";
 
       if (data.ogImage) {
@@ -143,6 +147,7 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (err) {
       showToast(`Lỗi: ${err.message}`);
     } finally {
+      btnSubmitUrl.disabled=false;
       btnExtractUrl.disabled = false;
       btnExtractUrl.innerHTML = `<span>Quét Dữ Liệu</span>`;
     }
@@ -158,7 +163,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const selectPresetUrl = document.getElementById("selectPresetUrl");
     const selectCaptionStyleUrl = document.getElementById("selectCaptionStyleUrl");
-    const checkEnableBgmUrl = document.getElementById("checkEnableBgmUrl");
     const checkUseOgImageUrl = document.getElementById("checkUseOgImageUrl");
 
     btnSubmitUrl.disabled = true;
@@ -172,10 +176,9 @@ document.addEventListener("DOMContentLoaded", () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ url }),
         });
-        if (res.ok) {
-          const data = await res.json();
-          currentExtractedData = { ...data, url };
-        }
+        const data=await res.json();
+        if(!res.ok)throw new Error(data.error||'Không thể đọc nội dung nguồn.');
+        currentExtractedData={...data,url};
       }
 
       const payload = {
@@ -184,7 +187,7 @@ document.addEventListener("DOMContentLoaded", () => {
         content: currentExtractedData?.content || "",
         image: currentExtractedData?.ogImage || null,
         domain: currentExtractedData?.domain || "web",
-        channel: inputChannelUrl.value.trim() || "Công Nghệ 24h",
+        channel: inputChannelUrl.value.trim() || "DevPeek36",
         voiceId: selectVoiceUrl.value,
         voiceProvider: "edge-tts",
         preset: selectPresetUrl?.value || "news_45",
@@ -192,13 +195,10 @@ document.addEventListener("DOMContentLoaded", () => {
           enabled: true,
           style: selectCaptionStyleUrl?.value || "tiktok-bold",
         },
-        bgm: checkEnableBgmUrl?.checked
-          ? { src: "assets/bgm/ambient-tech.mp3", volume: 0.18, duck: true }
-          : undefined,
         useOgImage: checkUseOgImageUrl?.checked || false,
       };
 
-      await launchPipeline(payload);
+      await window.Studio.prepare(payload, launchPipeline);
     } catch (err) {
       showToast(`Lỗi: ${err.message}`);
     } finally {
@@ -226,12 +226,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const payload = {
       title,
       content,
-      channel: inputChannelText.value.trim() || "Tin Tức AI 24h",
+      channel: inputChannelText.value.trim() || "DevPeek36",
       voiceId: selectVoiceText.value,
       voiceProvider: "edge-tts",
     };
 
-    await launchPipeline(payload);
+    btnSubmitText.disabled = true;
+    try { await window.Studio.prepare(payload, launchPipeline); } catch (err) { showToast(err.message); }
+    finally { btnSubmitText.disabled = false; }
   });
 
   // ── Load Sample Script ───────────────────────────────────────────────────
@@ -241,9 +243,9 @@ document.addEventListener("DOMContentLoaded", () => {
       metadata: {
         title: "Apple ra mắt chip AI thế hệ mới",
         source: { url: "local", domain: "apple.com", image: null },
-        channel: "Công Nghệ 24h",
+        channel: "DevPeek36",
       },
-      voice: { provider: "edge-tts", voiceId: "vi-VN-NamMinhNeural", speed: 1.0 },
+      voice: { provider: "edge-tts", voiceId: "vi-VN-NamMinhNeural", speed: 1.2, settingsSource:"script", pronunciation:"smart" },
       scenes: [
         {
           id: "hook",
@@ -277,8 +279,8 @@ document.addEventListener("DOMContentLoaded", () => {
         {
           id: "outro",
           type: "outro",
-          voiceText: "Theo dõi Công Nghệ 24h để xem bản tin mới mỗi ngày.",
-          templateData: { template: "outro", ctaTop: "Xem bản tin mới mỗi ngày", channelName: "Công Nghệ 24h", source: "Nguồn: apple.com" },
+          voiceText: "Theo dõi DevPeek36 để xem bản tin mới mỗi ngày.",
+          templateData: { template: "outro", ctaTop: "Xem bản tin mới mỗi ngày", channelName: "DevPeek36", source: "Nguồn: apple.com" },
         },
       ],
     };
@@ -296,7 +298,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     try {
       const parsed = JSON.parse(raw);
-      await launchPipeline({ script: parsed });
+      parsed.templatePack='reference';parsed.visualStyle='tech-editorial';parsed.motionPreset='calm';
+      parsed.creative={presetId:'reference',...parsed.creative};parsed.captions={enabled:true,style:'minimal',highlightMode:'estimated',...parsed.captions};
+      await window.Studio.reviewImported(parsed, launchPipeline);
     } catch (err) {
       showToast(`Lỗi cú pháp JSON: ${err.message}`);
     }
@@ -341,7 +345,11 @@ document.addEventListener("DOMContentLoaded", () => {
         d.logs.forEach(addLogLine);
       }
       if (d.step) updateProgressStep(d.step, d.totalSteps || 8, d.stepMessage || "");
-      if (d.status === "completed") handleJobSuccess(d);
+      if (d.status === "completed") { handleJobSuccess(d); activeEventSource.close(); }
+      if (d.status === "failed") {
+        updateProgressStep(0, 8, `Render thất bại: ${d.error || 'Hãy thử lại'}`, true);
+        activeEventSource.close();
+      }
     });
 
     activeEventSource.addEventListener("progress", (e) => {
@@ -481,7 +489,7 @@ document.addEventListener("DOMContentLoaded", () => {
       card.innerHTML = `
         <div class="video-thumb-container" data-slug="${vid.slug}">
           ${hasMp4 ? `
-            <video class="video-preview-player" src="${vid.videoUrl}#t=0.5" preload="metadata" muted playsinline></video>
+            <img class="video-preview-player" src="${escapeHtml(vid.thumbnailUrl || `/api/videos/${encodeURIComponent(vid.slug)}/thumbnail`)}" alt="Thumbnail ${escapeHtml(vid.title)}" loading="lazy" decoding="async" width="1080" height="1920">
             <div class="video-play-overlay">
               <div class="play-icon-circle">▶</div>
             </div>
@@ -549,6 +557,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // ── Video Player Modal ───────────────────────────────────────────────────
   function openPlayerModal(vid) {
+    activePlayerSlug = vid.slug;
     playerModalTitle.textContent = vid.title || "Xem Video";
     playerVideoTitle.textContent = vid.title || "Video thành phẩm";
     playerVideoMeta.textContent = `${vid.videoSizeMb ? `${vid.videoSizeMb} MB · ` : ""}Độ phân giải dọc 1080x1920 (9:16)`;
@@ -557,6 +566,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const downloadUrl = `/api/videos/${vid.slug}/download`;
     const mp3Url = vid.audioUrl || `/api/videos/${vid.slug}/file/voice.mp3`;
 
+    activeVideoPlayer.poster = vid.thumbnailUrl || `/api/videos/${encodeURIComponent(vid.slug)}/thumbnail`;
     activeVideoPlayer.src = mp4Url;
     activeVideoPlayer.play().catch(() => {});
 
@@ -565,8 +575,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     btnDownloadMp3.href = mp3Url;
     btnDownloadMp3.setAttribute("download", `${vid.slug}-voice.mp3`);
+    if(btnDownloadCover){
+      btnDownloadCover.href=`/api/videos/${encodeURIComponent(vid.slug)}/thumbnail?download=1`;
+      btnDownloadCover.download=`${vid.slug}-cover.png`;
+      btnDownloadCover.style.display='inline-flex';
+    }
 
-    playerCaptionBox.textContent = vid.caption || `${vid.title}\n\n#congnghe #thuthuat #cuongit #xuhuong`;
+    playerCaptionBox.textContent = vid.caption || `${vid.title}\n\n#Ai #Github #xuhuong #DevPeek36`;
 
     btnCopyCaption.onclick = () => {
       navigator.clipboard.writeText(playerCaptionBox.textContent).then(() => {
@@ -584,6 +599,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function closePlayerModal() {
+    activePlayerSlug = null;
     activeVideoPlayer.pause();
     activeVideoPlayer.src = "";
     playerModal.style.display = "none";
@@ -719,11 +735,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (lexiconSection) lexiconSection.style.display = mode === "lexicon" ? "flex" : "none";
     if (librarySection) librarySection.style.display = mode === "library" ? "block" : "none";
 
+    window.dispatchEvent(new CustomEvent("app:mode",{detail:mode}));
     if (mode === "studio") {
       btnModeStudio?.classList.add("active");
     } else if (mode === "feeds") {
       btnModeFeeds?.classList.add("active");
-      loadFeedsData();
     } else if (mode === "timeline") {
       btnModeTimeline?.classList.add("active");
       loadProjectsList();
@@ -1019,6 +1035,8 @@ document.addEventListener("DOMContentLoaded", () => {
         inspectorSceneTitle.textContent = `Chi Tiết Cảnh: ${scene.id}`;
         inspectorSceneType.textContent = scene.type;
         inspectorVoiceText.value = scene.voiceText;
+        const timingHost=document.getElementById('inspectorBlockTiming');
+        if(timingHost){const panel=document.createElement('div');timingHost.replaceChildren(panel);window.Studio?.blockTimingEditor(panel,Object.assign(scene,{githubStarLeadIn:scene.type==='hook'&&Boolean(currentProject.script.metadata.githubStars)})).catch(err=>{panel.textContent=err.message;});}
         inspectorTemplate.value = scene.templateData.template;
         inspectorDuration.value = foundClip.duration.toFixed(1);
         metaSceneId.textContent = scene.id;
@@ -1167,6 +1185,15 @@ document.addEventListener("DOMContentLoaded", () => {
       } catch {}
     }
   }
+
+  document.getElementById('btnReferenceDesign')?.addEventListener('click',()=>{
+    if(!currentProject)return;
+    currentProject.script.templatePack='reference';currentProject.script.visualStyle='tech-editorial';currentProject.script.motionPreset='calm';
+    currentProject.script.creative={presetId:'reference',hookType:'problem-solution',structureId:'explainer'};
+    currentProject.script.captions={enabled:true,style:'minimal',highlightMode:'estimated'};
+    currentProject.timelineState.script=currentProject.script;
+    showToast('Đã áp dụng thiết kế video mẫu cho mọi cảnh. Lưu kịch bản rồi Render để tạo bản mới.');
+  });
 
   // Inspector Field Changes
   inspectorVoiceText.addEventListener("input", () => {
@@ -1516,19 +1543,13 @@ document.addEventListener("DOMContentLoaded", () => {
   btnViewPublishChecklist?.addEventListener("click", async () => {
     if (!activeVideoPlayer.src) return;
     // Lấy slug từ player title hoặc active project
-    const currentSlug = currentProject ? currentProject.slug : (selectTimelineProject?.value || "");
+    const currentSlug = activePlayerSlug;
     if (!currentSlug) return;
 
     try {
       const res = await fetch(`/api/projects/${currentSlug}/publish`);
       const data = await res.json();
       publishMarkdownContent.textContent = data.publishContent || "Chưa có checklist đăng bài.";
-
-      if (data.hasCover && btnDownloadCover) {
-        btnDownloadCover.href = data.coverUrl;
-        btnDownloadCover.download = `${currentSlug}-cover.png`;
-        btnDownloadCover.style.display = "inline-flex";
-      }
 
       publishModal.style.display = "flex";
     } catch (err) {
@@ -1549,6 +1570,16 @@ document.addEventListener("DOMContentLoaded", () => {
       showToast("Đã sao chép toàn bộ checklist đăng bài vào clipboard!");
     });
   });
+
+  window.addEventListener('radar:import',event=>{
+    const link=event.detail?.link;
+    if(typeof link!=='string'||!/^https?:\/\//i.test(link))return;
+    if(btnSubmitUrl.disabled||btnExtractUrl.disabled){showToast('Studio đang xử lý. Vui lòng chờ xong trước khi nhập bài khác.');return;}
+    switchMode('studio');document.getElementById('tabUrl').click();
+    inputArticleUrl.value=link;currentExtractedData=null;extractedCard.style.display='none';
+    inputArticleUrl.scrollIntoView({behavior:'smooth',block:'center'});inputArticleUrl.focus();btnExtractUrl.click();
+  });
+  document.getElementById('legacyFeeds')?.addEventListener('toggle',event=>{if(event.target.open&&!cachedFeedItems.length)loadFeedsData();});
 
   // ── Feeds RSS Logic (Milestone M7) ───────────────────────────────────────
   async function loadFeedsData() {
@@ -1603,7 +1634,7 @@ document.addEventListener("DOMContentLoaded", () => {
             content: item.description || item.title,
             url: item.link,
             domain: item.domain || "news",
-            channel: "Tin Tức AI 24h",
+            channel: "DevPeek36",
           });
         });
 
@@ -1817,9 +1848,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const MODEL_PRESETS = {
     gemini: [
-      { id: "gemini-2.0-flash", label: "gemini-2.0-flash (Mặc định · Cực nhanh & Chuẩn)", isDefault: true },
-      { id: "gemini-1.5-flash", label: "gemini-1.5-flash (Ổn định)" },
-      { id: "gemini-1.5-pro", label: "gemini-1.5-pro (Mô hình lớn chuyên sâu)" },
+      { id: "gemini-flash-lite-latest", label: "gemini-flash-lite-latest (Khuyên dùng · Siêu tốc 1s)", isDefault: true },
+      { id: "gemini-3.5-flash-lite", label: "gemini-3.5-flash-lite (Rất nhanh)" },
+      { id: "gemini-3.8-flash", label: "gemini-3.8-flash (Model mới · Tư duy cao)" },
     ],
     openai: [
       { id: "gpt-4o-mini", label: "gpt-4o-mini (Nhanh & Tiết kiệm)", isDefault: true },

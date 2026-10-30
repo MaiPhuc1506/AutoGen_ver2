@@ -1,0 +1,1441 @@
+--- /dev/null
++++ b/docs/adr-reference-video-design.md
+@@ -0,0 +1,47 @@
++# Thiết kế chung theo video tham chiếu
++
++Ngày: 29/10/2026, Asia/Ho_Chi_Minh.
++
++## Cập nhật bản sửa 2
++Bản đầu chưa đạt độ gần mẫu theo phản hồi người dùng. Quyết định hiện tại: dùng renderer reference riêng trong `src/render/reference-scenes.ts`, thay vì trang trí lại HTML layout legacy. Hero tách tên sản phẩm khỏi câu hook; body là các bảng tích lũy. Thêm `scene.referenceBoard`, `templateData.hero`, và `captions.highlightMode` tùy chọn. Hiệu ứng có blur/focus/exit và sweep/pulse trên GSAP; bỏ grain SVG lớn, không bỏ blur chuyển động ngắn. Xem `reference-v2-close-study.md` cho mốc đo, triển khai và kiểm chứng mới. Các chi tiết bên dưới ghi lại thiết kế bản đầu; khi khác nhau, quyết định bản sửa 2 được ưu tiên.
++
++## Yêu cầu đã chốt
++Người dùng đồng ý triển khai tự chủ, bỏ các điểm chờ duyệt trong prompt trước. Toàn bộ loại video và bố cục của Studio mới dùng một thiết kế chung dựa trên `/Users/mbp/Downloads/Download.mp4`. Tận dụng renderer, TTS, media và timeline hiện có. Không đổi framework, không thêm dependency. Không tự ghi đè video/dự án người dùng đã lưu.
++
++## Phân tích tham chiếu
++Đã đo bằng ffprobe: 87,832683 s; 576×1024, 30 fps; H.264, AAC stereo 44,1 kHz. Trích 3 frame/s trong 10 giây đầu, 1 frame/4 s ở phần còn lại và xem contact sheet. Các mốc cảnh dưới đây là khoảng quan sát, không phải phân tích từng frame chính xác.
++
++| Khoảng giây (ước lượng) | Nội dung / bố cục |
++| --- | --- |
++| 0–6,3 | Vấn đề nhiều tab; logo sản phẩm, tên và chip lợi ích, không thay toàn cảnh theo mỗi cụm caption |
++| 6,3–18 | Thanh repo + screenshot; lần lượt bổ sung so sánh cách đóng gói |
++| 18–35 | Thẻ cơ chế nạp theo yêu cầu, cache; thêm trạng thái bật/tắt và các chỉ số |
++| 35–47 | Nhóm widget và tính năng, thẻ phụ xuất hiện dần |
++| 47–64 | Cửa sổ code và ảnh giao diện, thẻ mô tả tùy biến |
++| 64–81 | Thẻ lưu ý / giới hạn và câu hỏi liên hệ lại hook |
++| 81–84,5 | CTA/profile |
++| 84,5–87,8 | Phần kết nền tảng TikTok, không tái tạo |
++
++Bốn trục:
++- Hook: vấn đề quen thuộc → giải pháp → lợi ích. Số liệu RAM/widget/dung lượng trong video chưa xác minh; không đưa vào preset mới.
++- Bố cục: nội dung tập trung phía trên/giữa, các thẻ lồng theo nhóm, caption tách bên dưới. Screenshot, code và sơ đồ mang thông tin riêng, không chép toàn bộ voice lên slide.
++- Phong cách: nền gần đen ánh xanh; glow xanh nhạt/cam, particles nhỏ; thẻ viền mờ, bo góc; chữ trắng, nhấn cam; mint cho giá trị tích cực, đỏ nhạt cho giới hạn. Font sans đậm; chưa xác định được font gốc. Dùng Be Vietnam Pro đang đóng gói trong repo để hỗ trợ tiếng Việt.
++- Timing: logo hiện trong khoảng 0–0,7 giây ở mẫu đầu, giữ bố cục vài giây và lần lượt bổ sung thẻ. Caption thay theo cụm ngắn, nhấn từ. Fade/dịch nhẹ là diễn giải từ frame mẫu; không khẳng định đúng easing gốc.
++
++Âm thanh đo bằng FFmpeg `silencedetect=noise=-35dB:d=0.18,volumedetect`: mean -23,9 dBFS, sample peak 0 dBFS. Ví dụ các khoảng mức thấp 2,435–2,664; 6,493–6,728; 10,165–10,416 giây; cuối 84,475–87,423. Đây là số đo toàn mix, không tách voice/nhạc, không phải LUFS. Chưa nghe/phiên âm đầy đủ nên không suy ra giọng, provider hay tốc độ tiếng/giây chính xác. Không sao chép âm thanh của mẫu.
++
++## Quyết định triển khai
++- `templatePack: reference` là mặc định cho script mới từ cả AI và source-only; 16 bố cục hiện có cùng dùng một hệ màu, khoảng cách và lớp caption. Giao diện chính chuyển gallery phong cách thành gallery bố cục chung thiết kế.
++- `creative` tùy chọn tách `presetId`, `hookType`, `structureId`, `pacingId`. Hai kiểu hook: problem-solution, question. Cấu trúc explainer/news/review truyền vào prompt AI; source-only giữ dữ kiện nguồn, không có khả năng biên tập tương đương AI.
++- `REFERENCE_PRESETS` là registry dữ liệu cho khoảng nghỉ, giữ cuối và thời lượng vào cảnh. `reference-quick` chứng minh thêm tổ hợp bằng dữ liệu; ghi đè pacing không đổi hook/structure.
++- `scene.blockTiming` tùy chọn lưu mốc theo ID ổn định; `atSec` chỉnh tay ưu tiên, sau đó phrase + occurrence hoặc cụm chữ trên thẻ khớp timestamp độ tin cậy high; cuối cùng fallback có nhãn estimated. Không biến timestamp ước lượng thành high.
++- Composer gắn `data-block-id`, `data-reveal-at`, `data-timing-basis`; animation dùng các mốc này, mọi chuyển động seek được, không random hoặc timer.
++- CSS reference áp dụng cho mọi layout, ẩn hình học/trang trí lớn, giữ thẻ có chiều sâu. Chỉnh CSS visibility của wrapper cũ để không che khối con. Font/runtime cục bộ, cùng markup/CSS cho preview và export.
++- Studio Review và inspector timeline cho chỉnh giây xuất hiện từng khối. Timeline có nút chuyển dự án hiện tại sang thiết kế mới; người dùng lưu/render để tạo hình mới. Không thay đổi file video cũ hàng loạt.
++
++## Tương thích và giới hạn
++Script cũ không có creative/reference giữ đường dựng cũ. Không migration hàng loạt. Thêm tổ hợp từ bố cục/style đã có chỉ cần dữ liệu registry; bố cục/hiệu ứng hoàn toàn mới vẫn cần code renderer. Preview duyệt nhanh là layout-only và timing ước lượng, không dùng để kết luận khớp âm thanh. Nhấn từ chỉ bật với timestamp high. Sửa lời/TTS có thể làm thay đổi mốc tự động; mốc chỉnh tay được giữ và chặn ở cuối cảnh khi cần.
++
++Thiết kế này học cấu trúc tổng quát; không tái tạo logo Glance, handle, caption, hình ảnh hoặc audio của tác giả. Không cam kết giống 100%.
++
++Hiệu năng: bỏ SVG turbulence của lớp grain cũ (kích thước 4 lần canvas), blur/backdrop và CSS animation thời gian thực trong chế độ mới; particles dùng GSAP có thể seek. Đây là thay đổi riêng reference, không sửa lớp dựng legacy.
+--- /dev/null
++++ b/docs/reference-design-guide.md
+@@ -0,0 +1,48 @@
++# Dùng thiết kế video mẫu
++
++Tạo video mới từ URL, văn bản, CLI hoặc JSON trong web: mặc định dùng Studio tối theo video mẫu. Gallery chính là 16 bố cục trong cùng thiết kế, không còn ép nội dung đổi sang màu/hiệu ứng MG khác nhau. Chọn thumbnail chỉ xem thử bố cục; hệ thống vẫn phối cảnh theo nội dung.
++
++1. Chọn **Cách mở đầu**, **Cách kể nội dung**, **Nhịp chuyển động**. Các lựa chọn độc lập với bố cục từng cảnh và số giây mục tiêu.
++2. Tạo bản nháp và chọn hook; sửa lời đọc, chữ, ảnh, code và chuyển cảnh trong bước duyệt.
++3. Mở **Nhịp xuất hiện từng khối**. Để trống để tự khớp cụm lời; nhập số giây tính từ đầu cảnh để chỉnh tay. Mốc tự động dùng timestamp chính xác khi có; nếu không có thì ước lượng và ghi nhãn trong composition. Chỉnh lời có thể làm thay đổi mốc tự động.
++4. Bấm **Xem thử** để duyệt bố cục. Preview này chưa có giọng và dùng thời gian dự phòng; mốc chỉnh tay dài hơn 3 giây sẽ kéo dài cảnh preview. Không dùng preview này để kết luận khớp giọng.
++5. Render và xem bản MP4. Trong bản duyệt, chọn nhấn từ theo mốc chính xác hoặc cho phép ước lượng khi TTS thiếu mốc từ. Dữ liệu low vẫn ghi low; màu cam ở chế độ ước lượng có thể lệch giọng. Nghe/xem lại TTS thật trước khi đăng.
++
++Dự án đã lưu: mở Timeline Editor, bấm **Áp dụng thiết kế video mẫu cho dự án**, lưu kịch bản rồi render. Lời và nguồn ảnh không đổi. Mốc từng khối cũng chỉnh được ở inspector của cảnh trên timeline. Video đã xuất trước đây không tự thay đổi.
++
++Trường JSON mới, đều tùy chọn:
++
++```json
++{
++  "templatePack": "reference",
++  "creative": {
++    "presetId": "reference",
++    "hookType": "problem-solution",
++    "structureId": "explainer",
++    "pacingId": "narrated"
++  }
++}
++```
++
++Hook khác: `question`. Cấu trúc khác: `news`, `review`; cấu trúc là chỉ dẫn cho AI, chế độ source-only chỉ ghép câu có nguồn. Nhịp khác: `quick`. Để thêm tổ hợp mới từ các chức năng đã có, đăng ký thêm dữ liệu trong `REFERENCE_PRESETS` và thêm ID vào schema; không cần sửa animation. Kiểu bố cục hoàn toàn mới cần renderer tương ứng.
++
++Trong cảnh có thể ghi `"blockTiming":{"item-0":{"atSec":1.8}}`. Hoặc neo cụm lời: `"blockTiming":{"item-0":{"phrase":"nạp theo yêu cầu","occurrence":1}}`. Mốc chỉnh tay ưu tiên; mốc vượt cảnh được chặn để có đủ thời gian hiện. ID các khối lấy từ `/api/studio/block-plan`; không nhập HTML/JavaScript hay CSS selector từ ngoài.
++
++Render lại từ voice đã lưu: `npm run rerender -- output/<du-an> --draft`. Có thể thêm `--fps=24`; HyperFrames hỗ trợ 24, 30 và 60 fps, mặc định vẫn 30 fps và 1080×1920. Lệnh tạo lại video trong thư mục dự án đã chọn, nên dùng bản sao nếu cần giữ bản MP4 trước đó.
++
++
++### Hook và bảng theo video mẫu (bản sửa 2)
++Trong bản duyệt, điền **Tên sản phẩm trên hook**, **Nhãn loại sản phẩm**, **Repo**, **Trước**, **Sau**. Tên sản phẩm nằm dưới khối kính, còn câu “Thay vì…” nằm ở lời đọc/phụ đề. Chọn ảnh sản phẩm và **Logo lớn giữa cảnh** để thay biểu tượng video trung tính. Nhãn trước/sau chỉ dùng lợi ích có trong nguồn.
++
++Mở **Thẻ bổ sung trên cùng bảng (JSON)** ở cảnh cơ chế/code/lưu ý để bổ sung rows/cards. Với data-flow, bảng cơ chế giữ ở trên, các hàng và thẻ lần lượt hiện phía dưới. Ví dụ:
++
++```json
++{
++  "rows": [{"title":"Duyệt trước khi xuất","detail":"Chỉnh lời đọc và tư liệu","tone":"mint","badge":"XEM"}],
++  "cards": [{"label":"Đầu ra video dọc","value":"1080 × 1920","tone":"blue"}]
++}
++```
++
++Mốc các thẻ bổ sung có ID `detail-0`, `metric-0`,... trong **Nhịp xuất hiện từng khối**. Không thêm quá nhiều nội dung vào một bảng; hệ thống thu vừa bảng dài, chữ sẽ nhỏ đi.
++
++Kịch bản JSON cũng mở bước duyệt trước khi render. Kiểm chứng và mẫu mới: `reference-v2-close-study.md`, `output/reference-v2-close-study/video.mp4`. Bản cũ ở `reference-design-validation` chỉ là kiểm chứng lần đầu, chưa đạt mức gần mẫu người dùng mong muốn.
+--- /dev/null
++++ b/docs/reference-design-validation.md
+@@ -0,0 +1,66 @@
++# Kiểm chứng thiết kế video mẫu — bản đầu, 29/10/2026
++
++Bản này đã bị người dùng phản hồi chưa giống template/hook/hiệu ứng. Báo cáo sửa và bản MP4 mới nằm ở `reference-v2-close-study.md`; không dùng nhận định hình ảnh của bản đầu làm kết luận cho bản mới.
++
++## Đã tích hợp
++- Mặc định video mới từ web URL/văn bản/JSON, generator AI/source-only và CLI dùng thiết kế `reference`.
++- 16 bố cục dùng chung nền tối, ánh sáng dịu, thẻ viền mờ, chữ trắng/cam/mint, phụ đề tách khỏi nội dung và profile CTA bằng branding dự án.
++- Hai kiểu hook, ba cách kể và hai nhịp độc lập; bộ dữ liệu pacing mở rộng được. Không lấy số liệu hay asset từ video Glance làm mặc định.
++- Khối có ID ổn định, mốc chỉnh tay/cụm lời/timing dự phòng; chỉnh được ở bước duyệt và inspector timeline. Chưa thêm track kéo thả riêng cho từng khối hoặc undo/redo riêng cho các ô timing.
++- Có nút chuyển thiết kế cho dự án hiện tại. Script cũ không tự đổi; không sửa video hoặc asset gốc của người dùng. Không thêm dependency, không commit.
++
++## Kết quả thực tế
++
++```text
++npx tsc --noEmit: exit 0
++npm test: 47 test files passed; 226 tests passed; exit 0
++node --check public/studio.js: exit 0
++node --check public/app.js: exit 0
++node --check src/render/templates/animations.js: exit 0
++git diff --check: exit 0
++```
++
++Repo chưa có lệnh lint trong package.json. Đã kiểm tra cú pháp JavaScript và diff; không tuyên bố đã chạy ESLint.
++
++Test mới: validate schema/timing; 16 layout có các reveal ID; script cũ không tự opt-in; ưu tiên timing tay; timestamp low không được nhận thành word anchor high; chặn cuối cảnh; preset pacing thứ hai; hai kiểu hook và hai nguồn nội dung không phụ thuộc Glance; route block-plan và preview với mốc tay.
++
++Hai fixture nội dung độc lập (bài báo, repo; URL example.test và GitHub mẫu) đi qua generator source-only và POST /api/studio/preview-script, đều HTTP 200, script hợp lệ và có reference-design. Đây là dữ liệu kiểm thử, không phải xác minh ingest hai URL thật hoặc gọi LLM thật.
++
++### Render mới
++
++`output/reference-design-validation/video.mp4`: HyperFrames draft, 491 frame, hoàn thành khoảng 42,2 giây ở lần cuối. ffprobe:
++
++```text
++1080×1920
++30/1 fps
++Có stream audio
++16.366667 giây
++```
++
++Audio không phải im lặng: FFmpeg mean -24,5 dBFS, peak -7,3 dBFS. Đo toàn mix, không coi là LUFS hay chất lượng giọng đã được duyệt.
++
++Đã xem khung hình đầu, screenshot/callout, các thẻ workflow bổ sung dần, cửa sổ code và profile cuối. Chữ trong mẫu không tràn/cắt, nội dung và caption tách vùng. Ảnh tổng hợp tại `output/reference-design-validation/contact-sheet.jpg`.
++
++### Lưu timing qua UI → export
++
++Trong browser tại local Studio, mở Timeline Editor → dự án kiểm chứng → inspector hook → Nhịp xuất hiện từng khối. Đổi benefit thành 0,65 giây, lưu script, nhận toast thành công. Tải lại trang, giá trị vẫn 0,65. Render lại bằng voice đã lưu, composition cuối có:
++
++```html
++data-block-id="benefit" data-reveal-at="0.650" data-timing-basis="manual"
++```
++
++Ảnh UI: `output/reference-design-validation/studio-timeline.png`. Không sửa dữ liệu project gốc; thao tác trên bản sao kiểm chứng.
++
++### Hồi quy
++
++`output/legacy-reference-regression/script.json` giống nguyên bản `output/template-pack-flat-vector-validation/script.json` theo so sánh JSON. Render lại ở chế độ legacy bằng HyperFrames draft 24 fps (engine hỗ trợ 24/30/60): 1080×1920, có audio, 16,375 giây, exit 0. HTML không có reference-design; giữ pack flat-vector. Đã trích và xem ảnh tổng hợp. Lệnh rerender được đồng bộ khoảng nghỉ/hold/CSS/font với pipeline cho editorial, thay vì luôn dùng khoảng nghỉ 0,3 giây và CSS classic.
++
++## Chưa kiểm chứng / giới hạn
++- Chưa nghe trực tiếp toàn bộ video; chưa xác nhận chất giọng, nhạc/SFX, độ lệch từng từ bằng tai hoặc đánh giá giống mẫu 100%.
++- Audio mẫu tái sử dụng từ fixture đã có; không sao chép audio của video tham chiếu, chưa thử gợi ý hook bằng LLM thật với preset mới.
++- Caption timestamp thấp giữ chữ trắng và không nhấn từng từ. Mẫu mới không giả vờ có word alignment chính xác khi provider chỉ có ước lượng.
++- Preview nhanh vẫn là layout-only, thời gian dự phòng, chưa phải preview audio chính xác. Bản MP4 là bước kiểm tra cuối.
++- HyperFrames có cảnh báo không chặn về composition dài và hai ảnh avatar dùng chung nguồn; file cuối được kiểm chứng độc lập bằng ffprobe.
++
++## Cách dùng
++Khởi động lại server project để nạp module mới, rồi tải lại trang. Xem `docs/reference-design-guide.md`. Diff riêng của lượt thay đổi này ở `docs/reference-design-changes.patch`; không gộp các chỉnh sửa có sẵn trước lượt làm việc này vào commit.
+--- /dev/null
++++ b/docs/reference-v2-close-study.md
+@@ -0,0 +1,58 @@
++# Đối chiếu sát video tham chiếu — bản sửa 2
++
++Ngày 29/10/2026. Phản hồi của người dùng: hook, template và hiệu ứng bản trước chưa giống video gửi kèm. Đây là chỉnh sửa renderer, không chỉ đổi bảng màu.
++
++## Quan sát trực tiếp
++
++Nguồn: `/Users/mbp/Downloads/Download.mp4`, 576×1024, 30fps, 87,832683 giây. Xem lại hook 0–8 giây ở 4 frame/giây; phần dựng bảng 12–36 giây ở 1 frame/giây; phần còn lại mỗi 2 giây. Xem riêng khung 1 giây và 28 giây ở độ phân giải gốc.
++
++- Hook: khối kính khoảng x137/y160, 300×300; logo ở trong, nhãn loại sản phẩm, tên sản phẩm ở y484; pill repo y555; đối chiếu trước/sau y612; phụ đề y742. Tên sản phẩm không phải cả câu hook. Lời mở đầu dẫn từ vấn đề tới giải pháp.
++- Hook hiện mờ/nhỏ rồi rõ khoảng 0,25–0,75 giây; giữ hình tới gần giây 6; có ánh màu chạy qua tên; toàn nhóm mờ/tan khi đổi cảnh.
++- Bảng cơ chế: x42/y154, rộng492; panel cơ chế cao160; hai hàng trạng thái ở y330/y421; hai thẻ cuối ở y514. Các thẻ được bổ sung, không bỏ toàn bộ bảng ở mỗi câu.
++- Các phần sau dùng nhóm tính năng tím, hàng icon, code window, ảnh tư liệu, nhóm lưu ý và profile kính. Phụ đề trắng/cam cùng một vùng; hạt màu mờ, các điểm nối có glow.
++- Chưa xác định font/easing/giọng đọc gốc. Không coi số RAM, widget, tốc độ của Glance là dữ kiện dự án.
++
++## Thay đổi tích hợp
++
++- `src/render/reference-scenes.ts`: renderer riêng của reference, đủ 16 bố cục; composer legacy giữ đường dựng riêng. Hero có `templateData.hero` (name/category/repository/before/after). Logo sản phẩm được dùng khi media có presentation=logo, nếu thiếu dùng biểu tượng video trung tính do dự án dựng bằng CSS/SVG.
++- `scene.referenceBoard`: rows và cards bổ sung trên cùng cảnh; semantic rows có màu/badge/trạng thái tắt; stable IDs detail-N và metric-N đi qua block-plan/timeline. Bảng cơ chế giữ cả nhãn và mô tả từ dữ liệu nodes.
++- `styles.reference.css`: vị trí đo từ mẫu nhân1,875 lên1080×1920; board923px rộng ở y289, kính563px ở y300, captions y1380; thẻ nhỏ và header nằm trong panel. Bảng dài tự thu vừa vùng nội dung sau khi font tải xong.
++- GSAP: blur→focus, scale nhẹ khi hiện, blur/fade cả nhóm lúc rời cảnh, title gradient sweep, pulse các điểm nối, hạt nền màu. Timeline seek được; không dùng CSS animation theo đồng hồ.
++- Schema/generator: trường mới tùy chọn; prompt phân biệt tên sản phẩm và lời hook, hướng dẫn dữ liệu bảng; source-only chỉ thêm liên từ tương phản cho dạng câu phù hợp, không thêm lợi ích/số liệu.
++- Studio: trường chỉnh tên/category/repo/trước/sau, JSON thẻ bổ sung, lựa chọn nhấn từ ước lượng hoặc chỉ dùng mốc chính xác. JSON nhập vào cũng qua schema và bản duyệt trước khi render.
++- Caption low vẫn giữ `accuracy: low`. `highlightMode: estimated` cho phép tô cam theo timing ước lượng, không giả thành word alignment high. Khi thiếu mốc từ, nhịp có thể lệch giọng và cần duyệt.
++
++## Bản dựng kiểm tra
++
++`output/reference-v2-close-study/video.mp4` dùng lời đọc mới về tính năng thật của AutoGen; không dùng lời hay logo Glance. Hook voice: “Thay vì dựng từng cảnh thủ công, bạn nhập nội dung, duyệt lời đọc rồi xuất video dọc với AutoGen.” Có cơ chế + 2 hàng + 2 thẻ, tính năng, code + thẻ timing, giới hạn và profile.
++
++```sh
++npm run rerender -- output/reference-v2-close-study --draft --fps=30
++```
++
++Edge NamMinh 1,10×, phát âm original. Provider hiện trả mốc low; bản mẫu dùng chế độ nhấn ước lượng. Nhạc/SFX theo pipeline hiện có. Bản MP4 được kiểm tra hình ảnh, không khẳng định đã nghe hoặc khớp giọng gốc.
++
++Ảnh: hook.png, mechanism.png, features.png, code.png, limits.png, outro.png, contact-sheet.jpg. `studio-review.png` chứng minh các trường hero/caption trong bản duyệt; preview UI mở được với dữ liệu bảng thực. Không khởi động render lần nữa từ nút duyệt khi QA.
++
++Các kiểm tra cuối và thông số ffprobe được ghi bên dưới sau khi chạy. Script cũ vẫn dùng renderer cũ; không thay video người dùng đã xuất, không commit.
++
++## Kết quả cuối thực tế
++
++```text
++npx tsc --noEmit: exit 0
++npm test: 47 files passed, 229 tests passed; exit 0 (30,84 giây)
++node --check public/studio.js: exit 0
++node --check public/app.js: exit 0
++node --check src/render/templates/animations.js: exit 0
++git diff --check: exit 0
++ffprobe: video 1080×1920, 30/1 fps; có audio; 38,533333 giây
++FFmpeg toàn mix: mean -24,2 dBFS, peak -6,7 dBFS (không phải LUFS)
++```
++
++Lần chạy test trong lúc render CPU cao có 5 timeout 5 giây; chạy lại sau khi render kết thúc thì 229/229 pass, không tăng timeout. Log cuối nằm cạnh MP4: tests.log, typecheck.log, render.log, ffprobe.json.
++
++Đã xem hook, bảng cơ chế, tính năng, code, lưu ý và outro từ MP4 cuối. `hook-comparison.jpg` và `board-comparison.jpg`: bên trái video nguồn, bên phải bản dựng mới. Nhãn/màu tích cực và số liệu dùng nội dung AutoGen, không lấy các phát biểu về Glance. `motion-study.jpg` trích 0,15/0,35/0,7/5,9/6,2/6,6 giây để kiểm tra focus và đổi cảnh.
++
++Browser QA: nhập JSON → schema validation → bản duyệt, thấy trường tên/category/repo/trước/sau, mode nhấn từ và JSON thẻ bổ sung; nút xem thử trả đúng hero và bảng đang sửa. Ảnh `studio-hook-fields.png` và `studio-review.png`. Một lần QA trước khi nối luồng duyệt đã vô tình mở render trùng; đã dừng đúng tiến trình render đó và xóa riêng thư mục QA trùng. Bản MP4 kiểm chứng ở trên được giữ nguyên.
++
++Đạt: cấu trúc hình mở đầu theo mẫu, bảng tích lũy, hiệu ứng focus/blur/sweep/pulse, tích hợp 16 bố cục, sửa được dữ liệu và timing, typecheck/tests/render thật. Chưa xác nhận: font/easing/giọng/nhạc giống chính xác nguồn; độ khớp từ của mốc low; LLM thật với prompt mới. Không tuyên bố giống 100%.
+--- a/public/app.js
++++ b/public/app.js
+@@ -296,7 +296,9 @@
+ 
+     try {
+       const parsed = JSON.parse(raw);
+-      await launchPipeline({ script: parsed });
++      parsed.templatePack='reference';parsed.visualStyle='tech-editorial';parsed.motionPreset='calm';
++      parsed.creative={presetId:'reference',...parsed.creative};parsed.captions={enabled:true,style:'minimal',highlightMode:'estimated',...parsed.captions};
++      await window.Studio.reviewImported(parsed, launchPipeline);
+     } catch (err) {
+       showToast(`Lỗi cú pháp JSON: ${err.message}`);
+     }
+@@ -1031,6 +1033,8 @@
+         inspectorSceneTitle.textContent = `Chi Tiết Cảnh: ${scene.id}`;
+         inspectorSceneType.textContent = scene.type;
+         inspectorVoiceText.value = scene.voiceText;
++        const timingHost=document.getElementById('inspectorBlockTiming');
++        if(timingHost){const panel=document.createElement('div');timingHost.replaceChildren(panel);window.Studio?.blockTimingEditor(panel,scene).catch(err=>{panel.textContent=err.message;});}
+         inspectorTemplate.value = scene.templateData.template;
+         inspectorDuration.value = foundClip.duration.toFixed(1);
+         metaSceneId.textContent = scene.id;
+@@ -1179,6 +1183,15 @@
+       } catch {}
+     }
+   }
++
++  document.getElementById('btnReferenceDesign')?.addEventListener('click',()=>{
++    if(!currentProject)return;
++    currentProject.script.templatePack='reference';currentProject.script.visualStyle='tech-editorial';currentProject.script.motionPreset='calm';
++    currentProject.script.creative={presetId:'reference',hookType:'problem-solution',structureId:'explainer'};
++    currentProject.script.captions={enabled:true,style:'minimal',highlightMode:'estimated'};
++    currentProject.timelineState.script=currentProject.script;
++    showToast('Đã áp dụng thiết kế video mẫu cho mọi cảnh. Lưu kịch bản rồi Render để tạo bản mới.');
++  });
+ 
+   // Inspector Field Changes
+   inspectorVoiceText.addEventListener("input", () => {
+--- a/public/index.html
++++ b/public/index.html
+@@ -97,10 +97,14 @@
+         <section class="voice-studio" aria-label="Giọng đọc và phong cách">
+           <div class="studio-section-heading"><span class="studio-kicker">BẢN DỰNG CỦA BẠN</span><h3>Giọng đọc & phong cách</h3><p>Chọn giọng, nghe thử, duyệt từng cảnh rồi xuất video.</p></div>
+           <section class="pack-gallery" aria-label="Thư viện template video">
+-            <div class="pack-gallery-heading"><div><span class="studio-kicker">NỘI DUNG CỦA BẠN · PHONG CÁCH BẠN CHỌN</span><h3>Chọn template, xem rồi mới dựng</h3></div><span id="studioPackCount" class="pack-count">Đang tải…</span></div>
+-            <p class="field-hint">15 phong cách từ mg-styles-15 được thích ứng cho video kiến thức 9:16, cùng 2 phong cách có sẵn. Preview bên cạnh là renderer thật với nội dung minh họa; không phải phim gốc 10 giây.</p>
+-            <div class="pack-browser"><div id="studioPackGrid" class="pack-grid" role="group" aria-label="Chọn phong cách"></div><aside class="pack-preview-panel"><span class="pack-preview-label">PREVIEW NHẸ · KHÔNG VOICE</span><h4 id="studioPackTitle">Tech Editorial</h4><iframe id="studioStylePreview" src="/api/studio/style-preview?pack=editorial&motion=dynamic" title="Preview template đang chọn" loading="lazy"></iframe><p id="studioPackDescription" class="field-hint"></p><a id="studioPackSource" target="_blank" rel="noopener noreferrer" hidden>Xem phong cách gốc</a><span class="field-hint">Mẫu 3 giây/cảnh. Bản dựng thật dùng lời đọc và tư liệu của bạn.</span></aside></div>
++            <div class="pack-gallery-heading"><div><span class="studio-kicker">PHONG CÁCH VIDEO MẪU · DÙNG CHO MỌI BỐ CỤC</span><h3>Một phong cách, nhiều cách kể</h3></div><span id="studioPackCount" class="pack-count">Đang tải…</span></div>
++            <p class="field-hint">Nền tối, thẻ kính, ánh sáng dịu và phụ đề trắng/cam theo video tham chiếu. Chọn bố cục để xem thử; khi dựng, hệ thống phối các bố cục theo nội dung của bạn.</p>
++            <div class="pack-browser"><div id="studioPackGrid" class="pack-grid" role="group" aria-label="Chọn phong cách"></div><aside class="pack-preview-panel"><span class="pack-preview-label">PREVIEW NHẸ · KHÔNG VOICE</span><h4 id="studioPackTitle">Studio tối · Theo video mẫu</h4><iframe id="studioStylePreview" src="/api/studio/style-preview?pack=reference" title="Preview template đang chọn" loading="lazy"></iframe><p id="studioPackDescription" class="field-hint"></p><a id="studioPackSource" target="_blank" rel="noopener noreferrer" hidden>Xem phong cách gốc</a><span class="field-hint">Mẫu bố cục 3 giây/cảnh, chưa có giọng. Bản dựng thật dùng lời đọc, timing và tư liệu của bạn.</span></aside></div>
+           </section>
++          <div class="form-row">
++            <div class="form-group col-6"><label for="studioHookType">Cách mở đầu</label><select id="studioHookType"><option value="problem-solution">Vấn đề → giải pháp → lợi ích</option><option value="question">Câu hỏi → bằng chứng trả lời</option></select></div>
++            <div class="form-group col-6"><label for="studioStructure">Cách kể nội dung</label><select id="studioStructure"><option value="explainer">Giải thích · cơ chế và cách dùng</option><option value="news">Tin tức · sự kiện và tác động</option><option value="review">Review · lợi ích và giới hạn</option></select></div>
++          </div>
+           <div class="form-row">
+             <div class="form-group col-6"><label for="studioDepth">Mức độ giải thích repo</label><select id="studioDepth"><option value="overview">Tổng quan · theo preset 30 / 45 / 60 giây</option><option value="deep-dive">Giải thích kỹ · cách dùng, điều kiện, giới hạn</option></select></div>
+             <div class="form-group col-6"><label for="studioLongDuration">Thời lượng mục tiêu khi giải thích kỹ</label><select id="studioLongDuration" disabled><option value="90">90 giây</option><option value="120">120 giây</option><option value="180">180 giây</option></select></div>
+@@ -113,7 +117,7 @@
+             <div class="form-group col-6"><details class="studio-legacy-options"><summary>Giao diện cũ · tùy chọn</summary><label for="studioStyle">Giao diện tương thích</label><select id="studioStyle"><option value="tech-editorial">Dùng template đang chọn</option><option value="classic">Classic · Giao diện cũ</option></select></details></div>
+           </div>
+           <div class="form-row">
+-            <div class="form-group col-6"><label for="studioMotion">Nhịp chuyển động</label><select id="studioMotion"><option value="dynamic">Dynamic · Chữ bật / thẻ / chuyển cảnh</option><option value="calm">Calm · Nhẹ nhàng như bản đầu</option></select></div>
++            <div class="form-group col-6"><label for="studioMotion">Nhịp chuyển động</label><select id="studioMotion"><option value="calm">Theo lời đọc · Thẻ bổ sung dần</option><option value="dynamic">Gọn nhanh · Thẻ vào ngắn hơn</option></select></div>
+             <div class="form-group col-6"><label class="custom-checkbox studio-sound-toggle"><input id="studioSoundDesign" type="checkbox" checked><span>Âm thanh nhấn cảnh nhẹ</span></label><span class="field-hint">Có thể tắt nếu voice của bạn đã có nhạc hoặc hiệu ứng.</span></div>
+           </div>
+           <div class="form-row">
+@@ -324,7 +328,7 @@
+           <div class="form-actions">
+             <button type="button" class="btn btn-primary btn-glow" id="btnSubmitCustomScript">
+               <span class="icon">🚀</span>
+-              <span>Render Kịch Bản Này</span>
++              <span>Duyệt & Chỉnh Kịch Bản Này</span>
+             </button>
+           </div>
+         </div>
+@@ -341,7 +345,7 @@
+           <div class="tip-item">
+             <div class="tip-num">01</div>
+             <div class="tip-body">
+-              <strong>3 Giây Đầu Quyết Định:</strong> Cảnh Hook đầu tiên luôn có hiệu ứng chữ giật flash và số liệu gây tò mò để giữ chân người xem TikTok.
++              <strong>3 Giây Đầu Quyết Định:</strong> Mở bằng vấn đề hoặc câu hỏi cụ thể, rồi đưa bằng chứng từ nguồn. Thẻ và hình xuất hiện theo lời đọc.
+             </div>
+           </div>
+           <div class="tip-item">
+@@ -566,6 +570,8 @@
+               <textarea id="inspectorVoiceText" rows="4" placeholder="Nhập lời thoại của cảnh..."></textarea>
+             </div>
+ 
++            <details class="form-group"><summary>Nhịp xuất hiện từng khối</summary><p class="field-hint">Mốc tính từ đầu cảnh. Để trống để tự khớp lời đọc; nhập giây để chỉnh tay. Lưu rồi render để cập nhật hình.</p><div id="inspectorBlockTiming"></div></details>
++            <button type="button" id="btnReferenceDesign" class="btn btn-secondary">Áp dụng thiết kế video mẫu cho dự án</button>
+             <div class="form-row">
+               <div class="form-group col-6">
+                 <label for="inspectorTemplate">Template hiển thị</label>
+@@ -578,7 +584,7 @@
+                     <option value="callout">callout (Tuyên bố)</option>
+                     <option value="outro">outro (Kết bài)</option>
+                   </optgroup>
+-                  <optgroup label="Mở rộng Review (M3)">
++                  <optgroup label="Giải thích"><option value="workflow">Workflow · từng bước</option><option value="code-window">Code / terminal</option><option value="data-flow">Luồng dữ liệu</option><option value="worked-example">Ví dụ minh họa</option></optgroup><optgroup label="Mở rộng Review (M3)">
+                     <option value="spec-table">spec-table (Bảng cấu hình)</option>
+                     <option value="pros-cons">pros-cons (Ưu & Nhược điểm)</option>
+                     <option value="verdict-score">verdict-score (Điểm đánh giá)</option>
+@@ -1022,12 +1028,13 @@
+     <span class="toast-message" id="toastMessage">Thông báo</span>
+   </div>
+ 
+-  <dialog id="studioLayoutPreview" class="studio-review-dialog"><header><h3>Xem bố cục · mỗi cảnh 3 giây, chưa có voice</h3><button id="studioLayoutPreviewClose" class="btn btn-outline" type="button">Đóng</button></header><iframe id="studioLayoutFrame" title="Xem trước bố cục đang sửa" sandbox="allow-scripts allow-same-origin" style="width:100%;height:65vh;border:0;background:#050d18"></iframe></dialog>
++  <dialog id="studioLayoutPreview" class="studio-review-dialog"><header><h3>Xem bố cục · thời gian tạm, chưa có voice</h3><button id="studioLayoutPreviewClose" class="btn btn-outline" type="button">Đóng</button></header><iframe id="studioLayoutFrame" title="Xem trước bố cục đang sửa" sandbox="allow-scripts allow-same-origin" style="width:100%;height:65vh;border:0;background:#050d18"></iframe></dialog>
+   <dialog id="studioReview" class="studio-review-dialog">
+     <header><div><span class="studio-kicker">TRƯỚC KHI XUẤT VIDEO</span><h2>Duyệt kịch bản & giọng</h2></div><button id="studioReviewClose" class="btn btn-outline" type="button">Đóng</button></header>
+     <p id="studioReviewHint" role="status"></p>
+     <audio id="studioReviewAudio" controls hidden preload="none" style="width:100%;margin:12px 0"></audio>
+-    <label for="studioReviewPack">Template của bản dựng · đổi vẫn giữ kịch bản</label><select id="studioReviewPack"></select>
++    <label for="studioReviewPack">Thiết kế của bản dựng · giữ nguyên nội dung</label><select id="studioReviewPack"></select>
++    <label class="custom-checkbox"><input type="checkbox" id="studioReferenceDesign" checked><span>Áp dụng phong cách video mẫu cho tất cả cảnh</span></label>
+     <details id="studioPronunciationReview" class="studio-coverage"><summary>Cách đọc thuật ngữ · kiểm tra trước khi xuất</summary><p>Chỉ đổi âm đọc, giữ nguyên chữ trên hình. Từ điển riêng cho video này có dạng {"Agent":"ây chình"}. Nghe thử các cảnh sau khi áp dụng.</p><label for="studioPronunciationOverrides">Từ điển riêng của video (JSON)</label><textarea id="studioPronunciationOverrides" rows="4">{}</textarea><button id="studioApplyPronunciation" class="btn btn-secondary" type="button">Áp dụng & xem cách đọc</button><div id="studioPronunciationReport" role="status"></div></details>
+     <section id="studioCoverage" class="studio-coverage" hidden></section>
+     <div id="studioHookOptions" class="studio-hook-options" hidden></div>
+--- a/public/studio.js
++++ b/public/studio.js
+@@ -8,7 +8,7 @@
+   let visualRepo = "";
+   let templateCatalog = [];
+   let stylePacks = [];
+-  let currentPack = "editorial";
++  let currentPack = "reference";
+   const el = id => document.getElementById(id);
+   const message = text => { el('studioStatus').textContent = text; if (el('studioReview')?.open) el('studioReviewHint').textContent = text; };
+   const api = async (url, options) => {
+@@ -78,11 +78,12 @@
+   }
+   function applyPack(script,id) {
+     const pack=stylePacks.find(p=>p.id===id);if(!pack)return;
+-    script.templatePack=id;script.visualStyle='tech-editorial';script.motionPreset='dynamic';script.colorTheme=id==='explainer'?'midnight':'teal';
++    script.templatePack=id;script.visualStyle='tech-editorial';
++    if(id==='reference'){script.creative={presetId:'reference',...script.creative};script.motionPreset='calm';script.captions={enabled:true,style:'minimal',highlightMode:'estimated'};}else delete script.creative;
+   }
+   function selectPack(id) {
+     const pack=stylePacks.find(p=>p.id===id);if(!pack)return;
+-    currentPack=id;el('studioStyle').value='tech-editorial';el('studioMotion').disabled=false;el('studioMotion').value='dynamic';
++    currentPack=id;el('studioStyle').value='tech-editorial';el('studioMotion').disabled=false;el('studioMotion').value='calm';
+     el('studioTheme').value=id==='explainer'?'midnight':'teal';el('studioTheme').disabled=Boolean(pack.adaptation);
+     el('studioPackTitle').textContent=pack.name;el('studioPackDescription').textContent=pack.description+' Phù hợp: '+pack.goodFor+'.';
+     el('studioStylePreview').src=pack.previewUrl;
+@@ -90,16 +91,32 @@
+     el('studioPackGrid').querySelectorAll('button').forEach(b=>{const active=b.dataset.pack===id;b.classList.toggle('is-selected',active);b.setAttribute('aria-pressed',String(active));});
+   }
+   function buildPackGallery() {
+-    el('studioPackGrid').replaceChildren();el('studioPackCount').textContent=`${stylePacks.length} template`;
+-    stylePacks.forEach(pack=>{
+-      const button=document.createElement('button');button.type='button';button.className='pack-card';button.dataset.pack=pack.id;button.setAttribute('aria-label','Chọn template '+pack.name);
+-      const poster=document.createElement('img');poster.src=pack.posterUrl;poster.alt='Minh họa '+pack.name;poster.loading='lazy';poster.width=600;poster.height=360;
+-      const name=document.createElement('strong');name.textContent=pack.name;
+-      const desc=document.createElement('span');desc.className='pack-card-description';desc.textContent=pack.description;
+-      const tag=document.createElement('span');tag.className='pack-card-tag';tag.textContent=pack.adaptation?'MG · Bản thích ứng 9:16':'Phong cách có sẵn';
+-      button.append(poster,name,desc,tag);button.addEventListener('click',()=>selectPack(pack.id));el('studioPackGrid').append(button);
+-    });
+-    if(stylePacks.length)selectPack(currentPack);
++    el('studioPackGrid').replaceChildren();el('studioPackCount').textContent=`${templateCatalog.length} bố cục · 1 thiết kế chung`;
++    templateCatalog.forEach(template=>{
++      const button=document.createElement('button');button.type='button';button.className='pack-card';button.dataset.layout=template.id;
++      const name=document.createElement('strong');name.textContent=template.label;
++      const desc=document.createElement('span');desc.className='pack-card-description';desc.textContent='Studio tối · Thẻ hiện theo lời đọc';
++      button.append(name,desc);button.addEventListener('click',()=>{
++        currentPack='reference';el('studioStyle').value='tech-editorial';
++        el('studioPackTitle').textContent=template.label;
++        el('studioPackDescription').textContent='Bố cục minh họa. Khi dựng, hệ thống phối bố cục theo nội dung; mọi cảnh dùng thiết kế video mẫu.';
++        el('studioStylePreview').src='/api/studio/style-preview?pack=reference&layout='+encodeURIComponent(template.id);
++        el('studioPackSource').hidden=true;
++        el('studioPackGrid').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));
++      });el('studioPackGrid').append(button);
++    });
++    if(stylePacks.length)selectPack('reference');
++  }
++  async function blockTimingEditor(container,scene){
++    const data=await(await api('/api/studio/block-plan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scene})})).json();
++    data.blocks.forEach(block=>{
++      const row=document.createElement('label');row.className='block-timing-row';row.textContent=block.text.slice(0,85);
++      const input=document.createElement('input');input.type='number';input.min='0';input.max='180';input.step='.05';input.placeholder='Tự động theo lời';input.value=scene.blockTiming?.[block.id]?.atSec??'';
++      input.setAttribute('aria-label','Giây xuất hiện: '+block.text);
++      input.addEventListener('change',()=>{
++        scene.blockTiming??={};if(input.value==='')delete scene.blockTiming[block.id];else scene.blockTiming[block.id]={atSec:Number(input.value)};
++      });row.append(input);container.append(row);
++    });
+   }
+   function showCoverage(script) {
+     const section=el('studioCoverage');section.replaceChildren();section.hidden=!script.coverage;
+@@ -174,12 +191,18 @@
+     el('studioPronunciationOverrides').value=JSON.stringify(script.voice.pronunciationOverrides||{},null,2);
+     if(!script.voice.uploadId)refreshPronunciation(script).catch(err=>{el('studioPronunciationReport').textContent=err.message;});
+     renderCallback = callback;
++    el('studioReferenceDesign').checked=script.templatePack==='reference'||Boolean(script.creative);
+     const packSelect=el('studioReviewPack');packSelect.replaceChildren();
+     if(!script.templatePack&&script.visualStyle==='classic')packSelect.add(new Option('Classic · bản cũ','__legacy__'));
+     stylePacks.forEach(p=>packSelect.add(new Option(p.name,p.id)));
+     packSelect.value=script.templatePack||(script.visualStyle==='classic'?'__legacy__':script.colorTheme==='midnight'?'explainer':'editorial');
+     showCoverage(script);
+     el('studioReviewList').replaceChildren();
++    if(script.templatePack==='reference'||script.creative){
++      const label=document.createElement('label');label.textContent='Nhấn từ phụ đề';
++      const select=document.createElement('select');select.add(new Option('Cho phép nhịp ước lượng khi TTS thiếu mốc từ','estimated'));select.add(new Option('Chỉ nhấn khi có mốc từ chính xác','accurate-only'));
++      select.value=script.captions?.highlightMode||'accurate-only';select.addEventListener('change',()=>{script.captions ||= {enabled:true,style:'minimal'};script.captions.highlightMode=select.value;});el('studioReviewList').append(label,select);
++    }
+     const weights = script.scenes.map(s => s.voiceText.split(/\s+/).length);
+     const total = weights.reduce((a,b) => a+b, 0);
+     let position = 0;
+@@ -212,11 +235,25 @@
+       card.append(textLabel, text);
+       const key = primaryField(scene.templateData);
+       if (key) {
+-        const titleLabel = document.createElement('label'); titleLabel.textContent = 'Chữ chính trên hình';
++        const titleLabel = document.createElement('label'); titleLabel.textContent = scene.templateData.template==='hook'&&(script.templatePack==='reference'||script.creative)?'Tóm tắt ý hook (tên sản phẩm chỉnh bên dưới)':'Chữ chính trên hình';
+         const title = document.createElement('input'); title.value = scene.templateData[key];
+         title.maxLength = {headline:40,title:40,statement:80,label:40,productName:40,ctaTop:30}[key] || 40;
+         title.addEventListener('input', () => { scene.templateData[key] = title.value; });
+         card.append(titleLabel, title);
++      }
++      if(scene.templateData.template==='hook' && (script.templatePack==='reference'||script.creative)){
++        const note=document.createElement('p');note.className='hint';note.textContent='Hook mẫu: tên sản phẩm trên khối kính; câu vấn đề → giải pháp nằm ở lời đọc. Chọn logo sản phẩm trong phần tư liệu.';card.append(note);
++        const hero=scene.templateData.hero ||= {name:script.metadata.title.slice(0,40)};
++        for(const [field,label,max] of [['name','Tên sản phẩm trên hook',40],['category','Nhãn loại sản phẩm',32],['repository','Repo / nhãn nguồn',50],['before','Trước · vấn đề từ nguồn',40],['after','Sau · lợi ích từ nguồn',40]]){
++          const lab=document.createElement('label');lab.textContent=label;
++          const input=document.createElement('input');input.value=hero[field]||'';input.maxLength=max;
++          input.addEventListener('input',()=>{const currentHero=scene.templateData.hero ||= {name:script.metadata.title.slice(0,40)};currentHero[field]=input.value;if(field==='name'&&!input.value.trim())input.setCustomValidity('Nhập tên sản phẩm');else input.setCustomValidity('');});card.append(lab,input);
++        }
++      }
++      if(script.templatePack==='reference'||script.creative){
++        const details=document.createElement('details'),label=document.createElement('summary');label.textContent='Thẻ bổ sung trên cùng bảng (JSON)';
++        const field=document.createElement('textarea');field.rows=5;field.value=JSON.stringify(scene.referenceBoard||{},null,2);
++        field.addEventListener('change',()=>{try{scene.referenceBoard=JSON.parse(field.value);field.setCustomValidity('');}catch{field.setCustomValidity('JSON thẻ bổ sung chưa hợp lệ');}});details.append(label,field);card.append(details);
+       }
+       const templateLabel=document.createElement('label');templateLabel.textContent='Bố cục cảnh (đổi sẽ đặt lại nội dung hiển thị)';
+       const templateSelect=document.createElement('select');templateSelect.setAttribute('aria-label',`Bố cục cảnh ${i+1}`);
+@@ -224,7 +261,7 @@
+       templateSelect.value=scene.templateData.template;
+       templateSelect.addEventListener('change',()=>{
+         const selected=templateCatalog.find(t=>t.id===templateSelect.value);if(!selected)return;
+-        scene.templateData=JSON.parse(JSON.stringify(selected.data));
++        scene.templateData=JSON.parse(JSON.stringify(selected.data));delete scene.blockTiming;
+         if(scene.templateData.template==='outro')scene.templateData.channelName=script.metadata.channel.slice(0,30);
+         el('studioReview').close();showReview(script,callback);
+       });
+@@ -232,6 +269,8 @@
+       const json=document.createElement('textarea');json.rows=7;json.className='studio-template-json';json.value=JSON.stringify(scene.templateData,null,2);json.dataset.templateScene=i;
+       advanced.append(summary,json);advanced.addEventListener('toggle',()=>{if(advanced.open&&json.checkValidity())json.value=JSON.stringify(scene.templateData,null,2);});card.append(templateLabel,templateSelect,advanced);
+       sceneVisualEditor(card,scene);
++      const timing=document.createElement('details');const timingTitle=document.createElement('summary');timingTitle.textContent='Nhịp xuất hiện từng khối · giây từ đầu cảnh';timing.append(timingTitle);card.append(timing);
++      let loaded=false;timing.addEventListener('toggle',()=>{if(timing.open&&!loaded){loaded=true;blockTimingEditor(timing,scene).catch(err=>{loaded=false;message(err.message);});}});
+       const transitionLabel=document.createElement('label');transitionLabel.textContent='Chuyển cảnh';const transition=document.createElement('select');
+       ['cut','fade','slide','zoom'].forEach(t=>transition.add(new Option(t,t)));transition.value=scene.transition?.type||'cut';
+       transition.addEventListener('change',()=>{scene.transition={type:transition.value,duration:0.25};});card.append(transitionLabel,transition);
+@@ -276,7 +315,7 @@
+     }
+     const visualStyle = el('studioStyle').value;
+     message('Đang chuẩn bị kịch bản để bạn duyệt…');
+-    const response = await api('/api/generate-script', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, visualAssetIds: visualAssets.map(a=>a.id), directingMode: el("studioAutoDirect").checked ? "auto" : undefined, fitDuration: el("studioFitDuration").checked && !voice.uploadId, voice, visualStyle, templatePack: currentPack || undefined, contentMode: el('studioDepth').value, targetDurationSec: el('studioDepth').value === 'deep-dive' ? Number(el('studioLongDuration').value) : payload.preset === 'review_60' ? 60 : payload.preset === 'short_30' ? 30 : 45, colorTheme: el('studioTheme').value, motionPreset: visualStyle === 'tech-editorial' ? el('studioMotion').value : undefined, soundDesign: el('studioSoundDesign').checked, bgm: {enabled: el('studioBgmEnabled').checked}, captions: { enabled: true, style: visualStyle === 'tech-editorial' ? 'minimal' : payload.captions?.style || 'tiktok-bold' } }) });
++    const response = await api('/api/generate-script', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, creative:{presetId:'reference',hookType:el('studioHookType').value,structureId:el('studioStructure').value,pacingId:el('studioMotion').value==='dynamic'?'quick':'narrated'}, visualAssetIds: visualAssets.map(a=>a.id), directingMode: el("studioAutoDirect").checked ? "auto" : undefined, fitDuration: el("studioFitDuration").checked && !voice.uploadId, voice, visualStyle, templatePack: currentPack || undefined, contentMode: el('studioDepth').value, targetDurationSec: el('studioDepth').value === 'deep-dive' ? Number(el('studioLongDuration').value) : payload.preset === 'review_60' ? 60 : payload.preset === 'short_30' ? 30 : 45, colorTheme: el('studioTheme').value, motionPreset: visualStyle === 'tech-editorial' ? el('studioMotion').value : undefined, soundDesign: el('studioSoundDesign').checked, bgm: {enabled: el('studioBgmEnabled').checked}, captions: { enabled: true, style: visualStyle === 'tech-editorial' ? 'minimal' : payload.captions?.style || 'tiktok-bold' } }) });
+     const script = await response.json();
+     const sourceLogo=el('studioLogo').value;if(sourceLogo)script.metadata.logoAssetId=sourceLogo;
+     showReview(script, callback);
+@@ -291,11 +330,12 @@
+       if(currentPack&&el('studioStyle').value!=='classic'){el('studioStylePreview').src=`/api/studio/style-preview?pack=${currentPack}&motion=${el('studioMotion').value}`;return;}
+       el('studioStylePreview').src=`/api/studio/style-preview?style=${el('studioStyle').value}&motion=${el('studioMotion').value}&theme=${el('studioTheme').value}`;
+     };
+-    el('studioStyle').addEventListener('change',()=>{if(el('studioStyle').value==='classic'){currentPack=null;el('studioTheme').disabled=false;el('studioPackTitle').textContent='Classic · bản cũ';el('studioPackSource').hidden=true;el('studioPackGrid').querySelectorAll('button').forEach(b=>{b.classList.remove('is-selected');b.setAttribute('aria-pressed','false');});}else if(!currentPack){selectPack(el('studioTheme').value==='midnight'?'explainer':'editorial');}refreshStylePreview();});
++    el('studioStyle').addEventListener('change',()=>{if(el('studioStyle').value==='classic'){currentPack=null;el('studioTheme').disabled=false;el('studioPackTitle').textContent='Classic · bản cũ';el('studioPackSource').hidden=true;el('studioPackGrid').querySelectorAll('button').forEach(b=>{b.classList.remove('is-selected');b.setAttribute('aria-pressed','false');});}else if(!currentPack){selectPack('reference');}refreshStylePreview();});
+     el('studioMotion').addEventListener('change',refreshStylePreview);
+-    el('studioTheme').addEventListener('change',()=>{if(el('studioStyle').value!=='classic')selectPack(el('studioTheme').value==='midnight'?'explainer':'editorial');else refreshStylePreview();});
++    el('studioTheme').addEventListener('change',()=>{if(el('studioStyle').value!=='classic')selectPack('reference');else refreshStylePreview();});
+     el('studioDepth').addEventListener('change',()=>{el('studioLongDuration').disabled=el('studioDepth').value!=='deep-dive';});
+-    el('studioReviewPack').addEventListener('change',()=>{if(!pending)return;const id=el('studioReviewPack').value;if(id==='__legacy__'){delete pending.templatePack;pending.visualStyle='classic';}else applyPack(pending,id);message('Đã đổi template. Lời đọc và nội dung các cảnh được giữ nguyên; bấm Xem thử để kiểm tra.');});
++    el('studioReferenceDesign').addEventListener('change',()=>{if(!pending)return;if(el('studioReferenceDesign').checked){applyPack(pending,'reference');el('studioReviewPack').value='reference';message('Đã áp dụng thiết kế video mẫu cho mọi cảnh. Bấm Xem thử để kiểm tra.');}else{delete pending.creative;pending.templatePack='editorial';el('studioReviewPack').value='editorial';}});
++    el('studioReviewPack').addEventListener('change',()=>{if(!pending)return;const id=el('studioReviewPack').value;if(id==='__legacy__'){delete pending.templatePack;pending.visualStyle='classic';}else applyPack(pending,id);el('studioReferenceDesign').checked=id==='reference';message('Đã đổi template. Lời đọc và nội dung các cảnh được giữ nguyên; bấm Xem thử để kiểm tra.');});
+     el('studioFetchVisuals').addEventListener('click',async()=>{try{await fetchVisuals(el('inputArticleUrl').value.trim());}catch(err){el('studioVisualStatus').textContent=err.message;}});
+     el('studioVisualUpload').addEventListener('change',async()=>{
+       const file=el('studioVisualUpload').files[0];if(!file)return;
+@@ -330,7 +370,7 @@
+     });
+     el('studioReviewPreview').addEventListener('click',async()=>{
+       if(!pending)return;
+-      if(Array.from(el('studioReviewList').querySelectorAll('[data-template-scene]')).some(t=>!t.checkValidity()))return message('Sửa JSON bố cục bị lỗi trước khi xem thử.');
++      if(Array.from(el('studioReviewList').querySelectorAll('input,textarea,select')).some(t=>!t.checkValidity()))return message('Sửa JSON bố cục bị lỗi trước khi xem thử.');
+       el('studioReviewPreview').disabled=true;
+       try{const r=await api('/api/studio/preview-script',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({script:pending})});el('studioLayoutFrame').srcdoc=await r.text();el('studioLayoutPreview').showModal();}
+       catch(err){message(err.message);}finally{el('studioReviewPreview').disabled=false;}
+@@ -344,7 +384,7 @@
+     el('studioReviewRender').addEventListener('click', async () => {
+       if (!pending || !renderCallback) return;
+       try {
+-        const invalidJson=Array.from(el('studioReviewList').querySelectorAll('[data-template-scene]')).find(t=>!t.checkValidity());
++        const invalidJson=Array.from(el('studioReviewList').querySelectorAll('input,textarea,select')).find(t=>!t.checkValidity());
+         if(invalidJson)throw new Error('Sửa JSON bố cục bị lỗi trước khi render.');
+         if(!pending.voice.uploadId){applyPronunciationOverrides();await refreshPronunciation(pending);}
+         if (pending.scenes.some(s => !s.voiceText.trim())) throw new Error('Lời đọc mỗi cảnh không được trống.');
+@@ -358,11 +398,15 @@
+         await callback({ script });
+       } catch (err) { el('studioReviewHint').textContent = err.message; }
+     });
+-    try{stylePacks=(await(await api('/api/studio/style-packs')).json()).packs;buildPackGallery();}catch(err){el('studioPackCount').textContent='Chưa tải được template';message(err.message);}
+-    try{templateCatalog=(await(await api('/api/studio/templates')).json()).templates;}catch(err){message(err.message);}
++    try{stylePacks=(await(await api('/api/studio/style-packs')).json()).packs;}catch(err){el('studioPackCount').textContent='Chưa tải được template';message(err.message);}
++    try{templateCatalog=(await(await api('/api/studio/templates')).json()).templates;buildPackGallery();}catch(err){message(err.message);}
+     try { options = await (await api('/api/studio/options')).json().then(d => d.providers); }
+     catch (err) { message(err.message); }
+     syncMode();
+   });
+-  return { prepare };
++  async function reviewImported(script,callback){
++    const response=await api('/api/studio/validate-script',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({script})});
++    const validated=await response.json();showReview(validated.script,callback);
++  }
++  return { prepare, reviewImported, blockTimingEditor };
+ })();
+--- a/rerender.ts
++++ b/rerender.ts
+@@ -1,3 +1,6 @@
++import {referenceSettings} from './src/render/reference-design.js';
++import {stripCssImports} from './src/render/css.js';
++import {createRequire} from 'node:module';
+ // One-off script: re-render the existing composition without re-running TTS.
+ // Uses already-generated per-scene voice files in <outputDir>/voice/.
+ //
+@@ -7,7 +10,7 @@
+ dotenvConfig({ path: ".env.local" });
+ dotenvConfig();
+ 
+-import { readFile, writeFile, copyFile } from "node:fs/promises";
++import { readFile, writeFile, copyFile, mkdir } from "node:fs/promises";
+ import { join, dirname, basename } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { ScriptSchema } from "./src/render/script-schema.js";
+@@ -54,6 +57,13 @@
+       : cfg.vbeeVoiceCode;
+   }
+   const script = ScriptSchema.parse(raw);
++  const fpsArg=process.argv.find(a=>a.startsWith('--fps='));
++  const fps=fpsArg?Number(fpsArg.slice(6)):30;
++  if(![24,30,60].includes(fps))throw new Error('--fps chỉ hỗ trợ 24, 30 hoặc 60 theo HyperFrames.');
++  const reference=referenceSettings(script);
++  if(reference||script.templatePack)script.visualStyle='tech-editorial';
++  const gapSec=script.voice.uploadId?0:reference?.gapSec??(script.visualStyle==='tech-editorial'?.08:SCENE_GAP_SEC);
++  const outroHoldSec=reference?.outroHoldSec??(script.visualStyle==='tech-editorial'?.6:3);
+ 
+   // Probe per-scene durations from existing voice files
+   const sceneAudio = await Promise.all(
+@@ -68,14 +78,14 @@
+   // Re-concat voice (in case audio-tools fix changed encoding)
+   const voiceRawMp3 = join(outputDir, "voice-raw.mp3");
+   const voiceMp3 = join(outputDir, "voice.mp3");
+-  await concatWithSilence(sceneAudio.map((a) => a.path), SCENE_GAP_SEC, voiceRawMp3);
++  await concatWithSilence(sceneAudio.map((a) => a.path), gapSec, voiceRawMp3);
+ 
+   // Compute scene start times + collect SFX
+   let cursor = 0;
+   const sceneStarts: Record<string, number> = {};
+   for (const a of sceneAudio) {
+     sceneStarts[a.id] = cursor;
+-    cursor += a.durationSec + SCENE_GAP_SEC;
++    cursor += a.durationSec + gapSec;
+   }
+   // Smart SFX selection — same 3-tier logic as pipeline
+   const sfxIndex = indexSfxLibrary(SFX_DIR);
+@@ -110,7 +120,7 @@
+   const bgm=script.bgm ?? DEFAULT_BGM;
+   if(bgm.enabled!==false && existsSync(bgm.src)){
+     const dry=join(outputDir,'voice-before-bgm.mp3');await copyFile(voiceMp3,dry);
+-    await mixBgmWithVoice(dry,bgm.src,voiceMp3,{...bgm,durationSec:sceneAudio.reduce((n,a)=>n+a.durationSec+SCENE_GAP_SEC,0)+3});
++    await mixBgmWithVoice(dry,bgm.src,voiceMp3,{...bgm,durationSec:sceneAudio.reduce((n,a)=>n+a.durationSec+gapSec,0)+outroHoldSec});
+   }
+ 
+   const totalDur = await getDurationSec(voiceMp3);
+@@ -166,12 +176,12 @@
+   const html = composeHtml({
+     script,
+     sceneAudio: sceneAudio.map((a) => ({ id: a.id, durationSec: a.durationSec })),
+-    gapSec: SCENE_GAP_SEC,
++    gapSec,
+     bgImageRelPath,
+     audioRelPath: "voice.mp3",
+     tiktok: cfg.tiktok,
+     tiktokAvatarRelPath: ttAvatarFile,
+-    outroHoldSec: 3,
++    outroHoldSec,
+     captionCues,
+     mediaMap,
+   });
+@@ -183,11 +193,18 @@
+     createdAt: new Date().toISOString(),
+   }, null, 2));
+   await copyFile(join(TPL_DIR, "styles.css"),    join(outputDir, "styles.css"));
++  if(script.visualStyle==='tech-editorial'){
++    const base=stripCssImports(await readFile(join(TPL_DIR,'styles.css'),'utf8'));
++    await writeFile(join(outputDir,'styles.css'),base+'\n'+await readFile(join(TPL_DIR,'styles.tech-editorial.css'),'utf8')+'\n'+await readFile(join(TPL_DIR,'styles.follow-card.css'),'utf8'));
++    await mkdir(join(outputDir,'fonts'),{recursive:true});
++    await copyFile(join(__dirname,'assets/fonts/BeVietnamPro-Bold.ttf'),join(outputDir,'fonts/BeVietnamPro-Bold.ttf'));
++    await copyFile(createRequire(import.meta.url).resolve('gsap/dist/gsap.min.js'),join(outputDir,'gsap.min.js'));
++  }
+   await copyFile(join(TPL_DIR, "animations.js"), join(outputDir, "animations.js"));
+ 
+   // Render
+   const videoPath = join(outputDir, "video.mp4");
+-  await renderWithHyperframes({ compositionDir: outputDir, outputPath: videoPath });
++  await renderWithHyperframes({ compositionDir: outputDir, outputPath: videoPath, fps, quality:process.argv.includes('--draft')?'draft':'standard' });
+   await ensureVideoThumbnail(videoPath,join(outputDir,'cover.png'));
+   console.log(`\nDone: ${videoPath}`);
+ }
+--- a/src/pipeline.ts
++++ b/src/pipeline.ts
+@@ -1,3 +1,4 @@
++import {referenceSettings} from './render/reference-design.js';
+ import {pronunciationReport} from "./tts/lexicon.js";
+ import {stripCssImports} from "./render/css.js";
+ import {fitVoiceDuration} from "./studio/duration.js";
+@@ -76,11 +77,13 @@
+   }
+   const script: Script = ScriptSchema.parse(raw);
+   script.bgm ??= {...DEFAULT_BGM};
++  if(referenceSettings(script))script.visualStyle='tech-editorial';
+   if(script.templatePack){script.visualStyle="tech-editorial";if(script.templatePack==="explainer")script.colorTheme="midnight";}
+   cfg = voiceConfig(script.voice);
+   log.step(1, TOTAL_STEPS, `Validate script.json (${script.voice.uploadId ? "voice tải lên" : "TTS: " + cfg.ttsProvider})`);
+-  const gapSec = script.voice.uploadId ? 0 : script.visualStyle === 'tech-editorial' ? 0.08 : SCENE_GAP_SEC;
+-  const outroHoldSec = script.visualStyle === 'tech-editorial' ? 0.6 : OUTRO_HOLD_SEC;
++  const reference=referenceSettings(script);
++  const gapSec = script.voice.uploadId ? 0 : reference ? reference.gapSec : script.visualStyle === 'tech-editorial' ? 0.08 : SCENE_GAP_SEC;
++  const outroHoldSec = reference ? reference.outroHoldSec : script.visualStyle === 'tech-editorial' ? 0.6 : OUTRO_HOLD_SEC;
+ 
+   // STEP 2
+   log.step(2, TOTAL_STEPS, "Write script.txt for CapCut");
+--- a/src/render/channel-outro.test.ts
++++ b/src/render/channel-outro.test.ts
+@@ -6,11 +6,12 @@
+ import {applyChannelOutro,channelOutroVoice} from '../script/channel-outro.js';
+ import {speechText} from '../tts/lexicon.js';
+ import {generateScriptFromContent} from '../utils/script-generator.js';
+-it('renders the selected channel, Follow state, cursor and click animation for every pack and Classic',()=>{
++it('renders selected channel with a glass profile for reference and Follow interaction for legacy packs',()=>{
+  const s=ScriptSchema.parse(JSON.parse(readFileSync('tests/fixtures/studio-director.json','utf8')));applyChannelOutro(s,'DevPeek36');
+  for(const pack of [...PACK_IDS,undefined]){
+   for(const motionPreset of ['calm','dynamic'] as const){
+    const html=composeHtml({script:{...s,templatePack:pack,visualStyle:pack?'tech-editorial':'classic',motionPreset},sceneAudio:s.scenes.map(scene=>({id:scene.id,durationSec:3})),gapSec:0,outroHoldSec:0,bgImageRelPath:null,audioRelPath:'voice.mp3',tiktok:{displayName:'Unrelated',handle:'@other',followers:''}});
++   if(pack==='reference'){expect(html).toContain('ref-profile tt-card');expect(html).toContain('>DevPeek36</strong>');expect(html).not.toContain('class="tt-cursor"');continue;}
+    expect(html).toContain('class="tt-card"');expect(html).toContain('class="tt-cursor"');expect(html).toContain('class="tt-click-ring"');expect(html).toContain('Đã theo dõi');expect(html).toContain('class="tt-display-name">DevPeek36');expect(html).not.toContain('>Unrelated<');expect(html).toContain('function animateFollowCard');expect(html).not.toContain("tl.set(card, { opacity: 0, visibility: 'hidden' }");
+   }
+  }
+--- a/src/render/html-composer.ts
++++ b/src/render/html-composer.ts
+@@ -1,3 +1,5 @@
++import {renderReferenceScene} from './reference-scenes.js';
++import {referenceSettings,decorateReferenceBlocks} from './reference-design.js';
+ import {sourceLabel} from "./source-label.js";
+ import {packDecor,packVariables} from "./style-packs.js";
+ import { readFileSync } from "node:fs";
+@@ -51,7 +53,7 @@
+ 
+ export function composeHtml(args: ComposeArgs): string {
+   const { sceneAudio, gapSec, bgImageRelPath, audioRelPath } = args;
+-  const script:Script=args.script.templatePack ? {...args.script,visualStyle:"tech-editorial",colorTheme:args.script.templatePack==="explainer"?"midnight":args.script.colorTheme} : args.script;
++  const script:Script=args.script.templatePack || args.script.creative ? {...args.script,visualStyle:"tech-editorial",colorTheme:args.script.templatePack==="explainer"?"midnight":args.script.colorTheme} : args.script;
+   const tiktok = args.tiktok ?? DEFAULT_TIKTOK;
+   const tiktokAvatar = args.tiktokAvatarRelPath ?? "tiktok-avatar.jpg";
+   const outroHoldSec = args.outroHoldSec ?? 3;
+@@ -72,14 +74,15 @@
+   });
+   const totalDuration = cursor;
+ 
+-  const dynamic = script.visualStyle === "tech-editorial" && script.motionPreset === "dynamic";
++  const reference = referenceSettings(script);
++  const dynamic = !reference && script.visualStyle === "tech-editorial" && script.motionPreset === "dynamic";
+ 
+   // Render scenes
+   const sceneHtml = timing.map(({ scene, start, duration }) => {
+     const mediaRecord = args.mediaMap?.[scene.id];
+     const gallery=scene.templateData.template==='image-gallery'?scene.templateData.images.map((_,i)=>i===0&&mediaRecord?mediaRecord:args.mediaMap?.[`${scene.id}:gallery:${i}`]):[];
+-    let sceneMarkup = renderScene(scene, start, duration, bgImageRelPath, tiktok, tiktokAvatar, mediaRecord, script.visualStyle, dynamic, channelLogoPath,gallery);
+-    if(script.templatePack && !['editorial','explainer'].includes(script.templatePack))sceneMarkup=sceneMarkup.replace(/(<div class="scene clip"[\s\S]*?>)/,'$1'+packDecor(script.templatePack));
++    let sceneMarkup = reference ? renderReferenceScene({scene,start,duration,script,media:mediaRecord,gallery,channelLogoPath,tiktok}) : renderScene(scene, start, duration, bgImageRelPath, tiktok, tiktokAvatar, mediaRecord, script.visualStyle, dynamic, channelLogoPath,gallery);
++    if(!reference && script.templatePack && !['editorial','explainer'].includes(script.templatePack))sceneMarkup=sceneMarkup.replace(/(<div class="scene clip"[\s\S]*?>)/,'$1'+packDecor(script.templatePack));
+     if (dynamic) {
+       const index = script.scenes.indexOf(scene);
+       const label = scene.type === 'hook' ? 'MỞ ĐẦU' : scene.type === 'outro' ? 'KẾT NỐI' : 'ĐIỂM CHÍNH';
+@@ -88,6 +91,7 @@
+         <div class="scene-progress"><div class="scene-progress-fill"></div></div>`;
+       sceneMarkup = sceneMarkup.replace(/(<div class="scene clip"[\s\S]*?>)/, '$1' + decor);
+     }
++    if(reference)sceneMarkup=decorateReferenceBlocks(sceneMarkup,scene,start,duration,args.captionCues||[],reference);
+     return sceneMarkup;
+   }).join("\n");
+ 
+@@ -102,13 +106,15 @@
+   if (dynamic) shellHtml += `<div class="motion-grid"></div><div class="motion-orb orb-one"></div><div class="motion-orb orb-two"></div>
+     <div class="motion-specks">${Array.from({length:12},(_,i)=>`<i style="left:${8+(i*29)%84}%;top:${15+(i*17)%66}%"></i>`).join('')}</div>
+     <div class="editorial-footer"><span>${escapeHtml(sourceLabel(script.metadata.source.domain))}</span><span>${escapeHtml(script.metadata.channel)}</span></div>`;
++
++  if(reference) shellHtml += `<div class="reference-specks" aria-hidden="true">${Array.from({length:36},(_,i)=>`<i style="left:${(i*37+5)%96}%;top:${(i*23+7)%96}%;width:${4+i%4*2}px;height:${4+i%4*2}px;--particle:${["#8ad8bf","#8a9fd0","#a48acb","#e3bc73"][i%4]}"></i>`).join('')}</div><div class="reference-topline"></div><div class="reference-footer">${escapeHtml(script.metadata.channel)}</div>`;
+ 
+   // Render optional captions layer (M1)
+   const captionsEnabled = script.captions?.enabled ?? false;
+   let captionsHtml = "";
+   if (captionsEnabled && args.captionCues && args.captionCues.length > 0) {
+     const style = script.captions?.style ?? "tiktok-bold";
+-    captionsHtml = renderCaptions(args.captionCues, style);
++    captionsHtml = renderCaptions(args.captionCues, style, script.captions?.highlightMode);
+   }
+ 
+   // Saved/generated metadata must never burn editor guides into an MP4.
+@@ -120,6 +126,7 @@
+ </div>`
+     : "";
+ 
++  const referenceCss = reference ? `<style>${readFileSync(join(TPL_DIR,'styles.reference.css'),'utf8')}</style>` : '';
+   const animJs = readFileSync(join(TPL_DIR, "animations.js"), "utf8");
+ 
+   const tpl = readFileSync(join(TPL_DIR, "base.html.tmpl"), "utf8");
+@@ -127,8 +134,8 @@
+     ? tpl.replace(/<link[^>]+(?:fonts.googleapis.com|fonts.gstatic.com)[^>]*>/g, '')
+       .replace('https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js', 'gsap.min.js')
+     : tpl;
+-  return base
+-    .replace('<body>', script.visualStyle === 'tech-editorial' ? `<body class="tech-editorial${dynamic ? " motion-dynamic" : ""}${script.colorTheme === "midnight" ? " theme-midnight" : ""}${script.templatePack ? " pack-active pack-"+script.templatePack : ""}">` : '<body>')
++  return base.replace('</head>',referenceCss+'</head>')
++    .replace('<body>', script.visualStyle === 'tech-editorial' ? `<body class="tech-editorial${reference ? " reference-design" : ""}${dynamic ? " motion-dynamic" : ""}${script.colorTheme === "midnight" ? " theme-midnight" : ""}${script.templatePack ? " pack-active pack-"+script.templatePack : ""}">` : '<body>')
+     .replace('<body class="', script.templatePack ? `<body style="${packVariables(script.templatePack)}" class="` : '<body class="')
+     .replace("{{TITLE}}", escapeHtml(script.metadata.title))
+     .replace(/\{\{TOTAL_DURATION\}\}/g, totalDuration.toFixed(2))
+@@ -140,13 +147,13 @@
+ }
+ 
+ // ── CAPTIONS LAYER (M1) ────────────────────────────────────────────────────
+-function renderCaptions(cues: CaptionCue[], style: string): string {
++function renderCaptions(cues: CaptionCue[], style: string, highlightMode?:string): string {
+   return `
+ <!-- Captions layer (M1) -->
+ <div class="captions-container caption-style-${escapeHtml(style)}">
+   ${cues.map((cue) => {
+     const cueDur = (cue.endSec - cue.startSec).toFixed(3);
+-    return `  <div class="caption-cue clip" data-start="${cue.startSec.toFixed(3)}" data-duration="${cueDur}" data-accuracy="${cue.accuracy ?? "low"}">
++    return `  <div class="caption-cue clip" data-start="${cue.startSec.toFixed(3)}" data-duration="${cueDur}" data-accuracy="${cue.accuracy ?? "low"}" data-highlight-mode="${highlightMode||"accurate-only"}">
+     ${cue.words.map((w) => {
+       const wStart = (w.startMs / 1000).toFixed(3);
+       const wDur = Math.max(0.05, (w.endMs - w.startMs) / 1000).toFixed(3);
+--- /dev/null
++++ b/src/render/reference-design.test.ts
+@@ -0,0 +1,81 @@
++import {readFile} from 'node:fs/promises';
++import {expect,it} from 'vitest';
++import {ScriptSchema} from './script-schema.js';
++import {applyReferenceDefaults,sceneBlocks,resolveBlockTiming,referenceSettings,REFERENCE_PRESETS,BlockTiming} from './reference-design.js';
++import {TEMPLATE_CATALOG} from './template-catalog.js';
++import {composeHtml} from './html-composer.js';
++import {buildHookSuggestions} from '../script/hooks.js';
++import type {CaptionCue} from '../captions/types.js';
++const fixture=async()=>ScriptSchema.parse(JSON.parse(await readFile('tests/fixtures/studio-explainer.json','utf8')));
++it('renders every existing layout with the shared reference design and stable reveal IDs; legacy is opt-in',async()=>{
++ const legacy=await fixture();expect(referenceSettings(legacy)).toBeUndefined();
++ const script=applyReferenceDefaults(await fixture());
++ for(const entry of TEMPLATE_CATALOG){
++  const scene={...script.scenes[1],templateData:entry.data};
++  const s={...script,scenes:[scene]};
++  const html=composeHtml({script:s,sceneAudio:[{id:scene.id,durationSec:4}],gapSec:0,outroHoldSec:0,bgImageRelPath:null,audioRelPath:'voice.mp3'});
++  expect(html).toContain('reference-design');expect(html).toContain('reference-specks');
++  expect(html).not.toContain('class="pack-art');expect(html).not.toContain('class="scene-ordinal"');
++  for(const block of sceneBlocks(scene))expect(html).toContain(`data-block-id="${block.id}"`);
++ }
++ expect(legacy.templatePack).toBeUndefined();
++ expect(ScriptSchema.safeParse(script).success).toBe(true);
++});
++it('manual beats take precedence, accurate words anchor beats, low accuracy stays explicitly estimated',async()=>{
++ const script=applyReferenceDefaults(await fixture());const scene=script.scenes[0];scene.templateData={template:'hook',headline:'Công cụ mới',subhead:'Thử ngay',kenBurns:'zoom-in'};
++ const block=sceneBlocks(scene)[0];
++ const cue={accuracy:'high',words:[{text:'Công',startMs:12000,endMs:12200},{text:'cụ',startMs:12200,endMs:12400},{text:'mới',startMs:12400,endMs:12600}]} as CaptionCue;
++ expect(resolveBlockTiming(scene,block,0,10,5,[cue],REFERENCE_PRESETS.reference)).toEqual({atSec:1.96,basis:'word'});
++ expect(resolveBlockTiming(scene,block,0,10,5,[{...cue,accuracy:'low'}],REFERENCE_PRESETS.reference).basis).toBe('estimated');
++ scene.blockTiming={heading:{atSec:4.9}};
++ expect(resolveBlockTiming(scene,block,0,10,5,[cue],REFERENCE_PRESETS.reference)).toEqual({atSec:4.2,basis:'manual'});
++ expect(BlockTiming.safeParse({'<script>':{atSec:1}}).success).toBe(false);
++ expect(BlockTiming.safeParse({heading:{atSec:-1}}).success).toBe(false);
++});
++it('adds a second pacing combination as data, without changing renderer; overrides remain independent',async()=>{
++ const s=applyReferenceDefaults(await fixture(),{presetId:'reference-quick',hookType:'question',structureId:'news'});
++ expect(referenceSettings(s)?.gapSec).toBe(.04);
++ s.creative!.pacingId='narrated';expect(referenceSettings(s)?.gapSec).toBe(.08);
++ expect(s.creative?.hookType).toBe('question');expect(s.creative?.structureId).toBe('news');
++});
++it('hook modes retain source facts and do not inherit reference-video numbers',()=>{
++ const source='Mở nhiều tab gây khó theo dõi. Công cụ gom các chỉ số vào một trang.';
++ const problem=buildHookSuggestions('Dashboard',source,'problem-solution');
++ expect(problem[0].label).toBe('Vấn đề → giải pháp');expect(problem[0].voiceText).toMatch(/^Thay vì mở nhiều tab/u);
++ const questions=buildHookSuggestions('Dashboard',source,'question');expect(questions.every(h=>h.voiceText.endsWith('?'))).toBe(true);
++ expect(JSON.stringify([...problem,...questions])).not.toMatch(/15MB|37,6|28 widget/);
++});
++it('defaults both article and repository source-only drafts to the shared design without adding facts',async()=>{
++ const {generateScriptFromContent}=await import('../utils/script-generator.js');
++ for(const input of [{title:'Tin cập nhật',content:'Bản cập nhật hỗ trợ xuất báo cáo. Người dùng chọn định dạng trước khi tải về.',url:'https://example.test/tin'},{title:'Dashboard',content:'Mở nhiều tab gây khó theo dõi. Dashboard gom dữ liệu vào một trang. Dự án cần Docker để triển khai.',url:'https://github.com/example/dashboard'}]){
++  const script=ScriptSchema.parse(await generateScriptFromContent(input));
++  expect(script.templatePack).toBe('reference');expect(script.scenes.length).toBeGreaterThanOrEqual(5);
++  expect(JSON.stringify(script)).not.toContain('Glance');
++  expect(script.scenes[0].voiceText).toBeTruthy();
++ }
++});
++it('separates product identity from narration and keeps accumulated board blocks editable',async()=>{
++ const script=applyReferenceDefaults(await fixture());
++ const hook=script.scenes[0];hook.templateData={template:'hook',headline:'Une longue phrase de hook',hero:{name:'Tool <X>',category:'OPEN SOURCE',before:'Manuel',after:'Automatisé'},kenBurns:'zoom-in'};
++ hook.voiceText='Thay vì thao tác thủ công, hãy dùng công cụ.';
++ const body=script.scenes[1];body.templateData={template:'data-flow',title:'Cơ chế',nodes:[{label:'Nguồn',detail:'Nội dung'},{label:'Video',detail:'Đầu ra'}]};
++ body.referenceBoard={rows:[{title:'Chạy nền',detail:'Tắt khi đóng trang',tone:'red',disabled:true,badge:'TẮT'}],cards:[{label:'Đầu ra',value:'1080 × 1920',tone:'mint'}]};
++ body.blockTiming={'detail-0':{atSec:2.4},'metric-0':{atSec:3.1}};
++ script.scenes=[hook,body,...script.scenes.slice(2)];
++ const html=composeHtml({script,sceneAudio:script.scenes.map(s=>({id:s.id,durationSec:6})),gapSec:0,outroHoldSec:0,bgImageRelPath:null,audioRelPath:'voice.mp3'});
++ expect(html).toContain('Tool &lt;X&gt;');expect(html).not.toContain('>Une longue phrase de hook<');
++ expect(html).toContain('ref-glass');expect(html).toContain('ref-benefit hook-subhead');
++ for(const block of sceneBlocks(body))expect(html).toContain(`data-block-id="${block.id}"`);
++ expect(html).toContain('data-block-id="detail-0" data-reveal-at="2.400"');
++ expect(html).toContain('data-block-id="metric-0" data-reveal-at="3.100"');
++ expect(html).toContain("filter:'blur(14px)'");expect(html).toContain("filter:'blur(12px)'");
++ expect(ScriptSchema.safeParse(script).success).toBe(true);
++});
++it('allows approximate caption highlighting only with an explicit option, preserving timestamp accuracy',async()=>{
++ const script=applyReferenceDefaults(await fixture());script.scenes=script.scenes.slice(0,1);
++ const cues=[{id:1,startMs:0,endMs:1000,startSec:0,endSec:1,text:'Xin chào',accuracy:'low',words:[{text:'Xin',startMs:0,endMs:400},{text:'chào',startMs:400,endMs:1000}]}] as CaptionCue[];
++ const args={script,sceneAudio:[{id:script.scenes[0].id,durationSec:3}],gapSec:0,bgImageRelPath:null,audioRelPath:'voice.mp3',captionCues:cues};
++ expect(composeHtml(args)).toContain('data-accuracy="low" data-highlight-mode="estimated"');
++ script.captions!.highlightMode='accurate-only';expect(composeHtml(args)).toContain('data-accuracy="low" data-highlight-mode="accurate-only"');
++ expect(cues[0].accuracy).toBe('low');
++});
+--- /dev/null
++++ b/src/render/reference-design.ts
+@@ -0,0 +1,89 @@
++import {z} from 'zod';
++import type {Script, SceneType} from './script-schema.js';
++import type {CaptionCue} from '../captions/types.js';
++
++export const CreativeOptions = z.object({
++  presetId:z.enum(['reference','reference-quick']).optional(),
++  hookType:z.enum(['problem-solution','question']).optional(),
++  structureId:z.enum(['explainer','news','review']).optional(),
++  pacingId:z.enum(['narrated','quick']).optional(),
++});
++export type CreativeSettings=z.infer<typeof CreativeOptions>;
++export const BlockTiming=z.record(z.string().regex(/^[a-z][a-z0-9-]{0,49}$/),z.object({
++  atSec:z.number().finite().min(0).max(180).optional(),
++  phrase:z.string().trim().min(1).max(180).optional(),
++  occurrence:z.number().int().min(1).max(50).optional(),
++})).refine(v=>Object.keys(v).length<=30,'Tối đa 30 mốc mỗi cảnh');
++
++/** New combinations use the same renderer; legacy scripts never opt in implicitly. */
++export const REFERENCE_PRESETS={
++  reference:{gapSec:0.08,outroHoldSec:0.6,entranceSec:0.42,fallbackStepSec:0.9},
++  'reference-quick':{gapSec:0.04,outroHoldSec:0.45,entranceSec:0.25,fallbackStepSec:0.55},
++} as const;
++export function referenceSettings(script:Pick<Script,'templatePack'|'creative'>){
++  if(script.templatePack!=='reference'&&!script.creative)return undefined;
++  const id=script.creative?.pacingId==='quick'?'reference-quick':script.creative?.pacingId==='narrated'?'reference':script.creative?.presetId||'reference';
++  return REFERENCE_PRESETS[id];
++}
++export function applyReferenceDefaults(script:Script,creative?:CreativeSettings):Script{
++  script.templatePack='reference';script.visualStyle='tech-editorial';script.motionPreset='calm';
++  script.creative={presetId:'reference',hookType:'problem-solution',structureId:'explainer',...creative};
++  script.captions={enabled:true,style:'minimal',highlightMode:'estimated',...script.captions};
++  return script;
++}
++
++export interface SceneBlock{id:string;selector:string;index:number;text:string;}
++/** Stable IDs are independent of CSS, wording and resolved audio timestamps. */
++export function sceneBlocks(scene:SceneType):SceneBlock[]{
++  const td=scene.templateData,blocks:SceneBlock[]=[];
++  const add=(id:string,selector:string,text:string,index=0)=>blocks.push({id,selector,index,text});
++  switch(td.template){
++    case 'hook':add('heading','hook-headline',td.hero?.name||td.headline);if(td.hero?.after||td.hero?.before||td.subhead)add('benefit','hook-subhead',[td.hero?.before,td.hero?.after||td.subhead].filter(Boolean).join(' '));break;
++    case 'feature-list':add('heading','feat-title',td.title);td.bullets.forEach((s,i)=>add('item-'+i,'feat-bullet',s,i));break;
++    case 'comparison':add('item-0','cmp-card',td.left.label+' '+td.left.value);add('item-1','cmp-card',td.right.label+' '+td.right.value,1);break;
++    case 'stat-hero':add('heading','stat-value',td.value);add('benefit','stat-label',td.label);if(td.context)add('note','stat-context',td.context);break;
++    case 'callout':add('heading','callout-statement',td.statement);break;
++    case 'workflow':add('heading','explainer-title',td.title);td.steps.forEach((s,i)=>add('item-'+i,'workflow-step',s.label+' '+s.detail,i));break;
++    case 'data-flow':add('heading','explainer-title',td.title);td.nodes.forEach((s,i)=>add('item-'+i,'semantic-node',s.label+' '+s.detail,i));if(td.caption)add('note','semantic-caption',td.caption);break;
++    case 'worked-example':add('heading','explainer-title',td.title);[td.input,td.operation,td.output].forEach((s,i)=>add('item-'+i,'semantic-node',s,i));break;
++    case 'code-window':add('heading','explainer-title',td.title);add('code','code-window',td.title);if(td.note)add('note','code-note',td.note);break;
++    case 'spec-table':add('heading','spec-header',td.productName);td.specs.forEach((s,i)=>add('item-'+i,'spec-row',s.label+' '+s.value,i));break;
++    case 'pros-cons':if(td.title)add('heading','pros-cons-title',td.title);td.pros.forEach((s,i)=>add('pro-'+i,'pro-item',s,i));td.cons.forEach((s,i)=>add('con-'+i,'con-item',s,i));break;
++    case 'verdict-score':add('heading','verdict-product',td.productName);add('score','verdict-score-badge',String(td.score));add('benefit','verdict-summary',td.summary);break;
++    case 'price-tag':add('heading','price-product',td.productName);add('price','price-hero-box',td.price);if(td.note)add('note','price-note',td.note);break;
++    case 'image-gallery':if(td.title)add('heading','gallery-title',td.title);td.images.forEach((s,i)=>add('item-'+i,'gallery-card',s.caption||td.title||'Ảnh minh họa',i));break;
++    case 'phone-mockup':if(td.title)add('heading','mockup-title',td.title);add('screen','phone-frame',td.caption||td.title||'Giao diện');break;
++    case 'outro':add('heading','out-cta-top',td.ctaTop);add('profile','tt-card',td.channelName);break;
++  }
++  scene.referenceBoard?.rows?.forEach((r,i)=>add('detail-'+i,'ref-extra-row',r.title+' '+r.detail,i));
++  scene.referenceBoard?.cards?.forEach((r,i)=>add('metric-'+i,'ref-extra-card',r.label+' '+r.value,i));
++  if(scene.media&&!['image-gallery','phone-mockup'].includes(td.template))add('media','visual-asset',scene.storyboard?.intent||'Tư liệu minh họa');
++  return blocks;
++}
++const normalize=(s:string)=>s.normalize('NFC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
++export function resolveBlockTiming(scene:SceneType,block:SceneBlock,index:number,start:number,duration:number,cues:CaptionCue[],profile:typeof REFERENCE_PRESETS[keyof typeof REFERENCE_PRESETS]){
++  const setting=scene.blockTiming?.[block.id];
++  const clamp=(sec:number)=>Math.max(0,Math.min(sec,Math.max(0,duration-profile.entranceSec-Math.min(.38,duration*.14))));
++  if(setting?.atSec!==undefined)return {atSec:clamp(setting.atSec),basis:'manual' as const};
++  if(scene.type==='hook'&&scene.templateData.template==='hook'&&scene.templateData.hero&&!setting?.phrase)return {atSec:clamp(block.id==='heading'?.34:block.id==='benefit'?.55:.16),basis:'estimated' as const};
++  const words=cues.filter(c=>c.accuracy==='high').flatMap(c=>c.words).filter(w=>w.startMs>=start*1000&&w.startMs<(start+duration)*1000);
++  const tokens=words.map(w=>normalize(w.text));
++  const target=normalize(setting?.phrase||block.text).split(' ').filter(Boolean).slice(0,setting?.phrase?40:3);
++  if(target.length>=(setting?.phrase?1:2)){let seen=0;for(let i=0;i<tokens.length;i++){
++    if(target.every((t,k)=>tokens[i+k]===t)&&++seen===(setting?.occurrence||1))return {atSec:clamp(words[i].startMs/1000-start-0.04),basis:'word' as const};
++  }}
++  if(scene.type==='hook')return {atSec:clamp(block.id==='heading'?.34:block.id==='benefit'?.55:.16),basis:'estimated' as const};
++  return {atSec:clamp(block.id==='media'?0.08:index===0?0.04:Math.min(duration*.65,0.2+index*profile.fallbackStepSec)),basis:'estimated' as const};
++}
++
++/** Attach resolved, inert data to renderer-owned nodes. Text is escaped by composer. */
++export function decorateReferenceBlocks(html:string,scene:SceneType,start:number,duration:number,cues:CaptionCue[],profile:typeof REFERENCE_PRESETS[keyof typeof REFERENCE_PRESETS]):string{
++  for(const [i,b] of sceneBlocks(scene).entries()){
++    const timing=resolveBlockTiming(scene,b,i,start,duration,cues,profile);let found=0;
++    html=html.replace(/<([a-z][a-z0-9-]*)\b([^>]*\bclass="([^"]*)"[^>]*)>/g,(tag,name,attrs,classes)=>{
++      if(!classes.split(/\s+/).includes(b.selector)||found++!==b.index)return tag;
++      return `<${name}${attrs} data-block-id="${b.id}" data-reveal-at="${timing.atSec.toFixed(3)}" data-reveal-duration="${profile.entranceSec}" data-timing-basis="${timing.basis}">`;
++    });
++  }
++  return html;
++}
+--- /dev/null
++++ b/src/render/reference-scenes.ts
+@@ -0,0 +1,54 @@
++import type {Script,SceneType} from './script-schema.js';
++import type {MediaAssetRecord} from '../media/media-manager.js';
++import type {TiktokConfig} from '../config.js';
++import {sourceLabel} from './source-label.js';
++const e=(s:string)=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
++const svg=(path:string)=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${path}</svg>`;
++const icons={play:svg('<path d="m9 6 9 6-9 6Z"/>'),check:svg('<path d="m5 12 4 4L20 5"/>'),flow:svg('<rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/><path d="M14 6h4v8M6 10v8h8"/>'),bolt:svg('<path d="m13 2-9 12h7l-1 8 10-13h-7Z"/>'),code:svg('<path d="m8 6-6 6 6 6m8-12 6 6-6 6m-3-16-2 20"/>'),warn:svg('<path d="m12 3 10 18H2L12 3Z"/><path d="M12 9v4m0 4h.01"/>'),arrow:svg('<path d="M3 12h18m-6-6 6 6-6 6"/>')};
++const heading=(cls:string,text:string)=>`<h2 class="ref-section-title ${cls}">${e(text)}</h2>`;
++const row=(cls:string,label:string,detail:string,index:number,tone='mint')=>`<div class="ref-row ${cls} ref-${tone}"><span class="ref-row-icon">${index===0?icons.flow:index===1?icons.check:icons.bolt}</span><div class="ref-row-copy"><strong>${e(label)}</strong>${detail?`<p>${e(detail)}</p>`:''}</div><span class="ref-status"><i></i>${String(index+1).padStart(2,'0')}</span></div>`;
++const cell=(cls:string,label:string,value:string,tone='mint')=>`<div class="ref-cell ${cls} ref-${tone}"><small>${e(label)}</small><strong>${e(value)}</strong></div>`;
++function mediaPanel(media:MediaAssetRecord|undefined,cls='visual-asset'):string{
++ if(!media)return '';
++ const tag=media.type==='video'?`<video src="${e(media.localRelPath)}" autoplay muted loop playsinline></video>`:`<img src="${e(media.localRelPath)}" alt="Tư liệu nguồn" />`;
++ return `<figure class="ref-media ${cls}"><figcaption><span class="ref-window-dots"><i></i><i></i><i></i></span><span>${e(sourceLabel(media.credit||media.originalSrc||'Tư liệu nguồn'))}</span></figcaption>${tag}</figure>`;
++}
++export function referenceHero(script:Script,td:Extract<SceneType['templateData'],{template:'hook'}>){
++ let repository='';try{const u=new URL(script.metadata.source.url);if(u.hostname==='github.com')repository=u.pathname.split('/').filter(Boolean).slice(0,2).join('/');}catch{}
++ const fallback=repository.split('/')[1]||script.metadata.title.split(/[|·:]/)[0].trim();
++ return {name:td.hero?.name||fallback.slice(0,40)||td.headline,category:td.hero?.category||(repository?'GITHUB OPEN SOURCE':'TECH EXPLAINER'),repository:td.hero?.repository||repository,before:td.hero?.before,after:td.hero?.after||td.subhead};
++}
++/** Reference uses composed boards; legacy layouts remain in html-composer. */
++export function renderReferenceScene(a:{scene:SceneType;start:number;duration:number;script:Script;media?:MediaAssetRecord;gallery:(MediaAssetRecord|undefined)[];channelLogoPath?:string;tiktok:TiktokConfig}):string{
++ const {scene,script,media}=a,td=scene.templateData;let inner='';
++ switch(td.template){
++ case 'hook':{
++  const hero=referenceHero(script,td),logo=media?.presentation==='logo'?media:undefined;
++  inner=`<div class="ref-hook"><div class="ref-glass ${logo?'visual-asset':''}" data-ref-enter="0.16"><div class="ref-glass-halo"></div><i class="ref-scratch scratch-one"></i><i class="ref-scratch scratch-two"></i><i class="ref-scratch scratch-three"></i><div class="ref-product-icon">${logo?`<img src="${e(logo.localRelPath)}" alt="${e(hero.name)}"/>`:`<div class="ref-original-mark"><i></i><i></i><span>${icons.play}</span></div>`}</div><span class="ref-category">${e(hero.category)}</span></div><h1 class="ref-product-name hook-headline">${e(hero.name)}</h1>${hero.repository?`<div class="ref-repo-pill" data-ref-enter="0.5">${icons.code}<span>${e(hero.repository)}</span></div>`:''}${hero.after||hero.before?`<div class="ref-benefit hook-subhead">${hero.before?`<span>${e(hero.before)}</span><b>${icons.arrow}</b>`:''}<strong>${e(hero.after||'')}</strong></div>`:''}${media&&!logo?`<span class="visual-asset ref-hook-source" data-ref-enter=".6">${e(sourceLabel(media.credit||media.originalSrc))}</span>`:''}</div>`;
++  break;
++ }
++ case 'workflow':case 'data-flow':{
++  const items=td.template==='workflow'?td.steps:td.nodes,cls=td.template==='workflow'?'workflow-step':'semantic-node';
++  inner=`<div class="ref-panel ref-mechanism" data-ref-enter=".05">${heading('explainer-title',td.title)}<div class="ref-flow-overview${items.length>2?' ref-flow-many':''}">${items.map((v,i)=>`${i?`<div class="ref-connector"><i></i>${icons.arrow}<i></i></div>`:''}<div class="ref-mini-node${scene.referenceBoard?.rows?.length?' '+cls:''}"><strong>${e(v.label)}</strong><small>${e(v.detail)}</small></div>`).join('')}</div></div><div class="ref-rows">${(scene.referenceBoard?.rows?.length?[]:items).map((v,i)=>row(cls,v.label,v.detail,i,i%2?'mint':'blue')).join('')}</div>${td.template==='data-flow'&&td.caption?`<div class="ref-note semantic-caption">${e(td.caption)}</div>`:''}`;
++  break;
++ }
++ case 'feature-list':inner=`<div class="ref-panel ref-feature-header" data-ref-enter=".05"><div class="ref-count">${td.bullets.length}</div><div>${heading('feat-title',td.title)}<div class="ref-mini-tags">${td.bullets.map(v=>`<span>${e(v)}</span>`).join('')}</div></div></div><div class="ref-rows">${td.bullets.map((v,i)=>row('feat-bullet',v,'',i,i%2?'mint':'violet')).join('')}</div>`;break;
++ case 'comparison':inner=`<div class="ref-panel ref-comparison" data-ref-enter=".04"><div class="ref-section-label">${icons.flow}<span>TRƯỚC → SAU</span></div><div class="ref-two">${cell('cmp-card',td.left.label,td.left.value,'red')}${cell('cmp-card',td.right.label,td.right.value)}</div></div>`;break;
++ case 'stat-hero':inner=`<div class="ref-panel ref-stat-panel" data-ref-enter=".06"><span class="ref-stat-icon">${icons.bolt}</span><div class="stat-value ref-stat-value">${e(td.value)}</div>${heading('stat-label',td.label)}${td.context?`<p class="ref-note stat-context">${e(td.context)}</p>`:''}</div>`;break;
++ case 'callout':inner=`<div class="ref-panel ref-warning" data-ref-enter=".06"><span class="ref-row-icon">${icons.warn}</span><div>${td.tag?`<span class="ref-section-label">${e(td.tag)}</span>`:''}<h2 class="callout-statement ref-callout-text">${e(td.statement)}</h2></div></div>`;break;
++ case 'worked-example':inner=`<div class="ref-panel" data-ref-enter=".05">${heading('explainer-title',td.title)}<span class="ref-section-label">${td.basis==='conceptual'?'MINH HỌA KHÁI NIỆM':'VÍ DỤ TỪ NGUỒN · CHƯA CHẠY KIỂM CHỨNG'}</span></div><div class="ref-two">${cell('semantic-node','INPUT',td.input,'blue')}${cell('semantic-node','THAO TÁC',td.operation)}</div>${cell('semantic-node','OUTPUT',td.output)}`;break;
++ case 'code-window':inner=`<div class="ref-panel ref-code-heading" data-ref-enter=".04">${heading('explainer-title',td.title)}</div><div class="ref-code code-window"><div class="ref-code-toolbar"><span class="ref-window-dots"><i></i><i></i><i></i></span><span>${e(td.language)}</span><b>CODE</b></div><pre>${td.code.split('\n').map((l,i)=>`<span class="ref-code-line${td.highlightLines?.includes(i+1)?' is-highlight':''}"><b>${i+1}</b><code>${e(l)||' '}</code></span>`).join('')}</pre></div>${td.note?`<div class="ref-note ref-code-status code-note"><i></i>${e(td.note)}</div>`:''}`;break;
++ case 'spec-table':inner=`<div class="ref-panel" data-ref-enter=".05">${heading('spec-header',td.productName)}<div class="ref-section-label">THÔNG SỐ TỪ NGUỒN</div></div><div class="ref-specs">${td.specs.map((v,i)=>`<div class="ref-spec-row spec-row"><span>${e(v.label)}</span><span class="ref-meter"><i style="width:${28+i%3*24}%"></i></span><strong>${e(v.value)}</strong></div>`).join('')}</div>`;break;
++ case 'pros-cons':inner=`${td.title?`<div class="ref-panel" data-ref-enter=".05">${heading('pros-cons-title',td.title)}</div>`:''}<div class="ref-two ref-pros-cons"><div class="ref-panel ref-mint"><span class="ref-section-label">${icons.check} ĐIỂM MẠNH</span>${td.pros.map(v=>`<div class="pro-item ref-list-item">${e(v)}</div>`).join('')}</div><div class="ref-panel ref-gold"><span class="ref-section-label">${icons.warn} CẦN LƯU Ý</span>${td.cons.map(v=>`<div class="con-item ref-list-item">${e(v)}</div>`).join('')}</div></div>`;break;
++ case 'verdict-score':inner=`<div class="ref-panel" data-ref-enter=".05">${heading('verdict-product',td.productName)}<div class="verdict-score-badge ref-score"><strong>${td.score}</strong><small>/${td.scale}</small></div><div class="ref-section-label">${e(td.verdict)}</div><p class="verdict-summary ref-note">${e(td.summary)}</p></div>`;break;
++ case 'price-tag':inner=`<div class="ref-panel" data-ref-enter=".05">${heading('price-product',td.productName)}${td.variant?`<div class="ref-note">${e(td.variant)}</div>`:''}<div class="price-hero-box ref-price">${e(td.price)}</div>${td.note?`<div class="price-note ref-note">${e(td.note)}</div>`:''}</div>`;break;
++ case 'image-gallery':inner=`${td.title?`<div class="ref-panel" data-ref-enter=".05">${heading('gallery-title',td.title)}</div>`:''}<div class="ref-gallery count-${td.images.length}">${td.images.map((v,i)=>`<div class="gallery-card">${mediaPanel(a.gallery[i]|| (i===0?media:undefined),'ref-gallery-media')}${v.caption?`<div class="ref-note">${e(v.caption)}</div>`:''}</div>`).join('')}</div>`;break;
++ case 'phone-mockup':inner=`${td.title?`<div class="ref-panel" data-ref-enter=".05">${heading('mockup-title',td.title)}</div>`:''}<div class="phone-frame ref-screen">${mediaPanel(media,'ref-screen-media')}</div>${td.caption?`<p class="ref-note">${e(td.caption)}</p>`:''}`;break;
++ case 'outro':inner=`<div class="ref-profile tt-card" data-ref-enter=".1"><div class="ref-avatar">${a.channelLogoPath?`<img src="${e(a.channelLogoPath)}" alt="${e(td.channelName)}"/>`:icons.play}</div><strong>${e(td.channelName)}</strong><span>@${e(td.channelName.replace(/^@/,''))}</span><span class="ref-channel-pill">#${e(td.channelName.replace(/[^\p{L}\p{N}]/gu,''))}</span><h2 class="out-cta-top">${e(td.ctaTop)}</h2><p>${e(td.source)}</p></div>`;break;
++ }
++ const extras=scene.referenceBoard;
++ if(extras?.rows?.length)inner+=`<div class="ref-rows">${extras.rows.map((r,i)=>`<div class="ref-extra-row ref-row ref-${r.tone||'mint'}${r.disabled?' ref-disabled':''}"><span class="ref-row-icon">${r.disabled?icons.warn:icons.check}</span><div class="ref-row-copy"><strong>${e(r.title)}</strong><p>${e(r.detail)}</p></div>${r.badge?`<span class="ref-status"><i></i>${e(r.badge)}</span>`:''}</div>`).join('')}</div>`;
++ if(extras?.cards?.length)inner+=`<div class="ref-two ref-bottom-cards">${extras.cards.map(r=>`<div class="ref-extra-card ref-cell ref-${r.tone||'mint'}"><small>${e(r.label)}</small><strong>${e(r.value)}</strong>${r.detail?`<p>${e(r.detail)}</p>`:''}</div>`).join('')}</div>`;
++ const extraMedia=media&&!['hook','outro','image-gallery','phone-mockup'].includes(td.template)?mediaPanel(media):'';
++ return `<div class="scene clip ref-scene" id="scene-${e(scene.id)}" data-start="${a.start.toFixed(2)}" data-duration="${a.duration.toFixed(2)}" data-layout="${td.template}" data-media="${media?.presentation||'none'}" data-transition="cut" data-transition-duration="0"><div class="ref-composition${td.template==='hook'?' ref-hero-composition':''}${td.template==='outro'?' ref-outro-composition':''}${extraMedia?' ref-with-media':''}"><div class="ref-board-canvas">${inner}${extraMedia}</div></div></div>`;
++}
+--- a/src/render/script-schema.ts
++++ b/src/render/script-schema.ts
+@@ -1,3 +1,4 @@
++import {CreativeOptions,BlockTiming} from './reference-design.js';
+ import { z } from "zod";
+ import { PACK_IDS } from "./style-packs.js";
+ import {DEFAULT_BGM} from '../channel-defaults.js';
+@@ -8,6 +9,11 @@
+   template: z.literal("hook"),
+   headline: z.string().min(1).max(40),
+   subhead: z.string().max(40).optional(),
++  /** Product identity is separate from the spoken problem/solution hook. */
++  hero: z.object({
++    name:z.string().min(1).max(40), category:z.string().max(32).optional(),
++    repository:z.string().max(50).optional(), before:z.string().max(40).optional(), after:z.string().max(40).optional(),
++  }).optional(),
+   /** background image path (literal "$source.image" → substituted at pipeline level) */
+   bgSrc: z.string().optional(),
+   /** Ken Burns effect class */
+@@ -203,6 +209,12 @@
+   id: z.string().min(1).max(80).regex(/^[a-zA-Z0-9_-]+$/, "ID cảnh chỉ gồm chữ, số, gạch ngang và gạch dưới"),
+   type: z.enum(["hook", "body", "outro"]),
+   voiceText: z.string().min(1),
++  blockTiming: BlockTiming.optional(),
++  /** Extra source-backed blocks accumulate beneath a reference board. */
++  referenceBoard:z.object({
++    rows:z.array(z.object({title:z.string().min(1).max(40),detail:z.string().max(65),tone:z.enum(['mint','red','blue','gold','violet']).optional(),badge:z.string().max(12).optional(),disabled:z.boolean().optional()})).max(3).optional(),
++    cards:z.array(z.object({label:z.string().max(40),value:z.string().min(1).max(40),detail:z.string().max(65).optional(),tone:z.enum(['mint','red','blue','gold','violet']).optional()})).max(2).optional(),
++  }).optional(),
+   storyboard: z.object({
+     assetId:z.string().uuid().optional(),
+     intent:z.string().min(1).max(180), visualBrief:z.string().min(1).max(240),
+@@ -223,6 +235,7 @@
+ 
+ // ── Caption schema (M1) ────────────────────────────────────────────────────
+ export const CaptionOptions = z.object({
++  highlightMode:z.enum(["accurate-only","estimated"]).optional(),
+   enabled: z.boolean().default(true),
+   style: z.enum(["tiktok-bold", "classic-sub", "minimal"]).default("tiktok-bold"),
+ });
+@@ -254,6 +267,7 @@
+ // ── Root schema ────────────────────────────────────────────────────────────
+ 
+ export const ScriptSchema = z.object({
++  creative: CreativeOptions.optional(),
+   templatePack: z.enum(PACK_IDS).optional(),
+   directingMode: z.literal("auto").optional(),
+   fitDuration: z.boolean().optional(),
+--- a/src/render/style-packs.test.ts
++++ b/src/render/style-packs.test.ts
+@@ -3,8 +3,8 @@
+ import {STYLE_PACKS,packPoster,packDecor,packVariables} from './style-packs.js';
+ import {ScriptSchema} from './script-schema.js';
+ import {composeHtml} from './html-composer.js';
+-it('has fifteen distinct adaptations and two native packs; posters and renderer share geometry',async()=>{
+- expect(STYLE_PACKS).toHaveLength(17);expect(STYLE_PACKS.filter(p=>p.demo)).toHaveLength(15);
++it('has fifteen distinct adaptations and three native packs; posters and renderer share geometry',async()=>{
++ expect(STYLE_PACKS).toHaveLength(18);expect(STYLE_PACKS.filter(p=>p.demo)).toHaveLength(15);
+  const s=JSON.parse(await readFile('tests/fixtures/studio-explainer.json','utf8'));
+  const content=JSON.stringify(ScriptSchema.parse(s).scenes);
+  const signatures=new Set<string>();
+--- a/src/render/style-packs.ts
++++ b/src/render/style-packs.ts
+@@ -2,10 +2,11 @@
+  * These are new data-driven renderers, not the original fixed ten-second films.
+  * Reference/attribution: docs/adr-style-gallery.md and assets/third-party/mg-styles-15.LICENSE.
+  */
+-export const PACK_IDS = ['editorial','explainer','flat-vector','line-art','isometric','soft-3d','cel-boil','collage','liquid','shape-morph','bauhaus','synthwave','aurora-glass','variety','sticker','pixel','hud'] as const;
++export const PACK_IDS = ['reference','editorial','explainer','flat-vector','line-art','isometric','soft-3d','cel-boil','collage','liquid','shape-morph','bauhaus','synthwave','aurora-glass','variety','sticker','pixel','hud'] as const;
+ export type PackId = typeof PACK_IDS[number];
+ export interface StylePack { id:PackId; name:string; description:string; goodFor:string; motif:string; bg:string; fg:string; accent:string; second:string; panel:string; muted:string; demo?:string; }
+ export const STYLE_PACKS:StylePack[] = [
++ {id:'reference',name:'Studio tối · Theo video mẫu',description:'Thẻ kính gọn, ánh sáng dịu, chữ trắng/cam và nội dung hiện theo lời đọc.',goodFor:'Mọi loại video: tin tức, repo, review và hướng dẫn',motif:'glass',bg:'#080f16',fg:'#f3f4ef',accent:'#ff963e',second:'#66d4bd',panel:'#152129',muted:'#a1b2b8'},
+  {id:'editorial',name:'Tech Editorial',description:'Chữ lớn, thẻ rõ ràng, xanh đen và cam.',goodFor:'Giới thiệu repo, tin công nghệ',motif:'flat',bg:'#04171e',fg:'#fff6eb',accent:'#ffad4c',second:'#57c9b7',panel:'#12333a',muted:'#a2bcbc'},
+  {id:'explainer',name:'Navy Explainer',description:'Thẻ có chiều sâu, workflow và code.',goodFor:'Hướng dẫn, quy trình kỹ thuật',motif:'iso',bg:'#071427',fg:'#f3f8ff',accent:'#73d7ff',second:'#9c99ff',panel:'#11263e',muted:'#a9bfd4'},
+  {id:'flat-vector',name:'Flat Vector',description:'Mảng màu phẳng, hình học và chuyển động bật nảy.',goodFor:'Tính năng, lợi ích, giải thích dễ hiểu',motif:'flat',bg:'#f4eddf',fg:'#182653',accent:'#244fe4',second:'#ef7657',panel:'#fffaf0',muted:'#465078',demo:'01-flat-vector'},
+--- a/src/render/template-catalog.ts
++++ b/src/render/template-catalog.ts
+@@ -3,7 +3,7 @@
+ export const TEMPLATE_CATALOG: { id: TemplateDataType['template']; label: string; data: TemplateDataType }[] = [
+   {id:'data-flow',label:'Sơ đồ · input → xử lý → output',data:{template:'data-flow',title:'Luồng dữ liệu',nodes:[{label:'Input',detail:'Dữ liệu từ nguồn'},{label:'Output',detail:'Kết quả được mô tả'}],caption:'Minh họa luồng từ tài liệu'}},
+   {id:'worked-example',label:'Ví dụ minh họa · từng bước',data:{template:'worked-example',title:'Ví dụ minh họa',input:'Input theo tài liệu',operation:'Xử lý theo tài liệu',output:'Kết quả theo tài liệu',basis:'conceptual'}},
+-  {id:'hook' ,label:'Hook · chữ lớn',data:{template:'hook',headline:'Ý chính của video',subhead:'Bằng chứng từ nguồn',kenBurns:'zoom-in'}},
++  {id:'hook' ,label:'Hook · kính & tên sản phẩm',data:{template:'hook',headline:'Ý chính của video',subhead:'Bằng chứng từ nguồn',kenBurns:'zoom-in'}},
+   {id:'stat-hero',label:'Số liệu lớn',data:{template:'stat-hero',value:'15',label:'Thay bằng số có trong nguồn'}},
+   {id:'feature-list',label:'Thẻ tính năng',data:{template:'feature-list',title:'Điểm nổi bật',bullets:['Nội dung từ nguồn']}},
+   {id:'callout',label:'Trích dẫn / điểm nhấn',data:{template:'callout',statement:'Một ý chính có trong nguồn'}},
+--- a/src/render/templates/animations.js
++++ b/src/render/templates/animations.js
+@@ -42,6 +42,11 @@
+       tl.set(scene, { opacity: 1 }, start);
+     }
+     tl.set(scene, { opacity: 0 }, start + dur);
++
++    if(document.body.classList.contains('reference-design')){
++      animateReference(scene,tl,start,dur);
++      return;
++    }
+ 
+     // Adaptive pack motifs are part of the same seekable timeline as the narration.
+     const art=scene.querySelector('.pack-art');
+@@ -140,6 +145,46 @@
+       tl.fromTo(el,{y:0,opacity:0.12},{y:-40-(i%4)*20,opacity:0.55,duration:total,ease:'none'},0);
+     });
+   }
++  if(document.body.classList.contains('reference-design')){
++    const total=parseFloat(stage.dataset.duration);
++    stage.querySelectorAll('.reference-specks i').forEach((el,i)=>tl.fromTo(el,{y:0,opacity:.22+(i%3)*.06},{y:-24-(i%5)*13,opacity:.3+(i%3)*.07,duration:total,ease:'none'},0));
++    tl.fromTo('.reference-topline',{scaleX:0},{scaleX:1,duration:total,ease:'none',transformOrigin:'left center'},0);
++    document.fonts.ready.then(()=>{
++      stage.querySelectorAll('.ref-composition:not(.ref-hero-composition):not(.ref-outro-composition) .ref-board-canvas').forEach(el=>{
++        const ratio=Math.min(1,1000/Math.max(el.scrollHeight,1));
++        if(ratio<1){el.style.transformOrigin='top center';el.style.transform='scale('+ratio+')';}
++      });
++      stage.querySelectorAll('.scene [class^="layout-"],.scene .explainer-content').forEach(el=>{
++        const ratio=Math.min(1,el.clientHeight/Math.max(el.scrollHeight,1),el.clientWidth/Math.max(el.scrollWidth,1));
++        if(ratio<1){el.style.transformOrigin='top center';el.style.transform='scale('+ratio+')';}
++      });
++    });
++  }
++  function animateReference(scene,tl,start,dur){
++    // Seekable focus/reveal/exit: no CSS wall-clock animations in the renderer.
++    const composition=scene.querySelector('.ref-composition');
++    const exit=Math.min(.38,dur*.14);
++    if(composition){
++      tl.fromTo(composition,{filter:'blur(0px)',opacity:1,scale:1},{filter:'blur(12px)',opacity:0,scale:.975,duration:exit,ease:'power2.in'},start+dur-exit);
++    }
++    scene.querySelectorAll('[data-reveal-at],[data-ref-enter]').forEach(el=>{
++      const local=Number(el.dataset.revealAt ?? el.dataset.refEnter);
++      const at=start+(el.dataset.revealAt!==undefined?local:Math.min(local,Math.max(0,dur-exit-.55)));
++      const entrance=Math.min(Number(el.dataset.revealDuration)||(scene.dataset.layout==='hook'?.55:.42),dur/4);
++      tl.fromTo(el,{opacity:0,y:20,scale:el.classList.contains('ref-glass')?.8:.97,filter:'blur(14px)'},{opacity:1,y:0,scale:1,filter:'blur(0px)',duration:entrance,ease:'power3.out'},at);
++    });
++    const name=scene.querySelector('.ref-product-name');
++    if(name){
++      const cycles=Math.max(1,Math.floor(dur/2));
++      tl.fromTo(name,{backgroundPosition:'100% 0%'},{backgroundPosition:'0% 0%',duration:dur/cycles,repeat:cycles-1,ease:'none'},start);
++      // Fit longer product names without moving the repository/benefit pills.
++      const count=name.textContent.length;
++      if(count>12)name.style.setProperty('font-size',Math.max(52,110*12/count)+'px','important');
++    }
++    scene.querySelectorAll('.ref-connector i,.ref-status i,.ref-code-status>i').forEach((el,i)=>{
++      tl.fromTo(el,{opacity:.4,scale:.8},{opacity:1,scale:1.12,duration:.7,repeat:Math.max(0,Math.floor(dur/.7)-1),yoyo:true,ease:'sine.inOut'},start+(i%2)*.1);
++    });
++  }
+   function animateDynamic(scene, tl, start, dur) {
+     animateEditorial(scene, tl, start, dur);
+     const entrance = Math.min(0.36,dur*0.18);
+@@ -345,7 +390,7 @@
+     // Word-level highlight
+     const words = Array.from(cue.querySelectorAll(".caption-word"));
+     words.forEach((w) => {
+-      if (document.body.classList.contains('tech-editorial') && cue.dataset.accuracy !== 'high') return;
++      if (document.body.classList.contains('tech-editorial') && cue.dataset.accuracy !== 'high' && cue.dataset.highlightMode !== 'estimated') return;
+       const wStart = parseFloat(w.dataset.wordStart || w.dataset.start || "0");
+       const wDur   = parseFloat(w.dataset.wordDuration || w.dataset.duration || "0.2");
+       const wEnd   = wStart + wDur;
+@@ -356,7 +401,7 @@
+       if (highlight) tl.set(highlight, { opacity: 0 }, 0);
+ 
+       // Active word state: scale up and reveal highlight
+-      tl.set(w, { scale: 1.15 }, wStart);
++      tl.set(w, { scale: document.body.classList.contains('reference-design') ? 1 : 1.15 }, wStart);
+       if (highlight) tl.set(highlight, { opacity: 1 }, wStart);
+ 
+       // Finished word state: reset to normal
+--- /dev/null
++++ b/src/render/templates/styles.reference.css
+@@ -0,0 +1,55 @@
++/* Measured against Download.mp4: reference coordinates × 1.875.
++   Hero glass: (257,300) 563². Board: (79,289) 923 wide. Captions: y1390. */
++body.reference-design{--ref-bg:#080e15;--ref-panel:#18252c;--ref-text:#f5f5f3;--ref-muted:#b7c5ca;--ref-orange:#ff982e;--ref-mint:#74e8c4;--ref-blue:#62d4fb;--ref-gold:#ffd070;--ref-border:#8cb2c047;--pack-bg:var(--ref-bg)!important;--pack-panel:var(--ref-panel)!important;--pack-fg:var(--ref-text)!important;--pack-muted:var(--ref-muted)!important;--pack-accent:var(--ref-orange)!important;--pack-second:var(--ref-mint)!important;background:var(--ref-bg);color:var(--ref-text)}
++body.reference-design .shell-bg{background:radial-gradient(ellipse at 22% 12%,#6f9d7140,transparent 34%),radial-gradient(ellipse at 69% 10%,#9b743534,transparent 34%),radial-gradient(ellipse at 77% 68%,#35466c22,transparent 52%),linear-gradient(170deg,#101a21,#060b11 87%)!important}
++body.reference-design #grain-overlay{display:none}body.reference-design .vignette{display:block;opacity:.22}body.reference-design .brand-shell-header{left:67px;top:62px;gap:14px;opacity:.55}body.reference-design .brand-shell-header .project-logo{width:47px;height:47px;border-radius:50%;object-fit:contain}body.reference-design .brand-name{font:700 30px 'Editorial VN',sans-serif;letter-spacing:0;color:#bfcccc}
++.reference-specks{position:absolute;inset:0;z-index:2;pointer-events:none;overflow:hidden}.reference-specks i{position:absolute;border-radius:50%;background:var(--particle);opacity:.25;box-shadow:0 0 7px var(--particle)}.reference-topline{position:absolute;left:0;right:0;top:0;height:7px;background:linear-gradient(90deg,#ff9838,#83a5ed,#6ef6cd);z-index:10}.reference-footer{position:absolute;left:70px;right:68px;bottom:56px;text-align:right;color:#aebfc078;font:700 29px 'Editorial VN',sans-serif;z-index:10}
++body.reference-design .pack-art,body.reference-design .pack-edge,body.reference-design .editorial-footer{display:none!important}
++body.reference-design .ref-composition{position:absolute;left:79px;top:289px;width:923px;display:flex;flex-direction:column;gap:26px;z-index:4;font-family:'Editorial VN',sans-serif;color:var(--ref-text);transform-origin:center 350px}
++body.reference-design .ref-composition *,body.reference-design .ref-composition *::before,body.reference-design .ref-composition *::after{box-sizing:border-box}
++body.reference-design .ref-composition :where(*){opacity:1;animation:none}
++body.reference-design .ref-composition [data-reveal-at],body.reference-design .ref-composition [data-ref-enter]{opacity:0}
++body.reference-design .ref-composition svg{width:40px;height:40px;flex-shrink:0}
++body.reference-design .ref-composition :is(h1,h2,p,figure,pre){margin:0}
++body.reference-design .ref-composition .ref-panel{position:relative;padding:30px 34px;border:2px solid var(--ref-border);border-radius:42px;background:linear-gradient(120deg,#10202bd9,#0b1623da);box-shadow:inset 0 1px 0 #ffffff08}
++body.reference-design .ref-composition .ref-section-title{font:800 34px/1.2 'Editorial VN',sans-serif;letter-spacing:-.6px;color:var(--ref-blue);text-transform:none;text-align:center;max-width:100%;background:none;text-shadow:none;-webkit-text-fill-color:initial;overflow-wrap:anywhere}
++body.reference-design .ref-composition .ref-section-label{display:flex;align-items:center;justify-content:center;gap:14px;font:800 25px/1.3 'Editorial VN',sans-serif;letter-spacing:.5px;color:var(--ref-gold);margin:8px 0 18px}
++body.reference-design .ref-composition .ref-note{font:600 29px/1.4 'Editorial VN',sans-serif;color:var(--ref-muted);white-space:pre-wrap;overflow-wrap:anywhere}
++body.reference-design .ref-composition .ref-two{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:stretch}
++body.reference-design .ref-composition .ref-cell{position:relative;display:flex;flex-direction:column;justify-content:center;gap:13px;width:auto;min-width:0;min-height:230px;padding:30px;border:2px solid var(--ref-border);border-radius:36px;background:#1f2c34a8;box-shadow:none;transform:none;overflow-wrap:anywhere}
++body.reference-design .ref-composition .ref-cell small{font:700 29px/1.25 'Editorial VN',sans-serif;color:var(--ref-muted)}body.reference-design .ref-composition .ref-cell strong{font:800 46px/1.2 'Editorial VN',sans-serif;letter-spacing:-1px;color:var(--ref-mint)}
++body.reference-design .ref-composition .ref-mint{border-color:#81d7c57a;background:linear-gradient(110deg,#294d4599,#1c3039a8)}body.reference-design .ref-composition .ref-red{border-color:#d970765e;background:linear-gradient(110deg,#61393c66,#341e2aa8)}body.reference-design .ref-composition .ref-red strong{color:#f19a9b}body.reference-design .ref-composition .ref-blue{border-color:#6bcaf780;background:linear-gradient(110deg,#2547538c,#192f43aa)}body.reference-design .ref-composition .ref-violet{border-color:#9c90d76b;background:linear-gradient(110deg,#443c6066,#1a253aaa)}body.reference-design .ref-composition .ref-gold{border-color:#dcba6b75;background:linear-gradient(110deg,#66512455,#262b33aa)}
++/* Opening identity composition. Narration stays in captions, not in the name. */
++body.reference-design .ref-hero-composition{left:0;top:0;width:1080px;height:1350px;display:block;transform-origin:540px 780px}
++.ref-hook{position:relative;width:100%;height:100%}
++body.reference-design .ref-composition .ref-glass{position:absolute;left:257px;top:300px;width:563px;height:563px;padding:0;border:2px solid #bed7c33d;border-radius:126px;background:linear-gradient(145deg,#a7e0d32b,#cad9ac1c);box-shadow:inset 0 2px 5px #fff1,0 0 100px #8ad2a41b;overflow:visible}
++.ref-glass-halo{position:absolute;inset:-110px;border-radius:50%;background:radial-gradient(ellipse,#a6d69320,transparent 65%);z-index:-1}
++.ref-scratch{position:absolute;height:2px;border-radius:50%;background:linear-gradient(90deg,transparent,#eaf3db65,transparent);transform-origin:left center}.scratch-one{left:110px;top:68px;width:290px;transform:rotate(-8deg)}.scratch-two{right:55px;top:115px;width:300px;transform:rotate(83deg);transform-origin:right center}.scratch-three{left:70px;bottom:135px;width:135px;transform:rotate(65deg)}
++.ref-product-icon{position:absolute;left:119px;top:119px;width:322px;height:322px;border-radius:78px;background:#111318;display:grid;place-items:center;overflow:hidden}.ref-product-icon img{width:100%;height:100%;object-fit:contain}.ref-original-mark{position:relative;width:220px;height:220px}.ref-original-mark>i{position:absolute;left:0;width:78px;border-radius:15px;background:#9597b8}.ref-original-mark>i:first-child{top:0;height:220px}.ref-original-mark>i:nth-child(2){top:127px;left:100px;width:120px;height:93px;background:#727996}.ref-original-mark>span{position:absolute;left:100px;top:0;width:120px;height:105px;background:#ead185;border-radius:17px;display:grid;place-items:center;color:#171d23}.ref-original-mark>span svg{width:70px!important;height:70px!important}
++.ref-category{position:absolute;left:50%;bottom:50px;transform:translateX(-50%);white-space:nowrap;padding:17px 28px;border-radius:50px;background:#081118;color:#edf0f3;font:800 26px/1 'Editorial VN',sans-serif}
++body.reference-design .ref-composition .ref-product-name{position:absolute;top:898px;left:100px;width:880px;max-width:880px;text-align:center;font:800 110px/1.16 'Editorial VN',sans-serif;letter-spacing:-3px;text-transform:none;white-space:normal;background:linear-gradient(100deg,#fff 15%,#fff 35%,#ffe397 46%,#8cecd6 55%,#fff 65%,#fff 85%);background-size:280% 100%;background-position:100% 0;background-clip:text;-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-shadow:none;color:#fff;overflow-wrap:anywhere}
++.ref-repo-pill{position:absolute;top:1040px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:14px;white-space:nowrap;padding:20px 30px;border:2px solid #b3c5ce45;border-radius:50px;background:#b5d1da12;font:700 31px/1.1 'Editorial VN',sans-serif;color:#d9e0e4}.ref-repo-pill svg{width:36px!important;height:36px!important}
++body.reference-design .ref-composition .ref-benefit{position:absolute;top:1147px;left:50%;transform:translateX(-50%);display:flex;align-items:center;justify-content:center;gap:25px;max-width:970px;width:max-content;padding:24px 36px;border:2px solid #bfccd243;border-radius:60px;background:linear-gradient(100deg,#c4d9da15,#cbdac811);font:800 32px/1.2 'Editorial VN',sans-serif;color:#d3dce2;letter-spacing:-.7px;white-space:normal;text-align:center;box-shadow:inset 0 1px 0 #fff1}.ref-benefit b{display:flex;color:var(--ref-gold)}.ref-benefit strong{color:var(--ref-mint)}.ref-benefit span{max-width:360px}.ref-benefit strong{max-width:450px}.ref-hook-source{position:absolute;top:1080px;left:160px;right:160px;text-align:center;color:#c4cdd1;font-size:27px}
++/* Compact accumulated infographic boards. */
++body.reference-design .ref-composition .ref-mechanism{height:300px;padding:31px 34px 26px}.ref-flow-overview{display:flex;align-items:center;gap:22px;margin-top:26px}.ref-mini-node{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;min-width:0;min-height:158px;border:2px solid #83d2b87a;border-radius:36px;background:#5b9c8126;text-align:center;padding:18px 22px;gap:9px}.ref-mini-node:last-child{border-color:#6dbce280;background:#4c97bd24}.ref-mini-node strong{font-size:34px;line-height:1.1}.ref-mini-node small{font-size:24px;color:var(--ref-muted)}.ref-connector{width:115px;display:flex;align-items:center;justify-content:center;gap:0;color:#bacbd4}.ref-connector i{display:block;width:22px;height:22px;border-radius:50%;background:var(--ref-blue);box-shadow:0 0 20px #62d4fb88}.ref-connector i:last-child{background:var(--ref-mint);box-shadow:0 0 20px #74e8c488}.ref-connector svg{width:45px!important}
++.ref-rows{display:flex;flex-direction:column;gap:22px}
++body.reference-design .ref-composition .ref-row{display:flex;flex-direction:row;align-items:center;position:relative;gap:26px;min-height:148px;padding:24px 33px;border:2px solid var(--ref-border);border-radius:38px;width:100%;box-shadow:none;transform:none}
++body.reference-design .ref-composition .ref-row.ref-blue{border-color:#6bcaf75e;background:linear-gradient(110deg,#26464f85,#192f4390)}body.reference-design .ref-composition .ref-row.ref-mint{border-color:#81d7c57a;background:linear-gradient(110deg,#294d4599,#1c3039a8)}.ref-row-icon{flex:0 0 94px;width:94px;height:94px;border-radius:28px;display:grid;place-items:center;color:var(--ref-mint);background:#75d6b72d}.ref-row-icon svg{width:57px!important;height:57px!important}.ref-row-copy{min-width:0;flex:1}.ref-row-copy strong{font:800 34px/1.18 'Editorial VN',sans-serif!important;letter-spacing:-.5px;color:#f6f7f5!important}.ref-row-copy p{font:600 28px/1.25 'Editorial VN',sans-serif!important;letter-spacing:0;color:var(--ref-muted)!important;margin-top:7px!important}.ref-status{display:flex;align-items:center;gap:10px;padding:11px 17px;border-radius:40px;background:#65cfa322;font-size:25px;font-weight:800;color:var(--ref-mint)}.ref-status i,.ref-code-status>i{width:10px;height:10px;border-radius:50%;background:var(--ref-mint);box-shadow:0 0 14px #74e8c477}
++body.reference-design .ref-composition .ref-feature-header{display:flex;align-items:center;gap:27px;background:linear-gradient(110deg,#3b355a88,#22273daa);border-color:#b09ddd63;min-height:235px}.ref-count{display:grid;place-items:center;flex:0 0 116px;height:116px;background:#a795df26;color:#c7b6ff;border:2px solid #ad9ce26b;border-radius:32px;font-size:64px;font-weight:800}.ref-feature-header>div:last-child{flex:1;min-width:0}body.reference-design .ref-feature-header .ref-section-title{text-align:left;color:#e2dbfb}.ref-mini-tags{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:20px}.ref-mini-tags span{font-size:22px;color:#c5bbdf;padding:9px 13px;background:#c0a4ff0b;border:1px solid #b19ad53d;border-radius:13px;overflow-wrap:anywhere}
++body.reference-design .ref-composition .ref-stat-panel{text-align:center;padding:55px 36px;background:linear-gradient(130deg,#386d5b55,#16333c88)}.ref-stat-icon{color:var(--ref-mint)}.ref-stat-icon svg{height:70px!important;width:70px!important}body.reference-design .ref-composition .ref-stat-value{font:800 150px/1.2 'Editorial VN',sans-serif;letter-spacing:-4px;text-align:center;color:var(--ref-mint);text-shadow:none;background:none;-webkit-text-fill-color:initial}body.reference-design .ref-stat-panel .ref-section-title{color:var(--ref-muted);font-size:36px}.ref-stat-panel .ref-note{margin-top:22px!important}
++body.reference-design .ref-composition .ref-warning{display:flex;align-items:center;gap:25px;border-color:#d58c706b;background:linear-gradient(110deg,#5d3e344d,#292634aa)}.ref-warning .ref-row-icon{color:#ffab87;background:#b2674e26}.ref-warning .ref-section-label{justify-content:flex-start;font-size:24px;margin-top:0}body.reference-design .ref-composition .ref-callout-text{font:800 40px/1.3 'Editorial VN',sans-serif;letter-spacing:-.8px;color:#f5e5d5;text-align:left;background:none;-webkit-text-fill-color:initial;text-shadow:none}
++body.reference-design .ref-composition .ref-code{border:2px solid var(--ref-border);border-radius:30px;background:#09141e;overflow:hidden;box-shadow:0 20px 45px #0002}.ref-code-toolbar{height:70px;display:flex;align-items:center;gap:28px;padding:0 28px;background:#1c2a34;color:#9eacbc;font-size:26px}.ref-window-dots{display:flex;align-items:center;gap:10px}.ref-window-dots i{height:14px;width:14px;border-radius:50%;background:#e38385}.ref-window-dots i:nth-child(2){background:#e2bf72}.ref-window-dots i:last-child{background:#6fc49e}.ref-code-toolbar>b{margin-left:auto;border-radius:12px;padding:5px 13px;color:#8db4d4;background:#52748c21;font-size:21px}.ref-code pre{padding:28px 20px;font:28px/1.6 monospace;white-space:pre-wrap;overflow-wrap:anywhere}.ref-code-line{display:flex;gap:23px;color:#91c5de}.ref-code-line b{flex:0 0 25px;text-align:right;font-size:22px;font-weight:400;color:#667489}.ref-code-line code{white-space:pre-wrap;overflow-wrap:anywhere;min-width:0}.ref-code-line.is-highlight{background:#74e8c411;color:#b1e5bd}.ref-code-line:nth-child(3n+2){color:#d5bf83}body.reference-design .ref-composition .ref-code-status{display:flex;align-items:center;gap:15px;padding:23px;border:1px solid #73c99c55;background:#4e917518;border-radius:21px;color:#a0d6bc}
++body.reference-design .ref-composition .ref-specs{padding:22px 28px;background:#aacbd30b;border:2px solid var(--ref-border);border-radius:34px}.ref-spec-row{display:flex;align-items:center;gap:22px;padding:18px 0;border:0!important;background:none!important;box-shadow:none!important;font-size:30px}.ref-spec-row>span:first-child{flex:1}.ref-spec-row strong{flex:0 1 44%;text-align:right;color:var(--ref-gold);font-size:30px}.ref-meter{width:75px;height:20px;border-radius:20px;background:#c3d1db15;overflow:hidden}.ref-meter i{display:block;height:100%;background:linear-gradient(90deg,#69d9df,#aaffeb);border-radius:20px}.ref-spec-row:nth-child(even) .ref-meter i{background:linear-gradient(90deg,#d69c24,#ffda7a)}
++body.reference-design .ref-composition .ref-list-item{font-size:29px;line-height:1.35;padding:18px 0;border-bottom:1px solid #b9c5d11b;overflow-wrap:anywhere}.ref-pros-cons>.ref-panel{padding:25px}.ref-pros-cons .ref-section-label{font-size:25px}.ref-score{background:none!important;border:0!important;box-shadow:none!important;width:auto!important;height:auto!important;padding:35px 0!important;text-align:center}.ref-score strong{font-size:130px;color:var(--ref-mint)}.ref-score small{font-size:40px;color:var(--ref-muted)}.ref-price{padding:35px 0;font-size:90px;font-weight:800;color:var(--ref-mint);overflow-wrap:anywhere}
++body.reference-design .ref-composition .ref-media{position:relative;top:auto;left:auto;right:auto;bottom:auto;width:100%;height:auto;max-height:430px;min-height:0;border:2px solid var(--ref-border);border-radius:28px;background:#111d27;overflow:hidden;box-shadow:0 15px 35px #0003;transform:none}.ref-media figcaption{display:flex;align-items:center;gap:24px;padding:16px 22px;background:#1c2934;font-size:22px;color:#b7c5ce}.ref-media :is(img,video){display:block;position:static;width:100%;max-height:370px;object-fit:contain;background:#0e1821}.ref-with-media .ref-media{order:-1}.ref-with-media .ref-panel{padding:24px}.ref-with-media .ref-rows{gap:18px}.ref-with-media .ref-row{min-height:115px!important;padding:17px 25px!important}.ref-with-media .ref-row-icon{height:65px;flex-basis:65px;width:65px;border-radius:18px}.ref-with-media .ref-row-icon svg{height:40px!important;width:40px!important}.ref-with-media .ref-mechanism{height:265px!important}.ref-with-media .ref-mini-node{min-height:130px;padding:10px}.ref-gallery{display:flex;flex-direction:column;gap:24px}.ref-gallery>.gallery-card{border:0;background:none;box-shadow:none;border-radius:24px;overflow:hidden}.ref-gallery.count-3 .ref-media{max-height:250px}.ref-gallery.count-3 .ref-media img{max-height:195px}.ref-gallery .ref-note{padding:14px 0}.ref-screen{position:relative!important;width:100%!important;height:auto!important;border:0!important;box-shadow:none!important;border-radius:28px!important;padding:0!important;background:none!important}
++/* Profile is a single glowing glass card, without a simulated follow click. */
++body.reference-design .ref-outro-composition{top:430px;left:210px;width:660px}
++body.reference-design .ref-composition .ref-profile{position:relative;left:auto;right:auto;top:auto;bottom:auto;display:flex;flex-direction:column;align-items:center;gap:22px;width:100%;padding:55px 45px;border:2px solid #d6b26263;border-radius:55px;background:linear-gradient(140deg,#a78f4534,#15242cd9);box-shadow:0 0 150px #b9a44d22;text-align:center}.ref-avatar{height:145px;width:145px;border:2px solid #dac78c60;border-radius:50%;display:grid;place-items:center;background:#a3ad6a14;color:var(--ref-gold);overflow:hidden}.ref-avatar img{width:100%;height:100%;object-fit:cover}.ref-avatar svg{height:70px!important;width:70px!important}.ref-profile>strong{font-size:50px;line-height:1.2}.ref-profile>span{font-size:29px;color:#c0c6c9}.ref-profile .ref-channel-pill{padding:12px 24px;border-radius:40px;border:1px solid #c6b87354;color:#e6cd8d;background:#a28e4314;font-size:26px}body.reference-design .ref-composition .out-cta-top{font:800 37px/1.35 'Editorial VN',sans-serif;color:#fff4d6;text-align:center;background:none}.ref-profile p{font-size:27px;line-height:1.35;color:#b6c2c8}
++body.reference-design .captions-container{top:1380px;bottom:auto;left:79px;right:79px;height:185px;text-align:center;z-index:50}body.reference-design .caption-cue{max-width:923px;font:800 48px/1.4 'Editorial VN',sans-serif;text-align:center;letter-spacing:-1px;text-transform:none;text-shadow:0 2px 9px #0008}body.reference-design .caption-word{margin:0 2px}body.reference-design .caption-word .word-text{color:var(--ref-text);background:none;padding:0;border-radius:0;-webkit-text-stroke:0}body.reference-design .caption-word .word-highlight{color:var(--ref-orange);filter:none;-webkit-text-stroke:0}body.reference-design .caption-cue[data-highlight-mode=estimated] .word-highlight{display:inline}
++body.reference-design .ref-composition .ref-row.ref-red{border-color:#d970765e;background:linear-gradient(110deg,#61393c66,#341e2aa8)}.ref-row.ref-red .ref-row-icon{color:#f2878e;background:#d66b7430}.ref-row.ref-red .ref-status{color:#f38b92;background:#dc626b25}.ref-disabled .ref-row-copy strong{text-decoration:line-through;text-decoration-color:#ec7c82}.ref-bottom-cards .ref-cell{min-height:235px}.ref-bottom-cards .ref-cell strong{font-size:47px}.ref-bottom-cards .ref-cell p{font-size:26px;line-height:1.3;color:var(--ref-muted)}
++body.reference-design .ref-composition .ref-mini-node{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;min-width:0;min-height:158px;border:2px solid #83d2b87a;border-radius:36px;background:#5b9c8126;text-align:center;padding:18px 22px;gap:9px;box-shadow:none;transform:none}body.reference-design .ref-composition .ref-mini-node strong{font:800 34px/1.1 'Editorial VN',sans-serif;color:var(--ref-text)}body.reference-design .ref-composition .ref-mini-node:last-child{border-color:#6dbce280;background:#4c97bd24}
++body.reference-design .ref-composition .ref-profile{transform:none}body.reference-design .ref-composition .ref-benefit{margin:0;text-shadow:none}body.reference-design .ref-composition .ref-mini-node strong{padding:0}body.reference-design .ref-hero-composition .hook-headline{font-size:110px!important}body.reference-design .ref-hero-composition .hook-subhead{font-size:32px!important}
++.ref-board-canvas{display:flex;flex-direction:column;gap:26px;width:100%}.ref-hero-composition .ref-board-canvas{height:100%;display:block}.ref-outro-composition .ref-board-canvas{display:block}.ref-scratch.scratch-two{left:495px;right:auto;top:115px;transform-origin:left center}.ref-mini-node small{font-size:28px;line-height:1.2}
++/* Neutral video-tool mark. Uploaded product logos replace it in the same tile. */
++.ref-original-mark>i:first-child{top:10px;left:0;width:220px;height:24px;border-radius:7px;background:repeating-linear-gradient(90deg,#8c9eaa 0 26px,transparent 26px 40px)}.ref-original-mark>i:nth-child(2){top:auto;bottom:10px;left:0;width:220px;height:24px;border-radius:7px;background:repeating-linear-gradient(90deg,#8c9eaa 0 26px,transparent 26px 40px)}.ref-original-mark>span{left:50px;top:62px;width:120px;height:96px;border-radius:25px;background:linear-gradient(125deg,#f0d38a,#b5e0c6)}
++.ref-flow-many{gap:12px}.ref-flow-many .ref-connector{width:30px}.ref-flow-many .ref-connector i{display:none}.ref-flow-many .ref-connector svg{width:30px!important}.ref-flow-many .ref-mini-node{padding:17px!important;min-height:200px!important}body.reference-design .ref-flow-many .ref-mini-node strong{font-size:25px!important}.ref-flow-many .ref-mini-node small{font-size:21px}body.reference-design .ref-mechanism:has(.ref-flow-many){height:auto!important}
+--- a/src/script/generator.ts
++++ b/src/script/generator.ts
+@@ -1,3 +1,4 @@
++import {applyReferenceDefaults,type CreativeSettings} from '../render/reference-design.js';
+ import {applyChannelOutro} from "./channel-outro.js";
+ import {DEFAULT_VOICE_SPEED,DEFAULT_BGM} from '../channel-defaults.js';
+ import {reviewStoryboard} from "./storyboard.js";
+@@ -104,6 +105,7 @@
+ }
+ 
+ export interface GenerateScriptOptions {
++  creative?: CreativeSettings;
+   input: string;
+   preset?: ScriptPreset;
+   outputDir?: string;
+@@ -139,7 +141,9 @@
+ 
+   // 3. Call LLM with retry mechanism (max 2 retries = 3 attempts total)
+   log.info(`[2/4] Generating script with LLM (${llmProvider.name})...`);
+-  const initialUserPrompt = buildUserPrompt(sources, preset, channelName, {contentMode:opts.contentMode,targetDurationSec:opts.targetDurationSec,directingMode:opts.directingMode,visualAssets:opts.visualAssets});
++  const initialUserPrompt = buildUserPrompt(sources, preset, channelName, {contentMode:opts.contentMode,targetDurationSec:opts.targetDurationSec,directingMode:opts.directingMode,visualAssets:opts.visualAssets}) + `\nMỞ ĐẦU: ${opts.creative?.hookType==='question'?'Đặt câu hỏi cụ thể, trả lời ngay bằng bằng chứng từ nguồn.':'Vấn đề có thật trong nguồn → giải pháp → lợi ích; thiếu vấn đề thì mở bằng tính năng thật, không bịa nỗi đau.'}\nCẤU TRÚC: ${opts.creative?.structureId==='news'?'Sự kiện → bằng chứng → tác động → giới hạn → CTA.':opts.creative?.structureId==='review'?'Giải pháp → lợi ích → bằng chứng → cách dùng → giới hạn → CTA.':'Giải pháp → cơ chế → tính năng → cách dùng → giới hạn → CTA.'} Bỏ mục không có dữ liệu. Thẻ có chữ ngắn gọn, nội dung bổ sung dần theo lời đọc; không chép toàn bộ lời đọc lên hình. Không sao chép số liệu hay branding của video tham chiếu.
++THIẾT KẾ MỞ ĐẦU: templateData.hero={name,category,repository?,before?,after?}. name chỉ là tên sản phẩm ngắn lấy từ nguồn, không phải câu hook. category là loại sản phẩm; repository chỉ điền repo thật. before/after là hai nhãn đối chiếu ngắn, chỉ khi nguồn xác nhận. voiceText mở bằng tương phản vấn đề → giải pháp theo lối "Thay vì…" khi có bằng chứng; không lặp lại tên lên headline như câu khẩu hiệu. headline vẫn là tóm tắt ý hook cho tương thích.
++BẢNG NỘI DUNG: ưu tiên data-flow 2 nodes cho cơ chế, feature-list cho tính năng, code-window cho hướng dẫn, pros-cons cho giới hạn. Có thể thêm scene.referenceBoard={rows:[{title,detail,tone,badge?,disabled?}],cards:[{label,value,detail?,tone}]} để BỔ SUNG dần các khối trên cùng bảng, không tách mọi ý thành slide mới. Tối đa 2 rows và 2 cards khi đã có panel cơ chế; mỗi chữ và số đều phải có trong nguồn. tone là mint/red/blue/gold/violet. Giữ tối đa khoảng 5 khối chính trên một bảng. Không tự tạo số đo hiệu năng hay badge ngụ ý đã kiểm chứng.`;
+ 
+   let currentPrompt = initialUserPrompt;
+   let parsedScript: Script | null = null;
+@@ -210,6 +214,8 @@
+     throw new Error("Unexpected error: script was not generated");
+   }
+ 
++  applyReferenceDefaults(parsedScript,opts.creative);
++
+   // 4. Fact check numbers against source content
+   log.info(`[3/4] Fact-checking numbers against source content...`);
+   const factCheck = factCheckScript(parsedScript, sources.content);
+--- a/src/script/hooks.ts
++++ b/src/script/hooks.ts
+@@ -13,7 +13,7 @@
+   const facts = clean.split(/\n+|(?<=[.!?])\s+/u).map(s => s.replace(/\s+/g, ' ').trim()).filter(s => s.length >= 12);
+   return [...new Set(facts.length ? facts : [title.trim()])];
+ }
+-export function buildHookSuggestions(title: string, content: string): HookSuggestion[] {
++export function buildHookSuggestions(title: string, content: string, hookType?: 'problem-solution'|'question'): HookSuggestion[] {
+   const facts = sourceFacts(content, title);
+   // Prefer a short concrete action/benefit over the repository or article name.
+   const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+@@ -33,8 +33,22 @@
+   }
+   const evidence = numeric || ranked[1] || benefit;
+   const question = (caveat || ranked[ranked.length-1] || benefit).replace(/[.!?]+$/,'');
+-  return [direct,
++  const suggestions = [direct,
+     { label: numeric ? 'Mở bằng số liệu nguồn' : 'Mở bằng tính năng', headline:compactText(evidence.replace(/[.!?]+$/,''),40), subhead:'Chi tiết có trong nguồn', voiceText:evidence },
+     { label:caveat ? 'Đặt giới hạn lên trước' : 'Đặt câu hỏi', headline:compactText(question+'?',40), subhead:compactText(title,40), voiceText:question+'?' },
+   ].filter((v,i,a)=>a.findIndex(p=>p.voiceText===v.voiceText)===i);
++  if(hookType==='question')return suggestions.map(h=>({...h,label:'Câu hỏi · '+h.label,headline:compactText(h.headline.replace(/[.!?…]+$/u,'')+'?',40),voiceText:h.voiceText.replace(/[.!?]+$/u,'')+'?'}));
++  if(hookType==='problem-solution'){
++    const problem=facts.find(f=>/(?:khó|mất thời gian|thủ công|ngốn|rườm rà|vấn đề|bất tiện|too many|manual|problem|slow|difficult)/iu.test(f));
++    // Source-only mode preserves exact statements, including negation and units.
++    const solution=ranked.find(f=>f!==problem);
++    if(problem&&solution){
++      const lowerInitial=(s:string)=>s.replace(/^[A-ZÀ-Ỹ][a-zà-ỹ]/u,m=>m.toLowerCase());
++      const contrast=/^(?:Bạn phải|Phải|Mở|Dựng|Làm|Thao tác|Việc|Người dùng phải)(?:\s|$)/u.test(problem);
++      const voiceText=contrast?'Thay vì '+lowerInitial(problem.replace(/[.!?]+$/u,''))+', '+lowerInitial(solution):problem+' '+solution;
++      suggestions.unshift({label:'Vấn đề → giải pháp',headline:compactText(problem,40),subhead:compactText(solution,40),voiceText});
++    }
++    else suggestions[0]={...suggestions[0],label:'Giải pháp từ nguồn · chưa có vấn đề cụ thể'};
++  }
++  return suggestions.slice(0,4);
+ }
+--- a/src/server.ts
++++ b/src/server.ts
+@@ -1,3 +1,4 @@
++import {applyReferenceDefaults,CreativeOptions} from './render/reference-design.js';
+ import {z} from "zod";
+ import {defaultCaption} from './channel-defaults.js';
+ import {ensureVideoThumbnail} from './ingest/thumbnail.js';
+@@ -415,6 +416,7 @@
+     }
+ 
+ 
++    const creative=CreativeOptions.parse(req.body.creative||{});
+     const directingMode=ScriptSchema.shape.directingMode.parse(req.body.directingMode);
+     const visualIds=z.array(z.string().uuid()).max(20).parse(req.body.visualAssetIds||[]);
+     const visualAssets=await Promise.all(visualIds.map(id=>readVisual(id)));
+@@ -433,7 +435,7 @@
+         const result = await generateScript({
+           input: content ? `${title}\n\n${content}` : url || title,
+           preset: llmPreset,
+-          contentMode, targetDurationSec, directingMode, visualAssets:visualAssets.map(({id,label,source,kind})=>({id,label,source,kind})),
++          creative, contentMode, targetDurationSec, directingMode, visualAssets:visualAssets.map(({id,label,source,kind})=>({id,label,source,kind})),
+           source: content ? {title,content,url:url||'manual',domain:domain||'manual',ogImage:image||null} : undefined,
+           channelName: channel || "DevPeek36",
+           llmProvider: llmInstance,
+@@ -468,8 +470,11 @@
+         : 'Đang dựng từ câu có trong nguồn. Chưa dùng AI để biên tập hook; có thể bật AI trong Cấu hình LLM.'
+     };
+     if (!req.body.voice?.uploadId) {
+-      const alternatives = usedAi ? (script.hookSuggestions || []) : buildHookSuggestions(title, content || title).map(h => ({ ...h, voiceText: normalizeVietnameseForTts(h.voiceText) }));
++      const alternatives = usedAi ? (script.hookSuggestions || []) : buildHookSuggestions(title, content || title,creative.hookType||'problem-solution').map(h => ({ ...h, voiceText: normalizeVietnameseForTts(h.voiceText) }));
+       const current = script.scenes[0];
++      if(!usedAi&&alternatives[0]&&current.templateData.template==='hook'){
++        current.voiceText=alternatives[0].voiceText;current.templateData.headline=alternatives[0].headline;current.templateData.subhead=alternatives[0].subhead;
++      }
+       script.hookSuggestions = current.templateData.template === 'hook'
+         ? [{ label: usedAi ? 'Hook AI đã chọn' : 'Hook đang dùng', headline: current.templateData.headline,
+             subhead: current.templateData.subhead || '', voiceText: current.voiceText }, ...alternatives.filter(h=>h.voiceText!==current.voiceText)].slice(0,4)
+@@ -502,6 +507,8 @@
+       assignImportedNarration(script, content || '', upload.durationSec);
+     }
+     if(templatePack)script.visualStyle="tech-editorial";
++    if(req.body.visualStyle==='classic'){delete script.templatePack;delete script.creative;}
++    else applyReferenceDefaults(script,creative);
+     res.json(ScriptSchema.parse(script));
+   } catch (err: any) {
+     res.status(400).json({ error: err.message });
+@@ -556,6 +563,7 @@
+     }
+ 
+     if (!req.body.script) {
++      applyReferenceDefaults(scriptData,CreativeOptions.parse(req.body.creative||{}));
+       if(req.body.fitDuration)scriptData.fitDuration=true;
+       if (req.body.templatePack) scriptData.templatePack=req.body.templatePack;
+       if (req.body.contentMode) scriptData.contentMode=req.body.contentMode;
+--- a/src/studio/routes.ts
++++ b/src/studio/routes.ts
+@@ -1,3 +1,4 @@
++import {sceneBlocks,referenceSettings} from '../render/reference-design.js';
+ import {applyChannelOutro} from "../script/channel-outro.js";
+ import {sceneMediaEntries} from '../media/media-manager.js';
+ import {zeroTtsInstalled} from "../tts/zerotts-client.js";
+@@ -40,7 +41,18 @@
+     script.visualStyle = req.query.style === 'classic' ? 'classic' : 'tech-editorial';
+     if(req.query.pack){const p=stylePack(String(req.query.pack));script.templatePack=p.id;script.visualStyle='tech-editorial';script.colorTheme=p.id==='explainer'?'midnight':'teal';}
+     script.motionPreset = req.query.motion === 'dynamic' ? 'dynamic' : 'calm';
++    if(script.templatePack==='reference')script.creative={presetId:'reference',pacingId:req.query.motion==='dynamic'?'quick':'narrated'};
+     if(!req.query.pack)script.colorTheme = req.query.theme === 'midnight' ? 'midnight' : 'teal';
++    if(req.query.layout){
++      const chosen=TEMPLATE_CATALOG.find(t=>t.id===req.query.layout);if(!chosen)throw new Error('Bố cục không hợp lệ.');
++      const source=script.scenes[chosen.id==='hook'?0:chosen.id==='outro'?script.scenes.length-1:1];
++      script.scenes=[{...source,id:'preview',type:chosen.id==='hook'?'hook':chosen.id==='outro'?'outro':'body',templateData:chosen.data}];
++    }
++    if(script.templatePack==='reference'){
++      script.captions={enabled:true,style:'minimal',highlightMode:'estimated'};
++      const opening=script.scenes.find(s=>s.templateData.template==='hook');
++      if(opening?.templateData.template==='hook')opening.templateData={...opening.templateData,hero:{name:'AutoGen',category:'OPEN SOURCE VIDEO TOOL',before:'Dựng từng cảnh',after:'Nội dung → video dọc'}};
++    }
+     const captionCues = script.scenes.flatMap((s, i) => groupWordsIntoCues(estimateWordTimings(s.voiceText, 3), { sceneStartMs: i * 3000 }).map(c => ({ ...c, accuracy: 'low' as const })));
+     let html = composeHtml({ purpose: 'preview', script, sceneAudio: script.scenes.map(s => ({ id: s.id, durationSec: 3 })), gapSec: 0, outroHoldSec: 0,
+       bgImageRelPath: null, audioRelPath: '', captionCues,
+@@ -58,6 +70,7 @@
+ studioRouter.post('/preview-script',async(req,res)=>{
+   try {
+     const script=ScriptSchema.parse(req.body.script);
++    if(referenceSettings(script))script.visualStyle='tech-editorial';
+     if(script.templatePack){script.visualStyle="tech-editorial";if(script.templatePack==="explainer")script.colorTheme="midnight";}
+     const mediaMap:Record<string,import('../media/media-manager.js').MediaAssetRecord>={};
+     for(const scene of sceneMediaEntries(script)){if(scene.media.src.startsWith('studio-asset:')){
+@@ -65,7 +78,10 @@
+       mediaMap[scene.id]={sceneId:scene.id,type:'image',originalSrc:a.source,localRelPath:a.previewUrl,fit:scene.media.fit,fx:scene.media.fx,presentation:scene.media.presentation,credit:scene.media.credit||a.source,width:a.width,height:a.height};
+     }}
+     if(script.metadata.logoAssetId){const a=await readVisual(script.metadata.logoAssetId);mediaMap.__logo__={sceneId:'__logo__',type:'image',originalSrc:a.source,localRelPath:a.previewUrl,fit:'contain',fx:'none'};}
+-    let html=composeHtml({purpose:'preview',script,sceneAudio:script.scenes.map(s=>({id:s.id,durationSec:3})),gapSec:0,outroHoldSec:0,bgImageRelPath:null,audioRelPath:'',mediaMap,tiktokAvatarRelPath:'/api/studio/assets/avatar.jpg'});
++    const durations=script.scenes.map(s=>Math.max(3,...Object.values(s.blockTiming||{}).map(t=>(t.atSec||0)+.9)));
++    let cursor=0;
++    const captionCues=script.scenes.flatMap((s,i)=>{const cues=groupWordsIntoCues(estimateWordTimings(s.voiceText,durations[i]),{sceneStartMs:cursor*1000}).map(c=>({...c,accuracy:'low' as const}));cursor+=durations[i];return cues;});
++    let html=composeHtml({purpose:'preview',script,sceneAudio:script.scenes.map((s,i)=>({id:s.id,durationSec:durations[i]})),gapSec:0,outroHoldSec:0,bgImageRelPath:null,audioRelPath:'',captionCues,mediaMap,tiktokAvatarRelPath:'/api/studio/assets/avatar.jpg'});
+     html=html.replace(/href="styles.css"/g,`href="/api/studio/style.css?style=${script.visualStyle==='classic'?'classic':'tech-editorial'}"`)
+       .replace(/(?:https:\/\/cdn.jsdelivr.net\/npm\/gsap@3.14.2\/dist\/)?gsap.min.js/g,'/api/studio/assets/gsap.min.js')
+       .replace(/<audio[\s\S]*?<\/audio>/g,'')
+@@ -74,8 +90,17 @@
+     res.type('html').send(html);
+   }catch(err:any){res.status(400).json({error:'Không xem được bố cục: '+err.message});}
+ });
+-studioRouter.get('/style-packs',(_req,res)=>res.json({packs:STYLE_PACKS.map(p=>({...p,posterUrl:`/api/studio/style-packs/${p.id}/poster.svg`,previewUrl:`/api/studio/style-preview?pack=${p.id}&motion=dynamic`,sourceUrl:p.demo?`https://github.com/Vincentwei1021/mg-styles-15/tree/main/demos/${p.demo}`:undefined,adaptation:Boolean(p.demo)}))}));
++studioRouter.get('/style-packs',(_req,res)=>res.json({packs:STYLE_PACKS.map(p=>({...p,posterUrl:`/api/studio/style-packs/${p.id}/poster.svg`,previewUrl:`/api/studio/style-preview?pack=${p.id}&motion=${p.id==='reference'?'calm':'dynamic'}`,sourceUrl:p.demo?`https://github.com/Vincentwei1021/mg-styles-15/tree/main/demos/${p.demo}`:undefined,adaptation:Boolean(p.demo)}))}));
+ studioRouter.get('/style-packs/:id/poster.svg',(req,res)=>{try{res.type('svg').send(packPoster(String(req.params.id)));}catch{res.status(404).send('Template không tồn tại.');}});
++studioRouter.post('/validate-script',(req,res)=>{
++  const parsed=ScriptSchema.safeParse(req.body.script);
++  if(!parsed.success)return res.status(400).json({error:parsed.error.message});
++  return res.json({script:parsed.data});
++});
++studioRouter.post('/block-plan',(req,res)=>{
++  try{const scene=ScriptSchema.shape.scenes.element.parse(req.body.scene);res.json({blocks:sceneBlocks(scene)});}
++  catch(err:any){res.status(400).json({error:err.message});}
++});
+ studioRouter.get('/templates', (_req,res)=>res.json({templates:TEMPLATE_CATALOG}));
+ studioRouter.post('/github-visuals', async(req,res)=>{
+   try {const {url}=z.object({url:z.string().max(500)}).parse(req.body);res.json(await collectGithubVisuals(url));}
+--- a/src/utils/script-generator.ts
++++ b/src/utils/script-generator.ts
+@@ -1,3 +1,4 @@
++import {applyReferenceDefaults} from '../render/reference-design.js';
+ import {channelOutroVoice} from "../script/channel-outro.js";
+ import {DEFAULT_VOICE_SPEED,DEFAULT_BGM} from '../channel-defaults.js';
+ import { buildHookSuggestions, sourceFacts, compactText } from "../script/hooks.js";
+@@ -104,6 +105,7 @@
+         templateData: {
+           template: "hook",
+           headline: hookHeadline.slice(0, 40),
++          hero:{name:compactText(title,40),category:"TECH EXPLAINER"},
+           subhead: hookSubhead.slice(0, 40),
+           kenBurns: "zoom-in",
+         },
+@@ -154,5 +156,5 @@
+     ],
+   };
+ 
+-  return script;
++  return applyReferenceDefaults(script);
+ }

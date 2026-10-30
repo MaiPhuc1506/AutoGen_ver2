@@ -1,201 +1,214 @@
-<a id="top"></a>
+# Auto Video Gen · DevPeek36
 
-<div align="center">
+Studio chạy trên máy cá nhân để tạo video tiếng Việt dọc **1080×1920** từ link bài viết, GitHub repo hoặc tư liệu của bạn. Có AI News Radar để tìm nội dung, AI viết kịch bản, giọng đọc, phụ đề theo lời nói, storyboard và xuất MP4 bằng HyperFrames/FFmpeg.
 
-# 🎬 Auto Video Gen v2.0 (Auto_GenVid)
+Đây là bản mở rộng của Auto News Video. Luồng nên dùng hiện tại là **Radar/link → Studio → duyệt kịch bản → render → tải video**. Không cần Claude hoặc Codex để vận hành sau khi cài; việc sinh kịch bản vẫn cần dịch vụ LLM và khóa riêng của bạn.
 
-### 🚀 Biến URL bài báo & Repo GitHub thành Video ngắn 9:16 chuyên nghiệp
+## 1. Cần cài những gì?
 
-**1 câu lệnh với AI Coding · 0đ Voice (Edge TTS) · Không cần edit thủ công · Sẵn sàng đăng TikTok, Reels, Shorts**
+| Cách chạy | Cần cài trên máy | Đã có trong bộ Docker |
+| --- | --- | --- |
+| Docker, khuyên dùng khi chuyển máy | Git, Docker Desktop hoặc Docker Engine + Compose **v2.24 trở lên** | Node 22, npm dependencies, Chromium, FFmpeg/ffprobe, Python 3 và Edge TTS |
+| Chạy trực tiếp | Git, Node.js **22+**, npm, FFmpeg/ffprobe, Chromium/Chrome, Python **3.11+** và venv | Không áp dụng |
 
-[![Stars](https://img.shields.io/github/stars/Cuongyd196/auto-video-gen?style=for-the-badge&logo=github&color=yellow)](https://github.com/Cuongyd196/auto-video-gen/stargazers)
-[![Forks](https://img.shields.io/github/forks/Cuongyd196/auto-video-gen?style=for-the-badge&logo=github&color=blue)](https://github.com/Cuongyd196/auto-video-gen/network/members)
-[![License](https://img.shields.io/github/license/Cuongyd196/auto-video-gen?style=for-the-badge&color=green)](LICENSE)
-[![Node](https://img.shields.io/badge/node-22%2B-brightgreen?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org)
-[![TypeScript](https://img.shields.io/badge/typescript-strict-blue?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Tests](https://img.shields.io/badge/tests-154%20passed-success?style=for-the-badge&logo=vitest&logoColor=white)](https://vitest.dev/)
+Cần Internet để lấy nguồn, gọi Gemini/LLM và Edge TTS. Nên có tối thiểu 8 GB RAM, khuyến nghị 16 GB khi render, và vài GB trống; ZeroTTS cần thêm dung lượng tải model. Đây là khuyến nghị vận hành, không phải cam kết tốc độ.
 
-[**📖 Tài liệu chi tiết (Full Docs)**](README.full.md) · [**🇬🇧 English Docs**](README.en.md) · [**📺 Xem Demo**](https://youtube.com/shorts/X8P_5tsHy4o) · [**🚀 Cài đặt nhanh**](#-cài-đặt--bắt-đầu-nhanh) · [**⚙️ Cơ chế hoạt động**](#-cơ-chế-hoạt-động-how-it-works)
+- **Bắt buộc khi dùng AI viết kịch bản:** API key của Gemini hoặc nhà cung cấp LLM đã chọn. Quyền dùng ChatGPT/Codex không thay cho API key của dịch vụ này.
+- **Không cần key:** Edge TTS Nam Minh, nhiều nguồn RSS/API công khai của Radar. Dịch vụ miễn phí vẫn có thể giới hạn hoặc tạm ngừng.
+- **Tùy chọn:** ZeroTTS local; key ElevenLabs/Vbee/LucyLab; GitHub/Reddit/X token nếu cần nguồn tương ứng. Không phải cài tất cả.
 
-</div>
-
-> 💡 **Bạn cần tài liệu kiến trúc & chuyển giao?**
-> Xem [👉 docs/handover-brief.md](docs/handover-brief.md) để biết đầy đủ lộ trình từ Milestone M0 đến M7, kiến trúc Headless Timeline, và các quyết định kỹ thuật ADR.
-
----
-
-## 🌟 Các tính năng nổi bật (v2.0)
-
-- 🎙️ **Giọng đọc tiếng Việt tự nhiên (0đ):** Mặc định sử dụng Microsoft Edge TTS (`vi-VN-NamMinhNeural`, `vi-VN-HoaiMyNeural`), hỗ trợ LucyLab, ElevenLabs, Vbee.
-- 🔤 **Phụ đề Karaoke từng từ (Word-level Sync):** Hiệu ứng chữ đổi màu và glow theo đúng giọng nói, tự động xuất/nhập file chuẩn `captions.srt`.
-- 🖼️ **Media thật & Chụp ảnh bài báo:** Tự động tìm ảnh/video stock (Pexels, Pixabay), chụp screenshot website bằng Puppeteer, hiệu ứng Ken Burns mượt mà và quản lý bản quyền `media.json`.
-- 🎨 **12 Template Motion Graphics đỉnh cao:** Hỗ trợ 2 theme (`dark-neon` và `light-pro`), bao gồm cả bộ template review sản phẩm công nghệ (bảng thông số, ưu nhược điểm, điểm số, giá bán, gallery ảnh, phone mockup).
-- 🤖 **Sinh kịch bản tự động bằng LLM ngay trong code:** Tự động gọi Claude/OpenAI, lọc số liệu lạ so với nguồn, xuất `script.review.md` trước khi render.
-- 🎵 **Audio Polish & BGM Ducking:** Nhạc nền tự động dìm âm lượng (sidechain compression) khi có giọng đọc và đẩy lên ở khoảng nghỉ; từ điển phát âm Lexicon chống đọc sai phiên âm tiếng Anh/tên riêng.
-- ⏱️ **Web UI Studio & Timeline Editor (M6):** Giao diện web đa track (Visual Scenes, Voice, Captions, BGM), Live Preview 9:16 đồng bộ GSAP timeline, các lệnh Command Pattern (Undo, Redo, Split, Ripple Delete, Snap), nút Re-TTS từng cảnh riêng lẻ và thanh tiến độ render thời gian thực (SSE).
-- 📰 **Thu thập tin tức RSS & Hàng đợi Batch (M7):** Tự động quét RSS từ VnExpress, Tuổi Trẻ, GenK... và tạo video hàng loạt với cơ chế cô lập lỗi.
-- 🚀 **Publish Kit đầy đủ:** Tự động trích xuất frame ảnh bìa `cover.png` và checklist `publish.md` (caption, 4 hashtag, ghi công nguồn, nhãn nội dung AI bắt buộc).
-
----
-
-## ⚙️ Cơ chế hoạt động (How It Works)
-
-```text
-[URL bài báo / RSS Feed / Văn bản]
-         │
-         ▼ (Bước 1: LLM tạo kịch bản & Kiểm tra số liệu)
-[script.json + sources.json + script.review.md]
-         │
-         ├───► [Xử lý Media thật / Stock / Screenshot / Ken Burns] (Bước 2)
-         │
-         ├───► [Từ điển phát âm Lexicon -> Thu âm TTS từng cảnh: voice/scene-*.mp3] (Bước 3)
-         │          │ (Tái sử dụng nếu đã có sẵn - Idempotent Caching)
-         │          ▼
-         ├───► [Nối audio + Mix SFX + Mix BGM có Ducking tự động: voice.mp3] (Bước 4)
-         │
-         ├───► [Gom timestamp thành Cues -> Xuất captions.srt & captions.json] (Bước 5)
-         │
-         ▼
-[Sinh HTML Composition: index.html + styles.css + animations.js] (Bước 6)
-         │ (Bố cục 9:16 bằng HTML5/CSS3/GSAP, nhúng Captions & Media)
-         ▼
-[HyperFrames Renderer: Puppeteer chụp frame + FFmpeg Encode] (Bước 7)
-         │
-         ▼
-[Hoàn tất sản phẩm: video.mp4 (1080x1920) + cover.png + publish.md] (Bước 8)
-```
-
----
-
-## 📐 Danh sách 12 Template Motion Graphics
-
-| Template | Nhóm | Mục đích sử dụng | Dữ liệu chính (`templateData`) |
-|---|---|---|---|
-| 🚨 **`hook`** | Cơ bản | Cảnh mở đầu giật gân, giữ chân người xem 3 giây đầu | `headline`, `subhead`, `bgSrc`, `kenBurns` |
-| 🔀 **`comparison`** | Cơ bản | So sánh 2 thông số hoặc 2 phương án đối lập | `left`, `right` (label, value, winner) |
-| 📊 **`stat-hero`** | Cơ bản | Nhấn mạnh con số thống kê hoặc dung lượng pin/camera lớn | `value`, `label`, `context` |
-| 📋 **`feature-list`** | Cơ bản | Danh sách điểm nhấn, gạch đầu dòng tính năng | `title`, `bullets` (mảng 1–4 dòng), `icon` |
-| 💬 **`callout`** | Cơ bản | Tuyên bố mạnh mẽ, câu trích dẫn hoặc giá bán | `statement`, `tag` |
-| 🎬 **`outro`** | Cơ bản | Thẻ follow kênh TikTok và nguồn tin trích dẫn | `ctaTop`, `channelName`, `source` |
-| 📑 **`spec-table`** | Review | Bảng thông số cấu hình phần cứng (RAM, CPU, Pin...) | `productName`, `specs` (label, value) |
-| ⚖️ **`pros-cons`** | Review | Cột ưu điểm (Pros) và nhược điểm (Cons) trực quan | `title`, `pros`, `cons` |
-| 🏆 **`verdict-score`** | Review | Điểm đánh giá tổng kết (thang 10 hoặc 100) kèm tóm tắt | `productName`, `score`, `verdict`, `summary` |
-| 🏷️ **`price-tag`** | Review | Nhãn giá bán sản phẩm nổi bật với tag khuyến mãi | `productName`, `price`, `variant`, `note` |
-| 🖼️ **`image-gallery`** | Review | Trưng bày bộ sưu tập 2–3 góc chụp sản phẩm | `title`, `images` (src, caption) |
-| 📱 **`phone-mockup`** | Review | Khung mô phỏng điện thoại chạy ảnh chụp màn hình | `title`, `screenSrc`, `caption` |
-
----
-
-## 🚀 Cài đặt & Bắt đầu nhanh
-
-### 1. Yêu cầu hệ thống
-- **Node.js**: Phiên bản 22 trở lên (`node --version`).
-- **FFmpeg & FFprobe**: Đã cài đặt và có trong `PATH`.
-  - *Ubuntu/Linux:* `sudo apt update && sudo apt install -y ffmpeg`
-  - *macOS:* `brew install ffmpeg`
-  - *Windows:* `winget install Gyan.FFmpeg`
-
-### 2. Cài đặt mã nguồn
+## 2. Clone và chạy bằng Docker
 
 ```bash
-git clone https://github.com/Cuongyd196/auto-video-gen.git
-cd auto-video-gen
-
-# Cài đặt dependencies
-npm install
-
-# Kiểm tra TypeScript và kiểm thử toàn bộ hệ thống
-npx tsc --noEmit
-npm test
-```
-
-### 3. Cấu hình môi trường
-
-```bash
+git clone https://github.com/NguyenTho2005/LC-auto-video-gen.git
+cd LC-auto-video-gen
 cp .env.example .env.local
+docker compose up -d --build
 ```
-*(Mặc định đã chạy Edge TTS 0đ miễn phí, không bắt buộc phải có API key để render).*
 
----
+Mở [Studio trên máy](http://localhost:3000). Trong trang, chọn **Đổi Model / API Key**, cấu hình nhà cung cấp/model/key và kiểm tra kết nối. Có thể điền key trong `.env.local` trước khi khởi động thay vì dùng giao diện.
 
-## 💻 Hướng dẫn sử dụng (How To Use)
-
-### 1. Sử dụng Giao diện Web Studio & Timeline Editor (Khuyên dùng)
-
-Khởi động giao diện web cục bộ:
-```bash
-npm run web
-# hoặc: npm start
-```
-Mở trình duyệt truy cập `http://localhost:3000`:
-- **Chế độ Tạo Video Mới:** Dán link bài báo / link GitHub, bấm "Bắt Đầu Tạo Video Ngay".
-- **Chế độ Timeline Editor:** Xem trước video tỉ lệ 9:16 trong khung điện thoại, tua playhead theo thời gian thực, kéo dãn cắt gọt clip trên Timeline đa track, sửa lời thoại và bấm **Re-TTS riêng cho từng cảnh**.
-
----
-
-### 2. Thu thập tin tức RSS và tạo video hàng loạt (M7)
+Lần build đầu tải Linux packages và npm/Python dependencies nên lâu hơn các lần chạy sau. Chưa có image phát hành sẵn; lệnh trên build từ mã nguồn hiện tại. Kiểm tra tình trạng:
 
 ```bash
-# 1. Quét danh sách bài viết mới từ các nguồn RSS (VnExpress, Tuổi Trẻ, GenK...)
-npm run ingest -- --list
-
-# 2. Chọn một bài cụ thể theo số thứ tự để làm video:
-npm run ingest -- --pick 1
-
-# 3. Chạy hàng đợi Batch tự động tạo video cho 3 bài liên tiếp:
-npm run ingest -- --batch 3
+docker compose ps
+docker compose logs --tail=100 -f app
+# Dừng, giữ dữ liệu:
+docker compose down
+# Chạy lại:
+docker compose up -d
+# Sau khi cập nhật source:
+git pull
+docker compose up -d --build
 ```
 
----
+Nếu cổng 3000 đang được dùng, tạo file `.env` cạnh `compose.yaml` với `WEB_PORT=3005`, rồi chạy lại và mở `http://localhost:3005`. `.env` trong ví dụ này phục vụ Compose; cấu hình ứng dụng đặt trong `.env.local` hoặc giao diện.
 
-### 3. Tạo kịch bản tự động bằng LLM trong dòng lệnh (M4)
+Docker chỉ mở cổng trên **127.0.0.1**, dành cho sử dụng cá nhân. Studio có chức năng lưu API key và đọc/ghi file; chưa có lớp xác thực để đưa thẳng lên Internet.
+
+### Dữ liệu và chuyển máy
+
+Compose dùng named volumes cho `config`, `output`, file upload, cache giọng và ZeroTTS. Chúng tồn tại sau `docker compose down`; **`docker compose down -v` xóa các volumes này**. Không mount `node_modules`/venv từ macOS hoặc Windows sang container Linux.
+
+- Clone source trên máy mới **không mang theo API key, video, upload hoặc thiết lập trình duyệt**. Thiết lập giọng/độ dài lưu ở trình duyệt cũng cần chọn lại.
+- Các file mặc định trong `config/` được chép vào volume ở lần tạo đầu. Rebuild image không ghi đè cấu hình đã lưu trong volume.
+- Sao lưu dữ liệu ra một thư mục riêng trước khi chuyển máy:
 
 ```bash
-# Từ URL bài báo
-npm run script -- https://vnexpress.net/... --preset news_45 --out output/tin-moi
-
-# Từ file văn bản cục bộ
-npm run script -- path/to/article.txt --preset review_60 --out output/review-sp
-
-# Bỏ qua bước xác nhận số liệu để render tự động:
-npm run script -- "Đánh giá chip M5" --yes
+mkdir -p backup/config backup/output backup/uploads
+docker compose cp app:/app/config/. backup/config/
+docker compose cp app:/app/output/. backup/output/
+docker compose cp app:/app/.uploads/. backup/uploads/
 ```
 
----
-
-### 4. Chạy Pipeline Render kịch bản có sẵn
+Thư mục backup có thể chứa key trong `config/llm.json` và tư liệu cá nhân: giữ riêng, không commit. Trên máy mới khởi động container rồi dừng dịch vụ ứng dụng để phục hồi bằng container tạm dùng cùng volumes:
 
 ```bash
-npm run pipeline -- tests/fixtures/sample-script-no-image.json
+docker compose stop app
+docker compose run --rm --no-deps -v "$PWD/backup:/backup:ro" app \
+  sh -c 'cp -R /backup/config/. /app/config/ && cp -R /backup/output/. /app/output/ && cp -R /backup/uploads/. /app/.uploads/'
+docker compose up -d
 ```
 
-**Thành phẩm tạo ra trong thư mục `output/<slug>/`:**
-- 🎬 `video.mp4`: Video dọc 1080×1920 30fps H.264/AAC.
-- 🖼️ `cover.png`: Ảnh bìa thumbnail dọc 9:16 cho TikTok.
-- 📋 `publish.md`: Checklist và nội dung bài đăng TikTok kèm 4 hashtag và nhãn AI.
-- 💬 `captions.srt` & `captions.json`: File phụ đề chuẩn hóa.
-- 🎙️ `voice.mp3`: File âm thanh giọng đọc đã mix BGM và SFX hoàn chỉnh.
+Các lệnh backup trên dùng shell macOS/Linux/WSL. Cache có thể tạo lại; không cần chuyển venv/model giữa hai hệ điều hành.
 
----
+### ZeroTTS trong Docker — tùy chọn
 
-### 5. Nhập phụ đề SRT từ bên ngoài (M1)
+Giọng mặc định vẫn là **Edge TTS · Nam Minh · 1.2×**. ZeroTTS không bị bỏ đi. Nếu muốn dùng local, sau khi app khởi động:
 
 ```bash
-npm run captions:import -- output/<slug> path/to/custom.srt
+docker compose exec app npm run zerotts:setup
 ```
 
----
+Lệnh cài SDK ZeroTTS 0.1.5 vào venv riêng và tải model thật, có thể khá lâu. Sau đó chọn ZeroTTS trong Studio. Model/runtime được giữ trong volumes riêng, không mở cổng worker ra ngoài. Khả năng cài SDK/hiệu năng ONNX phụ thuộc CPU và nền tảng; xem [hướng dẫn ZeroTTS](docs/huong-dan-zerotts.md). Sau khi nâng phiên bản Python/base image có thể cần tạo lại **riêng volume venv**; không xóa toàn bộ volumes dữ liệu để sửa môi trường Python.
 
-## 🧪 Kiểm thử và Đảm bảo chất lượng (QA)
+## 3. Chạy trực tiếp, không dùng Docker
 
-Repository được bảo vệ bởi bộ kiểm thử tự động toàn diện:
-- `npx tsc --noEmit`: 0 lỗi TypeScript strict mode.
-- `npm test`: **26 test suites, 154 unit & integration tests PASS 100%**.
-- Tích hợp GitHub Actions CI tự động kiểm tra code trên mỗi nhánh.
+Trên macOS có Homebrew:
 
----
+```bash
+brew install node@22 ffmpeg python@3.12
+export PATH="$(brew --prefix node@22)/bin:$(brew --prefix python@3.12)/libexec/bin:$PATH"
+# Cài Google Chrome/Chromium nếu máy chưa có trình duyệt này.
+```
 
-## 📄 Bản quyền (License)
+Đảm bảo `node --version` là 22 trở lên và `ffmpeg`, `ffprobe`, `python3` có trong PATH. Trên Linux cài các gói tương đương bằng package manager. Windows nên dùng Docker Desktop/WSL2; một số script bash/Python không được kiểm thử trên Windows native.
 
-Dự án phát hành theo giấy phép [MIT](LICENSE). Giữ nguyên ghi công tác giả gốc `Cuongyd196` và `hoquanghai`.
-Cung cấp giải pháp tự động hóa video nguồn mở cho cộng đồng sáng tạo nội dung Việt Nam.
+Sau khi clone:
+
+```bash
+npm ci
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -r requirements-edge.txt
+cp .env.example .env.local
+npm start
+```
+
+Giữ venv được kích hoạt trong terminal chạy server để helper Python đọc giọng/căn từ dùng đúng dependencies. Mỗi lần mở terminal mới: `source .venv/bin/activate` rồi `npm start`. Mở [localhost:3000](http://localhost:3000).
+
+HyperFrames có thể tìm Chrome trên máy hoặc tải browser ở lần chạy đầu. Nếu không tìm được, chỉ rõ executable:
+
+```bash
+# Ví dụ Linux; macOS trỏ tới executable thực tế trong Chrome.app.
+export HYPERFRAMES_BROWSER_PATH=/usr/bin/chromium
+npm start
+```
+
+ZeroTTS native: `npm run zerotts:setup`, sau đó chọn giọng trong Studio. Không bắt buộc cài để dùng Edge.
+
+## 4. Cấu hình một lần
+
+1. **LLM:** chọn Gemini, nhập key/model có quyền truy cập; cấu hình đang dùng là `gemini-flash-lite-latest`. Model/quota có thể thay đổi theo tài khoản. Có thể chọn OpenAI, Anthropic hoặc endpoint tương thích OpenAI trong phần cấu hình hiện có.
+2. **Kênh:** sửa tên hiển thị, handle và logo nếu cần. Giá trị hiện tại của bản dựng là DevPeek36.
+3. **Giọng:** nguồn giọng AI → Edge TTS → Nam Minh → **1.20×**, xử lý phát âm thông minh. ZeroTTS vẫn là lựa chọn riêng, không tự chuyển khi Edge lỗi.
+4. **Xuất:** `Nhanh · 1080p, 24 fps` phù hợp để thử. Đây là tốc độ khung hình xuất, không phải độ dài nội dung.
+5. Bật tự dựng theo nội dung, tự viết/đo giọng/căn thời gian, phụ đề theo lời đọc; nhạc nền nhẹ tự giảm khi nói và SFX có thể tắt tùy nhu cầu.
+
+**Ưu tiên cấu hình:** LLM đã lưu qua giao diện nằm trong `config/llm.json`, có ưu tiên hơn biến LLM trong `.env.local`. Với Docker, file này nằm trong volume `app-config`. Thay key trong env nhưng vẫn dùng key cũ thì kiểm tra cấu hình trên giao diện. Không đưa key vào Git hoặc Dockerfile; `.dockerignore` loại các file bí mật khỏi build context.
+
+`.env.example` để trống các key. Chỉ điền dịch vụ cần dùng. `EDGE_TTS_RATE=+0%` là cấu hình CLI cũ; Studio tự áp dụng 1.2× theo video, không cần cộng thêm +20% ở env.
+
+## 5. Workflow tạo video đang dùng
+
+### A. Video giới thiệu GitHub repo
+
+1. Dán URL repo công khai → **Quét Dữ Liệu**. Kiểm tra đúng repo và nguồn README đã lấy được.
+2. Chọn template/phong cách mong muốn; bật tự lấy ảnh khi tạo video từ GitHub. Ảnh/logo dự án được ưu tiên khi xác định được; avatar tác giả không mặc định là logo repo. Có thể tải/chọn logo riêng nếu repo không cung cấp ảnh phù hợp.
+3. Chọn mức nội dung:
+
+   | Mức | Khoảng lời đọc mục tiêu |
+   | --- | --- |
+   | Giải thích nhanh / Tin nhanh | **Không quá 60 giây**, nội dung ngắn có thể ít hơn |
+   | Giải thích vừa | **Trên 60 đến 90 giây** |
+   | Giải thích kĩ | **90 đến 120 giây** |
+
+   Hệ thống chọn độ dài theo nội dung và đo giọng thực tế để sửa lời/căn cảnh. Khi chọn mức này, preset cũ 30/45/60 không quyết định thời lượng. Không cần tự đếm chữ hay ép mỗi video đúng 90/120 giây.
+4. Giữ Nam Minh 1.2× và các thiết lập ở trên → **Chuẩn Bị & Duyệt Kịch Bản**. AI viết hook giới thiệu tên repo/số sao có bằng chứng, giải thích cách hoạt động và ví dụ phù hợp nguồn. Ví dụ minh họa không có nghĩa app đã chạy code repo.
+5. Xem bản duyệt: tên repo/số sao, ý chính, ví dụ, cảnh/ảnh, cảnh báo nguồn. Nếu tên tiếng Anh đọc chưa đúng, thêm cách đọc trong **Từ điển phát âm** hoặc override của video; chữ trên màn hình vẫn giữ tên gốc.
+6. Bấm **Duyệt & Render Video**. Đợi trạng thái hoàn tất → xem video → tải MP4/caption trong kết quả hoặc thư viện.
+
+Thông thường chỉ cần chọn một lần rồi đi tiếp qua các bước, nhưng bước duyệt vẫn cần để phát hiện nguồn thiếu, số liệu hoặc phát âm chưa đúng. Không cần tự viết lại toàn bộ kịch bản. Audio MP3/WAV có sẵn có thể tải lên, kèm SRT nếu có; app không tự viết lại lời đã nằm trong file audio của bạn.
+
+### B. Video tin AI từ Radar
+
+1. Mở **AI News Radar**, lọc nguồn/chuyên mục, tìm kiếm và chọn mới nhất hoặc trending.
+2. Xem tiêu đề, ngày, tóm tắt và link gốc → **Import** để đưa URL vào chính luồng Studio đang có.
+3. Quét nguồn, chọn **Tin nhanh** cho video ≤60 giây; hoặc chọn mức vừa/kĩ khi nguồn đủ thông tin.
+4. Chuẩn bị → duyệt → render như video repo. Nếu chỉ lấy được mô tả RSS, nội dung quá ngắn hoặc nguồn bị chặn, đổi nguồn công khai đầy đủ hơn; không coi phần tóm tắt Radar là toàn bộ bài.
+
+Radar lấy dữ liệu qua RSS/API, **không dùng Gemini cho mỗi lần tải danh sách**. Gemini được gọi lúc viết/sửa kịch bản và có thể gọi nhiều lượt khi cân thời gian. Render dùng CPU máy; không có thời gian cố định cho mọi repo/video. Bản 90–120 giây và nhiều animation sẽ tốn hơn bản ngắn.
+
+### File đầu ra
+
+Trong `output/<tên-bản-dựng>/`, tùy giai đoạn có `script.json`, `sources.json`, `script.review.md`, audio, `captions.srt`, dữ liệu timing, `video.mp4`, `cover.png`, caption và publish kit. Thư mục giọng/cảnh/cache được giữ để tận dụng khi chạy lại. Với Docker, tải qua giao diện hoặc dùng `docker compose cp` để lấy file ra máy.
+
+## 6. Tính năng và giới hạn hiện tại
+
+| Phần | Có gì | Còn cần lưu ý |
+| --- | --- | --- |
+| URL bài báo | VnExpress, Dân Trí, GenK, TechCrunch và HTML công khai | Có trang 403/500, chống bot/JS/paywall hoặc parser lấy thiếu nội dung; **luồng tin tức vẫn cần kiểm tra kỹ hơn repo** |
+| GitHub | README và tối đa 4 tài liệu liên quan, tên/sao, tư liệu ảnh | Không phân tích hết code, không chạy repo, không đảm bảo repo nào cũng có logo/demo phù hợp |
+| Radar | RSS/API thật; nguồn, nhóm nội dung, mới/trending, tìm kiếm, khử trùng URL/tiêu đề | Không phải phân tích ngữ nghĩa; có thể sót/trùng tin dịch lại. Trending dựa trên tín hiệu sẵn có, không phải bảng GitHub Trending chính thức |
+| Nguồn mở rộng | Hacker News, Reddit, Product Hunt, Hugging Face, arXiv, blog AI công khai | Reddit/PH có thể chỉ là excerpt. HF lấy model card/README; arXiv lấy abstract/metadata, chưa đọc toàn bộ PDF |
+| X / Telegram | X qua API được cấp quyền; Telegram bài text ở kênh công khai cấu hình sẵn | Không có token/quyền/nguồn công khai thì không hoạt động; không đọc nhóm riêng hoặc vượt khóa nội dung |
+| Kịch bản và hook | Tên repo, sao có nguồn; cơ chế, ví dụ, kiểm tra số và giảm lặp | AI vẫn có thể diễn đạt chưa hay, lặp nghĩa hoặc hiểu sai nguồn; không cam kết kiểm chứng mọi phát biểu |
+| Giọng và phụ đề | Edge mặc định, ZeroTTS tùy chọn, nhà cung cấp khác, từ điển và căn lời | Edge đôi lúc `NoAudioReceived`/timeout; tên tiếng Anh chưa luôn tự đọc đúng. Có fallback timing khi nguồn giọng thiếu boundary |
+| Template/hiệu ứng | Hook, so sánh, thống kê, workflow, code-window, data-flow, worked-example và các layout khác; phong cách tham chiếu, ảnh, nhạc ducking/SFX | Chất lượng phụ thuộc nội dung/tư liệu. Không hứa sao chép mọi video tham chiếu tự động |
+| Render và thư viện | MP4 dọc có audio; chọn 24/30 fps, xem/tải và dựng lại | CPU/RAM, số cảnh và Chromium ảnh hưởng tốc độ; chưa có hàng đợi render phân tán/GPU cloud |
+| Chi phí/quota | Dùng key LLM của người dùng; nhiều nguồn miễn phí | Chưa có dashboard tổng token/quota Gemini. X/TTS trả phí cần quyền/gói riêng |
+
+RSS Batch cũ vẫn giữ để tương thích, có thể dùng mô tả feed thay vì toàn bài. Ưu tiên **Radar → Import → Studio** cho workflow mới.
+
+## 7. Khi gặp lỗi
+
+- **Edge không trả audio / lỗi đo giọng:** kiểm tra mạng và thử lại sau. Hệ thống dừng với lỗi giọng thay vì tiếp tục viết lại vô ích. `draft-unmeasured.json` nếu có chỉ là nháp, chưa phải kịch bản đã căn thời gian thành công. Không tự đổi sang ZeroTTS; bạn chủ động chọn nếu muốn.
+- **Gemini 429/quota:** kiểm tra hạn mức/key/model ở nhà cung cấp, giảm số lần tạo hoặc đổi cấu hình hợp lệ. Đây khác với lỗi TTS.
+- **Nguồn 403/500 hoặc nội dung thiếu:** mở link gốc để kiểm tra, dùng nguồn công khai khác hoặc tư liệu của bạn; app không vượt CAPTCHA/paywall. RSS lấy được không bảo đảm bài đầy đủ đọc được.
+- **Render lâu:** thử Tin nhanh, xuất 24 fps, chạy một video mỗi lần và theo dõi log CPU/RAM; không bấm tạo lại liên tục khi job vẫn chạy.
+- **Thiếu browser/ffmpeg:** Docker đã khai báo các gói; native kiểm tra `ffmpeg -version`, `ffprobe -version`, Chrome/PATH. Không dùng venv/node_modules copy từ hệ điều hành khác.
+- **Docker không kết nối daemon:** mở Docker Desktop và đợi engine sẵn sàng; kiểm tra `docker info`. `docker compose config -q` chỉ kiểm tra Compose, không chứng minh container render được.
+- **Đổi máy mất key/cấu hình:** nhập lại hoặc phục hồi backup; Git cố ý không lưu các dữ liệu riêng này.
+
+## 8. Kiểm tra và CLI dành cho phát triển
+
+```bash
+npm run typecheck
+npm test -- --testTimeout=30000 --maxWorkers=1
+docker compose config -q
+# Tạo kịch bản qua CLI cũ:
+npm run script -- https://github.com/owner/repo --preset review_60
+# Render kịch bản đã duyệt:
+npm run pipeline -- output/ten-ban-dung/script.json
+ffprobe -v error -show_streams -show_format -of json output/ten-ban-dung/video.mp4
+```
+
+CLI giữ preset cũ để tương thích; ba mức thời lượng ở trên là workflow Studio mới. `--yes` của CLI tạo kịch bản không tự gọi render. Unit tests dùng mock dịch vụ ngoài; kiểm tra render thật riêng mới xác nhận browser/codec trên máy đó hoạt động. Xem [bằng chứng bộ cài](docs/installation-validation.md) để phân biệt phần đã thử và phần chưa xác minh.
+
+## 9. Tài liệu và ghi công
+
+- [Voice Studio](docs/huong-dan-voice-studio.md), [ZeroTTS](docs/huong-dan-zerotts.md), [storyboard](docs/huong-dan-storyboard.md), [chọn template](docs/huong-dan-chon-template.md).
+- [Kiến trúc Radar](docs/adr-0007-ai-news-radar.md), [quyết định đóng gói Docker](docs/adr-0008-portable-installation.md).
+- [README đầy đủ cũ](README.full.md) và [English README cũ](README.en.md) giữ để tham khảo lịch sử; một số preset/giao diện khác bản Studio hiện tại.
+
+Mã nguồn theo [MIT License](LICENSE). Ghi công tác giả gốc **Cuongyd196** và **hoquanghai**; bản này bổ sung workflow Studio, giọng đọc, template và AI News Radar. Xem giấy phép riêng đi kèm font/nhạc và tài nguyên bên thứ ba trong `assets/` trước khi tái phân phối.

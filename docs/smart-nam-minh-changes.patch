@@ -1,0 +1,3433 @@
+--- /dev/null
++++ b/assets/third-party/zerotts-text-norm/LICENSE.ZeroTTS
+@@ -0,0 +1,21 @@
++MIT License
++
++Copyright (c) 2026 ZeroWeight AI
++
++Permission is hereby granted, free of charge, to any person obtaining a copy
++of this software and associated documentation files (the "Software"), to deal
++in the Software without restriction, including without limitation the rights
++to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
++copies of the Software, and to permit persons to whom the Software is
++furnished to do so, subject to the following conditions:
++
++The above copyright notice and this permission notice shall be included in all
++copies or substantial portions of the Software.
++
++THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
++SOFTWARE.
+--- /dev/null
++++ b/assets/third-party/zerotts-text-norm/NOTICE
+@@ -0,0 +1,36 @@
++ZeroTTS
++Copyright (c) 2026 ZeroWeight AI
++Licensed under the MIT License (see LICENSE).
++
++------------------------------------------------------------------------------
++This product redistributes third-party components.
++------------------------------------------------------------------------------
++
++MOSS-Audio-Tokenizer-Nano
++Copyright the OpenMOSS Team.
++Licensed under the Apache License, Version 2.0.
++Full text: LICENSES/MOSS-Audio-Tokenizer-Apache-2.0.txt
++
++The ZeroTTS weights repository (huggingface.co/zeroweight-ai/ZeroTTS) bundles
++the ONNX **decoder** graphs of MOSS-Audio-Tokenizer-Nano under onnx/codec/, so
++that ZeroTTS has no runtime dependency on an external model repository. The
++encoder graphs are not redistributed. The graphs are unmodified except for the
++removal of the encoder entries from the accompanying metadata file.
++
++  Upstream: https://github.com/OpenMOSS/MOSS-Audio-Tokenizer
++            https://huggingface.co/OpenMOSS-Team/MOSS-Audio-Tokenizer-Nano-ONNX
++
++------------------------------------------------------------------------------
++
++soe-vinorm
++Copyright (c) vinhdq842.
++Licensed under the MIT License.
++Full text: src/zerotts/text_norm/data/LICENSE.soe-vinorm
++
++src/zerotts/text_norm/vi_normalizer.py adapts soe-vinorm's Vietnamese number,
++date, time, version and fraction expansion rules, and vendors its abbreviation
++table as data/abbreviations.txt. None of soe-vinorm's machinery is carried over
++— that project tags tokens with a CRF and disambiguates acronyms with an ONNX
++scorer, both downloaded at runtime; this module is pure stdlib regex.
++
++  Upstream: https://github.com/vinhdq842/soe-vinorm
+--- /dev/null
++++ b/assets/third-party/zerotts-text-norm/README.md
+@@ -0,0 +1,7 @@
++# ZeroTTS text normalization rules
++
++Vendored unchanged from the locally installed zerotts 0.1.5 package (file hashes pinned in manifest.json), from https://github.com/zeroweight-ai/ZeroTTS.
++
++Only `text_norm/vi_normalizer.py`, its abbreviation data and both license notices are included. ZeroTTS is MIT (LICENSE.ZeroTTS); abbreviation/rule provenance credits soe-vinorm, MIT (data/LICENSE.soe-vinorm). No models, ONNX, torch, network calls, package installation or voice inference are used by the normalizer.
++
++AutoGen loads this stdlib-only module through scripts/normalize-speech.py. Project-specific term protection, units and decimal handling live separately in src/tts/smart-pronunciation.ts.
+--- /dev/null
++++ b/assets/third-party/zerotts-text-norm/data/LICENSE.soe-vinorm
+@@ -0,0 +1,21 @@
++MIT License
++
++Copyright (c) 2025 Vinh Dang
++
++Permission is hereby granted, free of charge, to any person obtaining a copy
++of this software and associated documentation files (the "Software"), to deal
++in the Software without restriction, including without limitation the rights
++to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
++copies of the Software, and to permit persons to whom the Software is
++furnished to do so, subject to the following conditions:
++
++The above copyright notice and this permission notice shall be included in all
++copies or substantial portions of the Software.
++
++THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
++SOFTWARE.
+--- /dev/null
++++ b/assets/third-party/zerotts-text-norm/data/abbreviations.txt
+@@ -0,0 +1,2258 @@
++ANĐT:an ninh điều tra
++anđt:an ninh điều tra
++ANTT:an ninh trật tự
++antt:an ninh trật tự
++ANTQ:an ninh tổ quốc
++antq:an ninh tổ quốc
++ATGT:An toàn Giao thông
++atgt:An toàn Giao thông
++ATM:máy rút tiền tự động
++atm:máy rút tiền tự động
++ATNĐ:áp thấp nhiệt đới
++atnđ:áp thấp nhiệt đới
++ATTT:an toàn trật tự
++attt:an toàn trật tự
++ATTTGT:an toàn trật tự giao thông
++atttgt:an toàn trật tự giao thông
++ATVSTP:an toàn vệ sinh thực phẩm
++atvstp:an toàn vệ sinh thực phẩm
++BBCVT:Bộ Bưu chính Viễn thông
++bbcvt:Bộ Bưu chính Viễn thông
++BCS:ban cán sự,bao cao su
++bcs:ban cán sự,bao cao su
++BCSĐ:ban cán sự đảng
++bcsđ:ban cán sự đảng
++BCVN:bưu chính Việt Nam
++bcvn:bưu chính Việt Nam
++BCVT:Bưu chính Viễn thông
++bcvt:Bưu chính Viễn thông
++BBT:Ban biên tập
++bbt:Ban biên tập
++BC:báo cáo,bán công,bưu chính
++bc:báo cáo,bán công,bưu chính
++BCĐ:Ban chỉ đạo
++bcđ:Ban chỉ đạo
++BCĐĐMĐH:Ban chỉ đạo đổi mới đại học
++bcđđmđh:Ban chỉ đạo đổi mới đại học
++BCĐPCTNTƯ:Ban chỉ đạo phòng chống tham nhũng trung ương
++bcđpctntư:Ban chỉ đạo phòng chống tham nhũng trung ương
++BCĐQG:Ban chỉ đạo Quốc gia
++bcđqg:Ban chỉ đạo Quốc gia
++BCĐT:Bưu chính điện tử
++bcđt:Bưu chính điện tử
++BCĐTS:Ban chỉ đạo tuyển sinh
++bcđts:Ban chỉ đạo tuyển sinh
++BCH:Ban chấp hành,Ban chỉ huy
++bch:Ban chấp hành,Ban chỉ huy
++BCHCD:Ban chỉ huy chiến dịch
++bchcd:Ban chỉ huy chiến dịch
++BCHQS:Bộ chỉ huy quân sự
++bchqs:Bộ chỉ huy quân sự
++BCHTƯ:Ban chỉ huy trung ương
++bchtư:Ban chỉ huy trung ương
++BCHTW:Ban chỉ huy trung ương
++bchtw:Ban chỉ huy trung ương
++BĐS:bất động sản
++bđs:bất động sản
++BĐVN:bóng đá Việt Nam
++bđvn:bóng đá Việt Nam
++BĐH:Ban điều hành
++bđh:Ban điều hành
++BGD:Bộ Giáo dục
++bgd:Bộ Giáo dục
++BGDĐT:Bộ Giáo dục và Đào tạo
++bgdđt:Bộ Giáo dục và Đào tạo
++BGH:Ban giám hiệu
++bgh:Ban giám hiệu
++BGK:Ban giám khảo
++bgk:Ban giám khảo
++BH:bảo hiểm,bảo hành
++bh:bảo hiểm,bảo hành
++BHĐC:bán hàng đa cấp
++bhđc:bán hàng đa cấp
++BHL:Ban huấn luyện
++bhl:Ban huấn luyện
++BHXH:bảo hiểm xã hội
++bhxh:bảo hiểm xã hội
++BHTN:bảo hiểm thất nghiệp
++bhtn:bảo hiểm thất nghiệp
++BHYT:bảo hiểm y tế
++bhyt:bảo hiểm y tế
++BK:Bách khoa
++bk:Bách khoa
++BKHCN:bộ khoa học công nghệ
++bkhcn:bộ khoa học công nghệ
++BKS:biển kiểm soát,Ban kiểm soát
++bks:biển kiểm soát,Ban kiểm soát
++BLHS:Bộ luật Hình sự
++blhs:Bộ luật Hình sự
++BLDS:Bộ luật Dân sự
++blds:Bộ luật Dân sự
++BLV:bình luận viên
++blv:bình luận viên
++BLX:bằng lái xe
++blx:bằng lái xe
++BP:biên phòng
++bp:biên phòng
++BQL:ban quản lý
++bql:ban quản lý
++BQP:Bộ Quốc phòng
++bqp:Bộ Quốc phòng
++BQLDA:Ban Quản lý dự án
++bqlda:Ban Quản lý dự án
++BS:bác sĩ,biển số
++bs:bác sĩ,biển số
++BS.CKI:bác sĩ chuyên khoa một
++BS.CKII:bác sĩ chuyên khoa hai
++BS.CK1:bác sĩ chuyên khoa một
++BS.CK2:bác sĩ chuyên khoa hai
++BSC:công ty Chứng khoán Ngân hàng Đầu tư và Phát triển Việt Nam
++bsc:công ty Chứng khoán Ngân hàng Đầu tư và Phát triển Việt Nam
++BST:bộ sưu tập
++bst:bộ sưu tập
++BT:bảo trì,bộ trưởng
++bt:bảo trì,bộ trưởng
++BTBNN:bảo trợ bệnh nhân nghèo
++btbnn:bảo trợ bệnh nhân nghèo
++BTC:Ban tổ chức
++btc:Ban tổ chức
++BTS:Ban tuyển sinh
++bts:Ban tuyển sinh
++BTV:biên tập viên
++btv:biên tập viên
++BTVH:bổ túc văn hóa
++btvh:bổ túc văn hóa
++BV:bệnh viện
++bv:bệnh viện
++BVMT:bảo vệ môi trường
++bvmt:bảo vệ môi trường
++BVĐK:bệnh viện Đa khoa
++bvđk:bệnh viện Đa khoa
++BVTV:bảo vệ thực vật
++bvtv:bảo vệ thực vật
++BX:bến xe
++bx:bến xe
++BXL:bộ xử lý
++bxl:bộ xử lý
++CA:Công an
++ca:Công an
++CAHN:Công an Hà Nội
++cahn:Công an Hà Nội
++CAND:Công an Nhân dân
++cand:công an Nhân dân
++CATP:Công an Thành phố
++catp:Công an Thành phố
++CB:cơ bản,chế biến,cán bộ
++cb:cơ bản,chế biến,cán bộ
++CBYT:cán bộ y tế
++cbyt:cán bộ y tế
++CBCC:cán bộ công chức
++cbcc:cán bộ công chức
++CBCNV:cán bộ công nhân viên
++cbcnv:cán bộ công nhân viên
++CBQLGD:cán bộ quản lý giáo dục
++cbqlgd:cán bộ quản lý giáo dục
++CCB:Cựu chiến binh
++ccb:Cựu chiến binh
++CCCD:Căn cước công dân
++cccd:Căn cước công dân
++CCHC:cải cách hành chính
++cchc:cải cách hành chính
++CĐ:Cao đẳng,công điện
++cđ:Cao đẳng,công điện
++CĐDC:chất độc da cam
++cđdc:chất độc da cam
++CĐS:Chuyển đổi số
++cđs:Chuyển đổi số
++CĐSP:Cao đẳng Sư phạm
++cđsp:Cao đẳng Sư phạm
++CĐV:cổ động viên
++cđv:cổ động viên
++CHDC:Cộng hòa Dân chủ
++chdc:Cộng hòa Dân chủ
++CHDCND:Cộng hòa Dân chủ Nhân dân
++chdcnd:Cộng hòa Dân chủ Nhân dân
++CHLB:Cộng hòa Liên bang
++chlb:Cộng hòa Liên bang
++CHND:Cộng hòa Nhân dân
++chnd:Cộng hòa Nhân dân
++CHXNCN:Cộng hòa Xã hội Chủ nghĩa
++chxncn:Cộng hòa Xã hội Chủ nghĩa
++CHXHCNVN:Cộng hòa Xã hội Chủ nghĩa Việt Nam
++chxhcnvn:Cộng hòa Xã hội Chủ nghĩa Việt Nam
++CK:chứng khoán,chuyên khoa
++ck:chứng khoán,chuyên khoa
++CKI:chuyên khoa một
++CKII:chuyên khoa hai
++CK1:chuyên khoa một
++CK2:chuyên khoa hai
++CLB:câu lạc bộ
++clb:câu lạc bộ
++CMND:Chứng minh nhân dân
++cmnd:Chứng minh nhân dân
++CMT:Chứng minh thư
++cmt:Chứng minh thư
++CN:công nhân,công nghệ,công nghiệp
++cn:công nhân,công nghệ,công nghiệp
++CNCN:Chi nhánh Cấp nước
++cncn:Chi nhánh Cấp nước
++CNH:công nghiệp hóa
++cnh:công nghiệp hóa
++CNKT:công nhân kỹ thuật
++cnkt:công nhân kỹ thuật
++CNQSDĐ:chứng nhận quyền sử dụng đất
++cnqsdđ:chứng nhận quyền sử dụng đất
++CNSH:công nghệ sinh học
++cnsh:công nghệ sinh học
++CNTN:cử nhân tài năng
++cntn:cử nhân tài năng
++CNTT:công nghệ thông tin
++cntt:công nghệ thông tin
++CNV:công nhân viên
++cnv:công nhân viên
++CNVC:công nhân viên chức
++cnvc:công nhân viên chức
++COPD:bệnh phổi tắc nghẽn mãn tính
++copd:bệnh phổi tắc nghẽn mãn tính
++CP:cổ phiếu,cổ phần,Chính phủ
++cp:cổ phiếu,cổ phần,Chính phủ
++CPH:cổ phần hóa
++cph:cổ phần hóa
++CPSXTM:cổ phần xây dựng sản xuất thương mại
++cpsxtm:cổ phần xây dựng sản xuất thương mại
++CPTD:cổ phiếu tự do
++cptd:cổ phiếu tự do
++CPXD:cấp phép xây dựng
++cpxd:cấp phép xây dựng
++CQĐT:Cơ quan điều tra
++cqđt:Cơ quan điều tra
++CS:cảnh sát
++cs:cảnh sát
++CSCĐ:cảnh sát cơ động
++cscđ:cảnh sát cơ động
++CSDC:cảnh sát dã chiến
++csdc:cảnh sát dã chiến
++CSDL:cơ sở dữ liệu
++csdl:cơ sở dữ liệu
++CSĐN:cảnh sát đặc nhiệm
++csđn:cảnh sát đặc nhiệm
++CSĐT:cơ sở đào tạo,Cảnh sát điều tra
++csđt:cơ sở đào tạo,Cảnh sát điều tra
++CSĐTLX:cơ sở đào tạo lái xe
++csđtlx:cơ sở đào tạo lái xe
++CSĐTTP:Cảnh sát Điều tra tội phạm
++csđttp:Cảnh sát Điều tra tội phạm
++CSĐTTPMT:Cảnh sát điều tra tội phạm ma túy
++csđttpmt:Cảnh sát điều tra tội phạm ma túy
++CSG:cảng Sài Gòn
++csg:cảng Sài Gòn
++CSGT:Cảnh sát giao thông
++csgt:Cảnh sát giao thông
++CSHS:Cảnh sát Hình sự
++cshs:Cảnh sát Hình sự
++CSKH:chăm sóc khách hàng
++cskh:chăm sóc khách hàng
++CSKT:Cảnh sát Kinh tế
++cskt:Cảnh sát Kinh tế
++CSKV:Cảnh sát khu vực
++cskv:Cảnh sát khu vực
++CSPCTPMT:Cục Cảnh sát phòng chống tội phạm ma túy
++cspctpmt:Cục Cảnh sát phòng chống tội phạm ma túy
++CSPK:công suất phản kháng
++cspk:công suất phản kháng
++CSQLHC:Cảnh sát Quản lý hành chính
++csqlhc:Cảnh sát Quản lý hành chính
++CSSD:Đảng Xã hội Dân chủ cánh tả
++cssd:Đảng Xã hội Dân chủ cánh tả
++CSSX:cơ sở sản xuất
++cssx:cơ sở sản xuất
++CSVC:cơ sở vật chất
++csvc:cơ sở vật chất
++CSVN:Cộng sản Việt Nam
++csvn:Cộng sản Việt Nam
++CSXH:chính sách xã hội
++csxh:chính sách xã hội
++CT:chính trị,công ty,chỉ thị,cắt lớp vi tính
++ct:chính trị,công ty,chỉ thị,cắt lớp vi tính
++CTCC:công trình công cộng
++ctcc:công trình công cộng
++CTCH:chấn thương chỉnh hình
++ctch:chấn thương chỉnh hình
++CTCK:công ty chứng khoán
++ctck:công ty chứng khoán
++CTCLQG:chương trình chống lao quốc gia
++ctclqg:chương trình chống lao quốc gia
++CTCN:công ty cấp nước
++ctcn:công ty cấp nước
++CTCP:công ty cổ phần
++ctcp:công ty cổ phần
++CTĐ:Chữ thập đỏ
++ctđ:Chữ thập đỏ
++CTĐL:công ty điện lực
++ctđl:công ty điện lực
++CTN:chuyển tiền nhanh
++ctn:chuyển tiền nhanh
++CTSN:chấn thương sọ não
++ctsn:chấn thương sọ não
++CTTC:cho thuê tài chính
++cttc:cho thuê tài chính
++CTTH:chương trình truyền hình
++ctth:chương trình truyền hình
++CTTNHH:công ty Trách nhiệm Hữu hạn
++cttnhh:công ty Trách nhiệm Hữu hạn
++CTTT:chương trình tiên tiến
++cttt:chương trình tiên tiến
++CTV:cộng tác viên
++ctv:cộng tác viên
++CTXH:công tác xã hội
++ctxh:công tác xã hội
++CV:chuyên viên
++cv:chuyên viên
++CVĐC:công viên địa chất
++cvđc:công viên địa chất
++DAGTĐT:dự án giao thông đô thị
++dagtđt:dự án giao thông đô thị
++ĐATP:Đông Á - Thép Pomina
++đatp:Đông Á - Thép Pomina
++ĐB:đại biểu,đồng bằng
++đb:đại biểu,đồng bằng
++ĐBDT:đồng bào dân tộc
++đbdt:đồng bào dân tộc
++ĐBP:Điện Biên Phủ
++đbp:Điện Biên Phủ
++ĐBQH:đại biểu Quốc hội
++đbqh:đại biểu Quốc hội
++ĐBSCL:Đồng bằng sông Cửu Long
++đbscl:Đồng bằng sông Cửu Long
++ĐBTN:đại biểu thanh niên
++đbtn:đại biểu thanh niên
++ĐBTSXB:đánh bắt thủy sản xa bờ
++đbtsxb:đánh bắt thủy sản xa bờ
++ĐC:đồng chí,điều chế,địa chỉ
++đc:đồng chí,điều chế,địa chỉ
++ĐCNN:độ chia nhỏ nhất
++đcnn:độ chia nhỏ nhất
++DCCH:Dân chủ Cộng hòa
++dcch:Dân chủ Cộng hòa
++ĐCS:Đảng Cộng sản
++đcs:Đảng Cộng sản
++ĐCSTQ:Đảng Cộng sản Trung Quốc
++đcstq:Đảng Cộng sản Trung Quốc
++ĐCSVN:Đảng Cộng sản Việt Nam
++đcsvn:Đảng Cộng sản Việt Nam
++DD:dinh dưỡng,dân dụng
++dd:dinh dưỡng,dân dụng
++ĐD:đại diện
++đd:đại diện
++ĐĐ:động đất,đất đai
++đđ:động đất,đất đai
++DDVN:Duyên Dáng Việt Nam
++ddvn:Duyên Dáng Việt Nam
++ĐGNL:Đánh giá năng lực
++đgnl:Đánh giá năng lực
++ĐH:Đại học,Đại hội
++đh:Đại học,Đại hội
++ĐHBC:Đại học Bán công
++đhbc:Đại học Bán công
++ĐHBK:Đại học Bách khoa
++đhbk:Đại học Bách khoa
++ĐHBKHCM:Đại học Bách khoa Thành phố Hồ Chí Minh
++đhbkhcm:Đại học Bách khoa Thành phố Hồ Chí Minh
++ĐHBKHN:Đại học Bách khoa Hà Nội
++đhbkhn:Đại học Bách khoa Hà Nội
++ĐHBKTPHCM:Đại học Bách khoa Thành phố Hồ Chí Minh
++đhbktphcm:Đại học Bách khoa Thành phố Hồ Chí Minh
++ĐHCĐ:Đại học Công đoàn,đại hội cổ đông
++đhcđ:Đại học Công đoàn,đại hội cổ đông
++ĐHCLC:đại học chất lượng cao
++đhclc:đại học chất lượng cao
++ĐHCN:đại học Công nghệ
++đhcn:đại học Công nghệ
++ĐHCT:Đại học Cần Thơ
++đhct:Đại học Cần Thơ
++ĐHĐD:Đại học Đông Dương
++đhđd:Đại học Đông Dương
++ĐHĐCĐ:Đại hội đồng cổ đông
++đhđcđ:Đại hội đồng cổ đông
++ĐHDL:Đại học Dân lập
++đhdl:Đại học Dân lập
++ĐHĐN:Đại học Đà nẵng
++đhđn:Đại học Đà nẵng
++ĐHGTVT:Đại học Giao thông Vận tải
++đhgtvt:Đại học Giao thông Vận tải
++ĐHHB:Đại học Hồng Bàng
++đhhb:Đại học Hồng Bàng
++ĐHKH:Đại học Khoa học
++đhkh:Đại học Khoa học
++ĐHKHTN:Đại học Khoa học Tự nhiên
++đhkhtn:Đại học Khoa học Tự nhiên
++ĐHKHTNHN:Đại học Khoa học Tự nhiên Hà nội
++đhkhtnhn:Đại học Khoa học Tự nhiên Hà nội
++ĐHKHXH:Đại học Khoa học Xã hội
++đhkhxh:Đại học Khoa học Xã hội
++ĐHKT:Đại học Kỹ thuật
++đhkt:Đại học Kỹ thuật
++DHKTCN:Đại học Kỹ thuật Công nghệ
++dhktcn:Đại học Kỹ thuật Công nghệ
++ĐHKTCN:Đại học Kỹ thuật Công nghệ
++đhktcn:Đại học Kỹ thuật Công nghệ
++ĐHKTQD:Đại học Kinh tế Quốc dân
++đhktqd:Đại học Kinh tế Quốc dân
++ĐHN:đồng hồ nước,điện hạt nhân
++đhn:đồng hồ nước,điện hạt nhân
++ĐHNT:Đại học Nha Trang
++đhnt:Đại học Nha Trang
++ĐHQG:Đại học Quốc gia
++đhqg:Đại học Quốc gia
++ĐHQGHN:Đại học Quốc gia Hà nội
++đhqghn:Đại học Quốc gia Hà nội
++DHS:du học sinh
++dhs:du học sinh
++ĐHSP:Đại học Sư phạm
++đhsp:Đại học Sư phạm
++ĐK:đăng ký
++đk:đăng ký
++ĐKDT:đăng ký dự thi
++đkdt:đăng ký dự thi
++ĐKĐT:điện kế điện tử
++đkđt:điện kế điện tử
++ĐKĐĐ:Đăng ký đất đai
++đkđđ:Đăng ký đất đai
++ĐKHK:đăng ký hộ khẩu
++đkhk:đăng ký hộ khẩu
++ĐKKD:đăng ký kinh doanh
++đkkd:đăng ký kinh doanh
++ĐKKH:đăng ký kết hôn
++đkkh:đăng ký kết hôn
++ĐKNKTT:đăng ký nhân khẩu thường trú
++đknktt:đăng ký nhân khẩu thường trú
++ĐKVĐ:đương kim vô địch
++đkvđ:đương kim vô địch
++ĐKVN:điền kinh Việt Nam
++đkvn:điền kinh Việt Nam
++ĐKXT:đăng ký xét tuyển
++đkxt:đăng ký xét tuyển
++DL:du lịch
++dl:du lịch
++ĐL:đo lường
++đl:đo lường
++ĐLTP:điện kế điện tử
++đltp:điện kế điện tử
++ĐMN:Đá Mỹ Nghệ
++đmn:Đá Mỹ Nghệ
++DN:doanh nghiệp
++dn:doanh nghiệp
++ĐN:Đồng Nai,Đà Nẵng
++đn:Đồng Nai,Đà Nẵng
++ĐNA:Đông Nam Á
++đna:Đông Nam Á
++ĐNÁ:Đông Nam Á
++đná:Đông Nam Á
++DNNN:doanh nghiệp Nhà nước
++dnnn:doanh nghiệp Nhà nước
++DNT:doanh nghiệp trẻ
++dnt:doanh nghiệp trẻ
++DNTN:doanh nghiệp Tư nhân
++dntn:doanh nghiệp Tư nhân
++DNVN:doanh nghiệp Việt Nam
++dnvn:doanh nghiệp Việt Nam
++DNVVN:doanh nghiệp vừa và nhỏ
++dnvvn:doanh nghiệp vừa và nhỏ
++ĐRL:điểm rèn luyện
++đrl:điểm rèn luyện
++DS:dân số
++ds:dân số
++ĐS:đường sắt
++đs:đường sắt
++ĐSQ:đại sứ quán
++đsq:đại sứ quán
++DT:dự tuyển
++dt:dự tuyển
++ĐT:điện thoại,đào tạo,đội tuyển
++đt:điện thoại,đào tạo,đội tuyển
++ĐTA:đồng tính ái
++đta:đồng tính ái
++ĐTB:điểm trung bình
++đtb:điểm trung bình
++ĐTĐ:đái tháo đường
++đtđ:đái tháo đường
++ĐTDĐ:điện thoại di động
++đtdđ:điện thoại di động
++DTHT:dạy thêm học thêm
++dtht:dạy thêm học thêm
++ĐTHVN:đài truyền hình Việt Nam
++đthvn:đài truyền hình Việt Nam
++ĐTLA:đồng tính luyến ái
++đtla:đồng tính luyến ái
++ĐTLT:đào tạo liên thông
++đtlt:đào tạo liên thông
++ĐTNN:đầu tư nước ngoài
++đtnn:đầu tư nước ngoài
++DTQG:đội tuyển quốc gia
++dtqg:đội tuyển quốc gia
++ĐTQG:đội tuyển quốc gia
++đtqg:đội tuyển quốc gia
++ĐTTX:đào tạo từ xa
++đttx:đào tạo từ xa
++ĐTTXQM:đào tạo từ xa qua mạng
++đttxqm:đào tạo từ xa qua mạng
++ĐTV:điều tra viên
++đtv:điều tra viên
++ĐTVHD:động thực vật hoang dã
++đtvhd:động thực vật hoang dã
++ĐTVN:đội tuyển Việt Nam
++đtvn:đội tuyển Việt Nam
++ĐTXDCB:đầu tư xây dựng cơ bả
++đtxdcb:đầu tư xây dựng cơ bả
++DV:dịch vụ,diễn viên
++dv:dịch vụ,diễn viên
++ĐV:đơn vị,đoàn viên
++đv:đơn vị,đoàn viên
++ĐVHT:đơn vị học trình
++đvht:đơn vị học trình
++DVTMCM:dịch vụ thương mại Cà Mau
++dvtmcm:dịch vụ thương mại Cà Mau
++ĐVTN:đoàn viên thanh niên
++đvtn:đoàn viên thanh niên
++DVTT:dịch vụ trực tuyến,dịch vụ thông tin
++dvtt:dịch vụ trực tuyến,dịch vụ thông tin
++ĐVTTN:đoàn viên thanh thiếu nhi
++đvttn:đoàn viên thanh thiếu nhi
++ĐVƯT:đoàn viên ưu tú
++đvưt:đoàn viên ưu tú
++DVVL:dịch vụ việc làm
++dvvl:dịch vụ việc làm
++GCMND:giấy chứng minh nhân dân
++gcmnd:giấy chứng minh nhân dân
++GCN:giấy chứng nhận
++gcn:giấy chứng nhận
++GCNĐKKD:giấy chứng nhận đăng ký kinh doanh
++gcnđkkd:giấy chứng nhận đăng ký kinh doanh
++GCNKQT:giấy chứng nhận kết quả thi
++gcnkqt:giấy chứng nhận kết quả thi
++GCNQSD:giấy chứng nhận quyền sử dụng
++gcnqsd:giấy chứng nhận quyền sử dụng
++GCNQSDĐ:giấy chứng nhận quyền sử dụng đất
++gcnqsdđ:giấy chứng nhận quyền sử dụng đất
++GCNQSDĐƠ:giấy chứng nhận quyền sử dụng đất ở
++gcnqsdđơ:giấy chứng nhận quyền sử dụng đất ở
++GCNQSH:giấy chứng nhận quyền sở hữu
++gcnqsh:giấy chứng nhận quyền sở hữu
++GCNQSHN:giấy chứng nhận quyền sở hữu nhà
++gcnqshn:giấy chứng nhận quyền sở hữu nhà
++GCNQSHNƠ:giấy chứng nhận quyền sở hữu nhà ở
++gcnqshnơ:giấy chứng nhận quyền sở hữu nhà ở
++GCNSK:giấy chứng nhận sức khỏe
++gcnsk:giấy chứng nhận sức khỏe
++GCQ:giấy chủ quyền
++gcq:giấy chủ quyền
++GD:Giáo dục
++gd:Giáo dục
++GD&ĐT:Giáo dục và đào tạo
++GĐ:Giám đốc
++gđ:Giám đốc
++GĐNS:giám đốc nhân sự
++gđns:giám đốc nhân sự
++GDĐH:giáo dục dục đại học
++gdđh:giáo dục dục đại học
++GĐĐH:giám đốc điều hành
++gđđh:giám đốc điều hành
++GDĐT:Giáo dục và Đào tạo
++gdđt:Giáo dục và Đào tạo
++GDGT:giáo dục giới tính
++gdgt:giáo dục giới tính
++GDNN:giáo dục nghề nghiệp
++gdnn:giáo dục nghề nghiệp
++GĐT:Gạch Đồng Tâm
++gđt:Gạch Đồng Tâm
++GĐTLA:Gạch Đồng Tâm Long An
++gđtla:Gạch Đồng Tâm Long An
++GDTX:giáo dục thường xuyên
++gdtx:giáo dục thường xuyên
++GHPGVN:Giáo hội Phật giáo Việt Nam
++ghpgvn:Giáo hội Phật giáo Việt Nam
++GK:Giáo khoa
++gk:Giáo khoa
++GL:Gia Lai
++gl:Gia Lai
++GP:giấy phép
++gp:giấy phép
++GPLHĐB:giấy phép lưu hành đặc biệt
++gplhđb:giấy phép lưu hành đặc biệt
++GPLX:giấy phép lái xe
++gplx:giấy phép lái xe
++GPNK:phép nhập khẩu
++gpnk:phép nhập khẩu
++GPTM:giải phẫu thẩm mỹ
++gptm:giải phẫu thẩm mỹ
++GPXD:giấy phép xây dựng
++gpxd:giấy phép xây dựng
++GS:Giáo sư
++gs:Giáo sư
++GSTS:Giáo sư Tiến sĩ
++gsts:Giáo sư Tiến sĩ
++GS.TS:Giáo sư Tiến sĩ
++GSTSKH:Giáo sư Tiến sĩ Khoa học
++gstskh:Giáo sư Tiến sĩ Khoa học
++GS.TSKH:Giáo sư Tiến sĩ Khoa học
++GS.TS.BS:Giáo sư Tiến sĩ Bác sĩ
++GSTT:giám sát trọng tài
++gstt:giám sát trọng tài
++GT:giao thông,giá trị
++gt:giao thông,giá trị
++GTCC:Giao thông Công chánh
++gtcc:Giao thông Công chánh
++GTGT:giá trị gia tăng
++gtgt:giá trị gia tăng
++GTMT:giãn tĩnh mạch tinh
++gtmt:giãn tĩnh mạch tinh
++GTVT:Giao thông Vận tải
++gtvt:Giao thông Vận tải
++GV:giáo viên,giảng viên
++gv:giáo viên,giảng viên
++GVCN:giáo viên chủ nhiệm
++gvcn:giáo viên chủ nhiệm
++GVG:giáo viên giỏi
++gvg:giáo viên giỏi
++GVMN:giáo viên miền núi,giáo viên mầm non
++gvmn:giáo viên miền núi,giáo viên mầm non
++GVTH:giáo viên tiểu học
++gvth:giáo viên tiểu học
++GVTN:giáo viên tình nguyện
++gvtn:giáo viên tình nguyện
++H:huyện
++HTX:Hợp tác xã
++htx:Hợp tác xã
++HTXDVNN:Hợp tác xã dịch vụ Nông nghiệp
++htxdvnn:Hợp tác xã dịch vụ Nông nghiệp
++HAGL:Hoàng Anh Gia Lai
++hagl:Hoàng Anh Gia Lai
++HB:học bổng
++hb:học bổng
++HC:hành chính,huy chương
++hc:hành chính,huy chương
++HCB:huy chương bạc
++hcb:huy chương bạc
++HCĐ:huy chương đồng
++hcđ:huy chương đồng
++HCM:Hồ Chí Minh
++hcm:Hồ Chí Minh
++HCTC:học chế tín chỉ
++hctc:học chế tín chỉ
++HCTL:hội chợ triển lăm
++hctl:hội chợ triển lăm
++HCV:huy chương vàng
++hcv:huy chương vàng
++HCVL:hội chợ việc làm
++hcvl:hội chợ việc làm
++HD:hướng dẫn
++hd:hướng dẫn
++HĐ:hợp đồng,hội đồng
++hđ:hợp đồng,hội đồng
++HĐBA:Hội đồng Bảo an Liên Hiệp Quốc
++hđba:Hội đồng Bảo an Liên Hiệp Quốc
++HĐCD:Hội đồng chức danh
++hđcd:Hội đồng chức danh
++HĐCDGS:Hội đồng chức danh giáo sư
++hđcdgs:Hội đồng chức danh giáo sư
++HĐCDGSCS:Hội đồng chức danh giáo sư cơ sở
++hđcdgscs:Hội đồng chức danh giáo sư cơ sở
++HĐCDGSN:Hội đồng Chức danh giáo sư ngành
++hđcdgsn:Hội đồng Chức danh giáo sư ngành
++HĐCDGSNN:Hội đồng Chức danh giáo sư nhà nước
++hđcdgsnn:Hội đồng Chức danh giáo sư nhà nước
++HĐCT:hội đồng coi thi
++hđct:hội đồng coi thi
++HĐĐB:Hội đồng đền bù
++hđđb:Hội đồng đền bù
++HĐĐG:Hội đồng định giá
++hđđg:Hội đồng định giá
++HĐH:hệ điều hành
++hđh:hệ điều hành
++HĐKT:hợp đồng kinh tế
++hđkt:hợp đồng kinh tế
++HĐLĐ:hợp đồng lao động
++hđlđ:hợp đồng lao động
++HĐND:Hội đồng Nhân dân
++hđnd:Hội đồng Nhân dân
++HĐNDTP:Hội đồng Nhân dân thành phố
++hđndtp:Hội đồng Nhân dân thành phố
++HĐNT:hội đồng nghệ thuật
++hđnt:hội đồng nghệ thuật
++HĐQT:Hội đồng Quản trị
++hđqt:Hội đồng Quản trị
++HĐT:hội đồng trường,hội đồng thi
++hđt:hội đồng trường,hội đồng thi
++HĐTĐ:Hội đồng thẩm định
++hđtđ:Hội đồng thẩm định
++HĐTS:Hội đồng tuyển sinh
++hđts:Hội đồng tuyển sinh
++HĐTT:Hội đồng Trọng tài
++hđtt:Hội đồng Trọng tài
++HĐTV:Hội đồng thành viên
++hđtv:Hội đồng thành viên
++HDV:hướng dẫn viên
++hdv:hướng dẫn viên
++HĐXX:Hội đồng Xét xử
++hđxx:Hội đồng Xét xử
++HH:Hoa hậu
++hh:Hoa hậu
++HHTG:Hoa hậu Thế giới
++hhtg:Hoa hậu Thế giới
++HHVN:Hoa hậu Việt Nam
++hhvn:Hoa hậu Việt Nam
++HK:học kỳ
++hk:học kỳ
++HKDD:Hàng không dân dụng
++hkdd:hàng không dân dụng
++HKDDVN:hàng không dân dụng Việt Nam
++hkddvn:hàng không dân dụng Việt Nam
++HKHKT:hội khoa học kỹ thuật
++hkhkt:hội khoa học kỹ thuật
++HKHKTVN:hội khoa học kỹ thuật Việt Nam
++hkhktvn:hội khoa học kỹ thuật Việt Nam
++HKTT:hộ khẩu thường trú
++hktt:hộ khẩu thường trú
++HL:huấn luyện
++hl:huấn luyện
++HLBĐ:Hoa Lâm Bình Định
++hlbđ:Hoa Lâm Bình Định
++HLQG:Huấn luyện Quốc gia
++hlqg:Huấn luyện Quốc gia
++HLTTQG:Huấn luyện Thể thao Quốc gia
++hlttqg:Huấn luyện Thể thao Quốc gia
++HLV:huấn luyện viên
++hlv:huấn luyện viên
++HMNĐ:hiến máu nhân đạo
++hmnđ:hiến máu nhân đạo
++HN:Hà Nội,hội nghị
++hn:Hà Nội,hội nghị
++HND:Hội nông dân
++hnd:Hội nông dân
++HNGĐ:hôn nhân gia đình
++hngđ:hôn nhân gia đình
++HNHT:hội nghị hiệp thương
++hnht:hội nghị hiệp thương
++HNV:Hội Nhà văn
++hnv:Hội Nhà văn
++HP:học phần,Hải phòng
++hp:học phần,Hải phòng
++HPHN:Hòa Phát Hà Nội
++hphn:Hòa Phát Hà Nội
++HQ:Hàn Quốc,Hải quan
++hq:Hàn Quốc,Hải quan
++HQĐT:Hải quan điện tử
++hqđt:Hải quan điện tử
++HQHP:Hải quan Hải Phòng
++hqhp:Hải quan Hải Phòng
++HS:học sinh
++hs:học sinh
++HSBC:học sinh bán công
++hsbc:học sinh bán công
++HSĐKDT:hồ sơ đăng ký dự thi
++hsđkdt:hồ sơ đăng ký dự thi
++HSDPA:truy nhập gói đường xuống tốc độ cao
++hsdpa:truy nhập gói đường xuống tốc độ cao
++HSG:học sinh giỏi
++hsg:học sinh giỏi
++HSGQG:Học sinh giỏi Quốc gia
++hsgqg:Học sinh giỏi Quốc gia
++HSGQT:Học sinh giỏi Quốc tế
++hsgqt:Học sinh giỏi Quốc tế
++HSPT:học sinh phổ thông
++hspt:học sinh phổ thông
++HSSV:học sinh sinh viên
++hssv:học sinh sinh viên
++HSV:Hội sinh viên
++hsv:Hội sinh viên
++HTCĐ:học tập cộng đồng
++htcđ:học tập cộng đồng
++HUD:Tổng công ty Đầu tư phát triển nhà và đô thị
++hud:Tổng công ty Đầu tư phát triển nhà và đô thị
++HV:học viên
++hv:học viên
++HVANND:Học viện An ninh Nhân dân
++hvannd:Học viện An ninh Nhân dân
++HVBCVT:Học viện Bưu chính Viễn thông
++hvbcvt:Học viện Bưu chính Viễn thông
++HVCH:Học viên Cao học
++hvch:Học viên Cao học
++HVCNBCVT:Học viện Công nghệ Bưu chính Viễn thông
++hvcnbcvt:Học viện Công nghệ Bưu chính Viễn thông
++HVKHQS:Học viện Khoa học Quân sự
++hvkhqs:Học viện Khoa học Quân sự
++HVN:Honda Việt Nam
++hvn:Honda Việt Nam
++HVNCL:Hàng Việt Nam chất lượng
++hvncl:Hàng Việt Nam chất lượng
++HVNCLC:Hàng Việt Nam chất lượng cao
++hvnclc:Hàng Việt Nam chất lượng cao
++HVNH:Học viện Ngân hàng
++hvnh:Học viện Ngân hàng
++KBNN:Kho bạc Nhà nước
++kbnn:Kho bạc Nhà nước
++KCB:khám chữa bệnh
++kcb:khám chữa bệnh
++KCN:Khu công nghiệp
++kcn:Khu công nghiệp
++KCX:Khu chế xuất
++kcx:Khu chế xuất
++KDC:khu dân cư
++kdc:khu dân cư
++KĐCL:kiểm định chất lượng
++kđcl:kiểm định chất lượng
++KĐCLGD:kiểm định chất lượng giáo dục
++kđclgd:kiểm định chất lượng giáo dục
++KDCN:kiểu dáng công nghiệp
++kdcn:kiểu dáng công nghiệp
++KDDV:kinh doanh dịch vụ
++kddv:kinh doanh dịch vụ
++KDĐV:kiểm dịch động vật
++kdđv:kiểm dịch động vật
++KDHĐC:kinh doanh hàng đa cấp
++kdhđc:kinh doanh hàng đa cấp
++KDL:khu du lịch
++kdl:khu du lịch
++KDN:kinh doanh nhà
++kdn:kinh doanh nhà
++KDNPN:kinh doanh nhà Phú Nhuận
++kdnpn:kinh doanh nhà Phú Nhuận
++KĐS:Khu đường sông
++kđs:khu đường sông
++KĐT:khu đô thị
++kđt:khu đô thị
++KĐTM:khu đô thị mới
++kđtm:khu đô thị mới
++KĐTNTL:đô thị Nam Thăng Long
++kđtntl:đô thị Nam Thăng Long
++KH:kế hoạch,khoa học
++kh:kế hoạch,khoa học
++KHCN:Khoa học Công nghệ
++khcn:Khoa học Công nghệ
++KHĐT:Kế hoạch Đầu tư
++khđt:Kế hoạch Đầu tư
++KHKD:Kế hoạch Kinh doanh
++khkd:Kế hoạch Kinh doanh
++KHKT:Khoa học Kỹ thuật
++khkt:Khoa học Kỹ thuật
++KHKTHN:Khoa học Kỹ thuật Hạt nhân
++khkthn:Khoa học Kỹ thuật Hạt nhân
++KHKTHS:Khoa học Kỹ thuật Hình sự
++khkths:Khoa học Kỹ thuật Hình sự
++KHKTNN:Khoa học Kỹ thuật Nông nghiệp
++khktnn:Khoa học Kỹ thuật Nông nghiệp
++KHKTNNMN:Khoa học Kỹ thuật Nông nghiệp miền Nam
++khktnnmn:Khoa học Kỹ thuật Nông nghiệp miền Nam
++KHLS:Khoa học Lịch sử
++khls:Khoa học Lịch sử
++KHTN:Khoa học Tự nhiên
++khtn:Khoa học Tự nhiên
++KHXH:Khoa học Xã hội
++khxh:Khoa học Xã hội
++KK:khuyến khích
++kk:khuyến khích
++KKT:khu kinh tế
++kkt:khu kinh tế
++KM:khuyến mại
++km:khuyến mại
++KL:kết luận
++kl:kết luận
++KLĐT:kết luận điều tra
++klđt:kết luận điều tra
++KLQG:Kỷ lục Quốc gia
++klqg:Kỷ lục Quốc gia
++KN:khuyến nông
++kn:khuyến nông
++KNTC:khiếu nại tố cáo
++kntc:khiếu nại tố cáo
++KP:khu phố
++kp:khu phố
++KS:khách sạn,kỹ sư
++ks:khách sạn,kỹ sư
++KSND:Kiểm sát Nhân dân
++ksnd:Kiểm sát Nhân dân
++KSNDTC:Kiểm sát Nhân dân Tối cao
++ksndtc:Kiểm sát Nhân dân Tối cao
++KST:ký sinh trùng
++kst:ký sinh trùng
++KSV:kiểm sát viên
++ksv:kiểm sát viên
++KT:kinh tế,kỹ thuật
++kt:kinh tế,kỹ thuật
++KTCT:kinh tế chính trị
++ktct:kinh tế chính trị
++KTM:Khu thương mại
++ktm:Khu thương mại
++KTNN:Kinh tế Nhà nước
++ktnn:Kinh tế Nhà nước
++KTQD:kinh tế quốc dân
++ktqd:kinh tế quốc dân
++KTQDHN:Kinh tế Quốc dân Hà Nội
++ktqdhn:Kinh tế Quốc dân Hà Nội
++KTS:kiến trúc sư
++kts:kiến trúc sư
++KTTV:khí tượng thủy văn
++kttv:khí tượng thủy văn
++KTV:kỹ thuật viên
++ktv:kỹ thuật viên
++KTX:ký túc xá
++ktx:ký túc xá
++KV:khu vực
++kv:khu vực
++KV1:khu vực một
++kv1:khu vực một
++KV2:khu vực hai
++kv2:khu vực hai
++KV3:khu vực ba
++kv3:khu vực ba
++LB:liên bang
++lb:liên bang
++LCT:luật công ty,luật cạnh tranh
++lct:luật công ty,luật cạnh tranh
++LĐ:lao động
++lđ:lao động
++LĐXS:lao động sản xuất
++lđxs:lao động sản xuất
++LĐBĐ:Liên đoàn bóng đá
++lđbđ:Liên đoàn bóng đá
++LĐBĐVN:Liên đoàn bóng đá Việt Nam
++lđbđvn:Liên đoàn bóng đá Việt Nam
++LĐLĐ:Liên đoàn Lao động
++lđlđ:Liên đoàn Lao động
++LDP:Đảng Dân chủ Tự do
++ldp:Đảng Dân chủ Tự do
++LĐTB:Lao động Thương binh
++lđtb:Lao động Thương binh
++LĐTBXH:Lao động Thương binh Xã hội
++lđtbxh:Lao động Thương binh Xã hội
++LH:Liên hiệp,liên hoan
++lh:Liên hiệp,liên hoan
++LHP:Liên hoan phim
++lhp:Liên hoan phim
++LHPN:Liên hiệp Phụ nữ
++lhpn:Liên hiệp Phụ nữ
++LHQ:Liên Hợp Quốc
++lhq:Liên Hợp Quốc
++LHS:lưu học sinh
++lhs:lưu học sinh
++LHTN:Liên hiệp Thanh niên
++lhtn:Liên hiệp Thanh niên
++LHTNVN:Hội Liên hiệp Thanh niên Việt Nam
++lhtnvn:Hội Liên hiệp Thanh niên Việt Nam
++LL:lực lượng
++ll:lực lượng
++LLLĐ:lực lượng lao động
++lllđ:lực lượng lao động
++LS:luật sư
++ls:luật sư
++LSQ:Lãnh sự quán
++lsq:Lãnh sự quán
++LTQĐTD:lây truyền qua đường tình dục
++ltqđtd:lây truyền qua đường tình dục
++MBH:mũ bảo hiểm
++mbh:mũ bảo hiểm
++MHX:Mùa Hè Xanh
++mhx:Mùa Hè Xanh
++MS:mã số
++ms:mã số
++MT:môi trường,mặt trận
++mt:môi trường,mặt trận
++MTĐT:Máy tính điện tử
++mtđt:Máy tính điện tử
++MTDTGPMNVN:Mặt trận dân tộc giải phóng miền nam Việt Nam
++mtdtgpmnvn:Mặt trận dân tộc giải phóng miền nam Việt Nam
++MTTQ:Mặt trận Tổ quốc
++mttq:Mặt trận Tổ quốc
++MTTQVN:Mặt trận Tổ quốc Việt Nam
++mttqvn:Mặt trận Tổ quốc Việt Nam
++MTV:một thành viên
++mtv:một thành viên
++MTXT:máy tính xách tay
++mtxt:máy tính xách tay
++NC:nghiên cứu
++nc:nghiên cứu
++NCC:nhà cung cấp
++ncc:nhà cung cấp
++NCKH:nghiên cứu khoa học
++nckh:nghiên cứu khoa học
++NCL:ngoài công lập
++ncl:ngoài công lập
++NCS:nghiên cứu sinh
++ncs:nghiên cứu sinh
++NCTO:hội đồng các tổ chức dệt may quốc gia Mỹ
++ncto:hội đồng các tổ chức dệt may quốc gia Mỹ
++NCTT:nghiên cứu thị trường
++nctt:nghiên cứu thị trường
++ND:nhân dân
++nd:nhân dân
++NĐ:Nghị định
++nđ:Nghị định
++NDC:Trung tâm dữ liệu Viễn thám Quốc gia
++ndc:Trung tâm dữ liệu Viễn thám Quốc gia
++NDT:Nhân dân tệ
++ndt:Nhân dân tệ
++NĐT:nhà đầu tư
++nđt:nhà đầu tư
++NĐVN:người đẹp Việt Nam
++nđvn:người đẹp Việt Nam
++NH:ngân hàng
++nh:ngân hàng
++NHCSXH:Ngân hàng Chính sách xã hội
++nhcsxh:Ngân hàng Chính sách xã hội
++NHCTCN:Ngân hàng Công thương Chi nhánh
++nhctcn:Ngân hàng Công thương Chi nhánh
++NHCTHP:Ngân hàng Công thương Hải Phòng
++nhcthp:Ngân hàng Công thương Hải Phòng
++NHCTVN:Ngân hàng Công thương Việt Nam
++nhctvn:Ngân hàng Công thương Việt Nam
++NHĐA:Ngân hàng Đông Á
++nhđa:Ngân hàng Đông Á
++NHĐÁ:Ngân hàng Đông Á
++nhđá:Ngân hàng Đông Á
++NHĐT:Ngân hàng Đầu tư
++nhđt:Ngân hàng Đầu tư
++NHĐTPT:Ngân hàng Đầu tư phát triển
++nhđtpt:Ngân hàng Đầu tư phát triển
++NHK:Đài truyền hình quốc gia Nhật Bản
++nhk:Đài truyền hình quốc gia Nhật Bản
++NHNN:Ngân hàng Nhà nước
++nhnn:Ngân hàng Nhà nước
++NHNNo:Ngân hàng Nông nghiệp và Phát triển Nông thôn
++nhnno:Ngân hàng Nông nghiệp và Phát triển Nông thôn
++NHNNPTNT:Ngân hàng Nông nghiệp và Phát triển Nông thôn
++nhnnptnt:Ngân hàng Nông nghiệp và Phát triển Nông thôn
++NHNNVN:Ngân hàng Nhà nước Việt Nam
++nhnnvn:Ngân hàng Nhà nước Việt Nam
++NHNoVN:Ngân hàng Nông nghiệp và Phát triển Nông thôn Việt Nam
++nhnovn:Ngân hàng Nông nghiệp và Phát triển Nông thôn Việt Nam
++NHNT:Ngân hàng Ngoại thương
++nhnt:Ngân hàng Ngoại thương
++NHRC:Ủy ban Nhân quyền Quốc gia
++nhrc:Ủy ban Nhân quyền Quốc gia
++NHTM:Ngân hàng Thương mại
++nhtm:Ngân hàng Thương mại
++NHTMCP:ngân hàng thương mại cổ phần
++nhtmcp:ngân hàng thương mại cổ phần
++NHTMNN:ngân hàng thương mại nhà nước
++nhtmnn:ngân hàng thương mại nhà nước
++NHTMQD:ngân hàng thương mại quốc doanh
++nhtmqd:ngân hàng thương mại quốc doanh
++NHTQ:Ngân hàng Trung ương Trung Quốc
++nhtq:Ngân hàng Trung ương Trung Quốc
++NHTSA:Cục an toàn xa lộ quốc gia Mỹ
++nhtsa:Cục an toàn xa lộ quốc gia Mỹ
++NHTƯ:Ngân hàng Trung ương
++nhtư:Ngân hàng Trung ương
++NHTW:Ngân hàng Trung ương
++nhtw:Ngân hàng Trung ương
++NK:nhập khẩu
++nk:nhập khẩu
++NKBV:nhiễm khuẩn bệnh viện
++nkbv:nhiễm khuẩn bệnh viện
++NKKN:Nam Kỳ Khởi Nghĩa
++nkkn:Nam Kỳ Khởi Nghĩa
++NKNV:năng khiếu nghiệp vụ
++nknv:năng khiếu nghiệp vụ
++NKT:người khuyết tật
++nkt:người khuyết tật
++NL:năng lượng
++nl:năng lượng
++NLĐ:Người lao động
++nlđ:Người lao động
++NLMT:năng lượng mặt trời
++nlmt:năng lượng mặt trời
++NLS:nông lâm sản
++nls:nông lâm sản
++NLTT:năng lượng tái tạo
++nltt:năng lượng tái tạo
++NMĐ:nhà máy điện
++nmđ:nhà máy điện
++NN:Nhà nước
++nn:Nhà nước
++NNCĐDC:nạn nhân chất độc da cam
++nncđdc:nạn nhân chất độc da cam
++NNPTNT:Nông nghiệp và Phát triển Nông thôn
++NN&PTNT:Nông nghiệp và Phát triển Nông thôn
++nnptnt:Nông nghiệp và Phát triển Nông thôn
++NPP:Nhà phân phối
++npp:Nhà phân phối
++NQ:Nghị quyết
++nq:Nghị quyết
++NQD:ngoài quốc doanh
++nqd:ngoài quốc doanh
++NS:Nghệ sĩ
++ns:Nghệ sĩ
++NSND:Nghệ sĩ nhân dân
++nsnd:Nghệ sĩ nhân dân
++NSƯT:Nghệ sĩ ưu tú
++nsưt:Nghệ sĩ ưu tú
++NSNN:ngân sách nhà nước
++nsnn:ngân sách nhà nước
++NST:nhiễm sắc thể
++nst:nhiễm sắc thể
++NTBD:nghệ thuật biểu diễn
++ntbd:nghệ thuật biểu diễn
++NTD:người tiêu dùng,Nhà tuyển dụng
++ntd:người tiêu dùng,Nhà tuyển dụng
++NTK:nhà thiết kế
++ntk:nhà thiết kế
++NV:nhân viên,nguyện vọng
++nv:nhân viên,nguyện vọng
++NV1:nguyện vọng một
++nv1:nguyện vọng một
++NV2:nguyện vọng hai
++nv2:nguyện vọng hai
++NV3:nguyện vọng ba
++nv3:nguyện vọng ba
++NVH:nhà văn hóa
++nvh:nhà văn hóa
++NVHTN:nhà văn hóa Thanh niên
++nvhtn:nhà văn hóa Thanh niên
++NXB:Nhà xuất bản
++nxb:Nhà xuất bản
++NXBGD:Nhà xuất bản Giáo dục
++nxbgd:Nhà xuất bản Giáo dục
++NXBKHXH:Nhà xuất bản Khoa học Xã hội
++nxbkhxh:Nhà xuất bản Khoa học Xã hội
++NXBQĐND:Nhà xuất bản Quân đội Nhân dân
++nxbqđnd:Nhà xuất bản Quân đội Nhân dân
++NXBTN:Nhà xuất bản Tự nhiên
++nxbtn:Nhà xuất bản Tự nhiên
++NXBVHTT:Nhà xuất bản Văn hóa Thể thao
++nxbvhtt:Nhà xuất bản Văn hóa Thể thao
++PC14:Phòng Cảnh sát điều tra tội phạm về trật tự xã hội
++pc14:Phòng Cảnh sát điều tra tội phạm về trật tự xã hội
++PC15:Phòng Cảnh sát điều tra tội phạm về quản lý kinh tế và chức vụ
++pc15:Phòng Cảnh sát điều tra tội phạm về quản lý kinh tế và chức vụ
++PC16:Phòng Cảnh sát điều tra
++pc16:Phòng Cảnh sát điều tra
++PC17:Phòng cảnh sát phòng chống tội phạm ma tuý
++pc17:Phòng cảnh sát phòng chống tội phạm ma tuý
++PCBL:phòng chống bão lụt
++pcbl:phòng chống bão lụt
++PCBLTKCN:phòng chống bão lụt và tìm kiếm cứu nạn
++pcbltkcn:phòng chống bão lụt và tìm kiếm cứu nạn
++PCBTH:phổ cập bậc trung học
++pcbth:phổ cập bậc trung học
++PCC:phòng công chứng
++pcc:phòng công chứng
++PCCC:phòng cháy chữa cháy
++pccc:phòng cháy chữa cháy
++PCGD:phổ cập giáo dục
++pcgd:phổ cập giáo dục
++PCGDBTH:phổ cập giáo dục bậc trung học
++pcgdbth:phổ cập giáo dục bậc trung học
++PCGDTH:phổ cập giáo dục tiểu học
++pcgdth:phổ cập giáo dục tiểu học
++PCGDTHCS:phổ cập giáo dục trung học cơ sở
++pcgdthcs:phổ cập giáo dục trung học cơ sở
++PCLBMN:phòng chống lụt bão miền Nam
++pclbmn:phòng chống lụt bão miền Nam
++PCLBTƯ:phòng chống lụt bão Trung ương
++pclbtư:phòng chống lụt bão Trung ương
++PCLBTW:phòng chống lụt bão Trung ương
++pclbtw:phòng chống lụt bão Trung ương
++PCT:Phó chủ tịch
++pct:Phó chủ tịch
++PCTT:phòng chống thiên tai
++pctt:phòng chống thiên tai
++PCTH:phổ cập tiểu học
++pcth:phổ cập tiểu học
++PCTHCS:phổ cập trung học cơ sở
++pcthcs:phổ cập trung học cơ sở
++PCTN:phòng chống tệ nạn
++pctn:phòng chống tệ nạn
++PCTNXH:phòng chống tệ nạn xã hội
++pctnxh:phòng chống tệ nạn xã hội
++PCTPCNC:phòng chống tội phạm công nghệ cao
++pctpcnc:phòng chống tội phạm công nghệ cao
++PGĐ:Phó giám đốc
++pgđ:Phó giám đốc
++PGHH:Phật giáo Hòa Hảo
++pghh:Phật giáo Hòa Hảo
++PGS:Phó Giáo sư
++pgs:Phó Giáo sư
++PGS.TS:Phó Giáo sư Tiến sĩ
++PGSTS:Phó Giáo sư Tiến sĩ
++PGS.TS.BS:Phó Giáo sư Tiến sĩ Bác sĩ
++PGS.TSKH:Phó Giáo sư Tiến sĩ Khoa học
++PGSTSKH:Phó Giáo sư Tiến sĩ Khoa học
++PHHS:phụ huynh học sinh
++phhs:phụ huynh học sinh
++PL:pháp luật
++pl:pháp luật
++PM:phần mềm
++pm:phần mềm
++PMU:ban quản lý dự án
++pmu:ban quản lý dự án
++PN:phụ nữ
++pn:phụ nữ
++PP:phương pháp
++pp:phương pháp
++PS:phóng sự
++ps:phóng sự
++PT:phát thanh
++PTCS:phổ thông cơ sở
++ptcs:phổ thông cơ sở
++PTN:phòng thí nghiệm
++ptn:phòng thí nghiệm
++PTNT:Phát triển Nông thôn
++ptnt:Phát triển Nông thôn
++PTSC:Công ty Dịch vụ Kỹ thuật dầu khí
++ptsc:Công ty Dịch vụ Kỹ thuật dầu khí
++PTT:Phó Thủ tướng
++ptt:Phó Thủ tướng
++PTTH:Phổ thông Trung học
++ptth:Phổ thông Trung học
++PTTM:phẫu thuật thẩm mỹ
++pttm:phẫu thuật thẩm mỹ
++PTTT:phát triển trẻ thơ
++pttt:phát triển trẻ thơ
++PTV:phát thanh viên
++ptv:phát thanh viên
++PV:phỏng vấn,phóng viên
++pv:phỏng vấn,phóng viên
++PY:Phú Yên
++Q:quận
++QBLTD:Quỹ bảo lãnh tín dụng
++qbltd:Quỹ bảo lãnh tín dụng
++QC:Quy chế,quảng cáo
++qc:Quy chế,quảng cáo
++QCDCCS:quy chế dân chủ cơ sở
++qcdccs:quy chế dân chủ cơ sở
++QCGNHH:Quy chế ghi nhãn hàng hóa
++qcgnhh:Quy chế ghi nhãn hàng hóa
++QCHQ:quan chức hải quan
++qchq:quan chức hải quan
++QCKDTXD:Quy chế kinh doanh thép xây dựng
++qckdtxd:Quy chế kinh doanh thép xây dựng
++QCKT:quy chuẩn kĩ thuật
++qckt:quy chuẩn kĩ thuật
++QĐ:quy định,quyết định
++qđ:quy định,quyết định
++QĐND:Quân đội Nhân dân
++qđnd:Quân đội Nhân dân
++QG:Quốc gia
++qg:Quốc gia
++QH:Quốc hội
++qh:Quốc hội
++QHTD:quan hệ tình dục
++qhtd:quan hệ tình dục
++QK:Quân khu
++qk:Quân khu
++QL:quốc lộ,quản lý
++ql:quốc lộ,quản lý
++QLGTĐT:quản lý giao thông đô thị
++qlgtđt:quản lý giao thông đô thị
++QLVNCH:Quân lực Việt Nam Cộng Hòa
++qlvnch:Quân lực Việt Nam Cộng Hòa
++QLD:Quản lý dược
++qld:Quản lý dược
++QLDA:Quản lý dự án
++qlda:Quản lý dự án
++QLĐT:Quản lý Đào tạo
++qlđt:Quản lý Đào tạo
++QLTT:Quản lý thị trường
++qltt:Quản lý thị trường
++QSD:quyền sử dụng
++qsd:quyền sử dụng
++QSDĐ:quyền sử dụng đất
++qsdđ:quyền sử dụng đất
++QTKD:Quản trị Kinh doanh
++qtkd:Quản trị Kinh doanh
++RLCD:rối loạn cương dương
++rlcd:rối loạn cương dương
++SARS:Hội chứng hô hấp cấp tính nặng
++sars:Hội chứng hô hấp cấp tính nặng
++SBD:số báo danh
++sbd:số báo danh
++SBS:Công ty Chứng khoán Ngân hàng Sài Gòn Thương Tín
++sbs:Công ty Chứng khoán Ngân hàng Sài Gòn Thương Tín
++SD:sử dụng
++sd:sử dụng
++SDLĐ:sử dụng lao động
++sdlđ:sử dụng lao động
++SDĐ:sử dụng đất
++sdđ:sử dụng đất
++SDĐNN:sử dụng đất nông nghiệp
++sdđnn:sử dụng đất nông nghiệp
++SĐH:sau đại học
++sđh:sau đại học
++SĐK:số đăng ký
++sđk:số đăng ký
++SĐNĐ:Sông Đà Nam Định
++sđnđ:Sông Đà Nam Định
++SĐT:số điện thoại
++sđt:số điện thoại
++SG:Sài Gòn
++sg:Sài Gòn
++SGD:Sở Giáo dục
++sgd:Sở Giáo dục
++SGGP:Sài gòn giải phóng
++sggp:Sài gòn giải phóng
++SGK:sách giáo khoa
++sgk:sách giáo khoa
++SGTT:Sài Gòn Tiếp Thị
++sgtt:Sài Gòn Tiếp Thị
++SGTVT:Sở Giao thông Vận tải
++sgtvt:Sở Giao thông Vận tải
++SH:sinh hoạt
++sh:sinh hoạt
++SHNN:sở hữu nhà nước
++shnn:sở hữu nhà nước
++SHTD:sinh hoạt tình dục
++shtd:sinh hoạt tình dục
++SHTT:sở hữu trí tuệ
++shtt:sở hữu trí tuệ
++SK:sân khấu
++sk:sân khấu
++SKHCN:Sở Khoa học Công nghệ
++skhcn:Sở Khoa học Công nghệ
++SKHCNMT:Sở Khoa học Công nghệ và Môi trường
++skhcnmt:Sở Khoa học Công nghệ và Môi trường
++SKHĐT:Sở Kế hoạch và Đầu tư
++skhđt:Sở Kế hoạch và Đầu tư
++SKSS:sức khỏe sinh sản
++skss:sức khỏe sinh sản
++SLNA:Sông Lam Nghệ An
++slna:Sông Lam Nghệ An
++SMĐH:Sao mai Điểm hẹn
++smđh:Sao mai Điểm hẹn
++SN:sinh năm,sinh ngày
++sn:sinh năm,sinh ngày
++SNN:sở Nông nghiệp
++snn:sở Nông nghiệp
++SP:Sư phạm,sản phẩm
++sp:Sư phạm,sản phẩm
++SPKT:Sư phạm Kỹ thuật
++spkt:Sư phạm Kỹ thuật
++SS:sĩ số
++ss:sĩ số
++STT:số thứ tự
++stt:số thứ tự
++SV:sinh viên
++sv:sinh viên
++SVĐ:sân vận động
++svđ:sân vận động
++SVĐV:Sao Vàng Đất Việt
++svđv:Sao Vàng Đất Việt
++SVHS:sinh viên học sinh
++svhs:sinh viên học sinh
++SVNCKH:sinh viên nghiên cứu khoa học
++svnckh:sinh viên nghiên cứu khoa học
++SVTN:sinh viên tình nguyện
++svtn:sinh viên tình nguyện
++SVVN:sinh viên Việt Nam
++svvn:sinh viên Việt Nam
++SX:sản xuất
++sx:sản xuất
++SXH:sốt xuất huyết
++sxh:sốt xuất huyết
++SYLL:Sơ yếu lý lịch
++syll:Sơ yếu lý lịch
++TACN:thức ăn chăn nuôi
++tacn:thức ăn chăn nuôi
++TAND:Tòa án Nhân dân
++tand:Tòa án Nhân dân
++TANDTC:Tòa án Nhân dân Tối cao
++tandtc:Tòa án Nhân dân Tối cao
++TBD:Thái Bình Dương
++tbd:Thái Bình Dương
++TBKTSG:Thời báo kinh tế Sài Gòn
++tbktsg:Thời báo kinh tế Sài Gòn
++TBKTVN:Thời báo Kinh tế Việt Nam
++tbktvn:Thời báo Kinh tế Việt Nam
++TBMMN:tai biến mạch máu não
++tbmmn:tai biến mạch máu não
++TBT:tổng biên tập
++tbt:tổng biên tập
++TBTT:thuê bao trả trước
++tbtt:thuê bao trả trước
++TBXH:Thương binh Xã hội
++tbxh:Thương binh Xã hội
++TC:tổng cộng,Thông cáo,tài chính,tiêu chuẩn
++tc:tổng cộng,Thông cáo,tài chính,tiêu chuẩn
++TCBVNTD:tiêu chuẩn và bảo vệ người tiêu dùng
++tcbvntd:tiêu chuẩn và bảo vệ người tiêu dùng
++TCCN:trung cấp chuyên nghiệp
++tccn:trung cấp chuyên nghiệp
++TCCS:tổ chức cơ sở,Tạp chí Cộng sản
++tccs:tổ chức cơ sở,Tạp chí Cộng sản
++TCDL:Tổng cục Du lịch
++tcdl:Tổng cục Du lịch
++TCHL:tuyệt chủng hàng loạt
++tchl:tuyệt chủng hàng loạt
++TCHQ:Tổng cục Hải quan
++tchq:Tổng cục Hải quan
++TCKH:trái cây không hạt,Tạp chí Khoa học,Tài chính - Kế hoạch
++tckh:trái cây không hạt,Tạp chí Khoa học,Tài chính - Kế hoạch
++TCKT:Tài chính - Kế toán
++tckt:Tài chính - Kế toán
++TCMN:thủ công mỹ nghệ
++tcmn:thủ công mỹ nghệ
++TCMR:tiêm chủng mở rộng
++tcmr:tiêm chủng mở rộng
++TCN:trước công nguyên,trung cấp nghề
++tcn:trước công nguyên,trung cấp nghề
++TCNN:Tài chính Nhà nước
++tcnn:Tài chính Nhà nước
++TCS:Trịnh Công Sơn
++tcs:Trịnh Công Sơn
++TCT:tổng công ty
++tct:tổng công ty
++TCTD:tổ chức tín dụng
++tctd:tổ chức tín dụng
++TCTT:trò chơi trực tuyến
++tctt:trò chơi trực tuyến
++TCTTMSG:Tổng công ty Thương mại Sài Gòn
++tcttmsg:Tổng công ty Thương mại Sài Gòn
++TCVN:Tiêu chuẩn Việt Nam
++tcvn:Tiêu chuẩn Việt Nam
++TD:tình dục,thể dục
++td:tình dục,thể dục
++TĐ:từ điển
++tđ:từ điển
++TĐBKVN:Từ Điển Bách Khoa Việt Nam
++tđbkvn:Từ Điển Bách Khoa Việt Nam
++TĐC:tái định cư
++tđc:tái định cư
++TDTT:Thể dục thể thao
++tdtt:Thể dục thể thao
++TDTTQG:Thể dục thể thao Quốc gia
++tdttqg:Thể dục thể thao Quốc gia
++TDV:trình dược viên
++tdv:trình dược viên
++TG:thế giới
++tg:thế giới
++TGĐ:Tổng giám đốc
++tgđ:Tổng giám đốc
++TGPL:trợ giúp pháp lý
++tgpl:trợ giúp pháp lý
++TH:truyền hình,tiểu học,trường hợp
++th:truyền hình,tiểu học,trường hợp
++THCB:trung học chuyên ban
++thcb:trung học chuyên ban
++THCN:trung học chuyên nghiệp
++thcn:trung học chuyên nghiệp
++THCS:trung học cơ sở
++thcs:trung học cơ sở
++THCSND:thực hiện chính sách nhà đất
++thcsnd:thực hiện chính sách nhà đất
++THCSNĐ:thực hiện chính sách nhà đất
++thcsnđ:thực hiện chính sách nhà đất
++THDL:trung học dân lập
++thdl:trung học dân lập
++THGT:tín hiệu giao thông
++thgt:tín hiệu giao thông
++THKTS:truyền hình kỹ thuật số
++thkts:truyền hình kỹ thuật số
++THKTSMĐ:truyền hình kỹ thuật số mặt đất
++thktsmđ:truyền hình kỹ thuật số mặt đất
++THPT:trung học phổ thông
++thpt:trung học phổ thông
++THQG:thương hiệu quốc gia
++thqg:thương hiệu quốc gia
++THS:tín hiệu số
++ths:Thạc sĩ,tín hiệu số
++ThS.BS:Thạc sĩ Bác sĩ
++Ths-BS:Thạc sĩ Bác sĩ
++THTT:truyền hình trực tiếp
++thtt:truyền hình trực tiếp
++THVN:Truyền hình Việt Nam
++thvn:Truyền hình Việt Nam
++THX:Tân hoa xã
++thx:Tân hoa xã
++TK:thiết kế,thế kỷ
++tk:thiết kế,thế kỷ
++TKCN:tìm kiếm cứu nạn
++tkcn:tìm kiếm cứu nạn
++TM:Thương mại
++tm:Thương mại
++TMCP:Thương mại cổ phần
++tmcp:Thương mại cổ phần
++TMĐT:Thương mại Điện tử
++tmđt:Thương mại Điện tử
++TMN:Thép Miền Nam
++tmn:Thép Miền Nam
++TMV:Công ty ôtô Toyota Việt Nam
++tmv:Công ty ôtô Toyota Việt Nam
++TN:thanh niên
++tn:thanh niên
++TNCN:thu nhập cá nhân
++tncn:thu nhập cá nhân
++TNCS:Thanh niên Cộng sản
++tncs:Thanh niên Cộng sản
++TNĐH:tốt nghiệp đại học
++tnđh:tốt nghiệp đại học
++TNDN:thu nhập doanh nghiệp
++tndn:thu nhập doanh nghiệp
++TNĐT:Thoát nước Đô thị
++tnđt:Thoát nước Đô thị
++TNGT:tai nạn giao thông
++tngt:tai nạn giao thông
++TNHC:trinh nữ hoàng cung
++tnhc:trinh nữ hoàng cung
++TNHH:Trách nhiệm Hữu hạn
++tnhh:Trách nhiệm Hữu hạn
++TNK:thuế nhập khẩu
++tnk:thuế nhập khẩu
++TNKQ:trắc nghiệm khách quan
++tnkq:trắc nghiệm khách quan
++TNLN:thanh niên lập nghiệp
++tnln:thanh niên lập nghiệp
++TNMT:Tài nguyên Môi trường
++tnmt:Tài nguyên Môi trường
++TNND:Tiếng nói Nhân dân
++tnnd:Tiếng nói Nhân dân
++TNNT:thanh niên nông thôn
++tnnt:thanh niên nông thôn
++TNO:Thanh niên Online
++tno:Thanh niên Online
++TNS:tu nghiệp sinh
++tns:tu nghiệp sinh
++TNSV:thanh niên sinh viên
++tnsv:thanh niên sinh viên
++TNSVVN:thanh niên sinh viên Việt Nam
++tnsvvn:thanh niên sinh viên Việt Nam
++TNT:Tình Nguyện Trẻ
++tnt:Tình Nguyện Trẻ
++TNTN:thanh niên tình nguyện,tài nguyên thiên nhiên
++tntn:thanh niên tình nguyện,tài nguyên thiên nhiên
++TNTP:Thiếu niên Tiền phong
++tntp:Thiếu niên Tiền phong
++TNV:tình nguyện viên
++tnv:tình nguyện viên
++TNVN:Thanh niên Việt Nam
++tnvn:Thanh niên Việt Nam
++TNXH:tệ nạn xã hội
++tnxh:tệ nạn xã hội
++TNXK:Thanh niên xung kích
++tnxk:Thanh niên xung kích
++TNXP:Thanh niên xung phong
++tnxp:Thanh niên xung phong
++TP:thành phố
++Tp:thành phố
++tp:thành phố
++TPCĐ:trái phiếu chuyển đổi
++tpcđ:trái phiếu chuyển đổi
++TPCN:thực phẩm chức năng
++tpcn:thực phẩm chức năng
++TPCT:Thành phố Cần Thơ
++tpct:Thành phố Cần Thơ
++TPHCM:Thành phố Hồ Chí Minh
++tphcm:Thành phố Hồ Chí Minh
++TP.HCM:Thành phố Hồ Chí Minh
++TPO:Tiền phong Online
++tpo:Tiền phong Online
++TQ:Trung Quốc
++tq:Trung Quốc
++TSDĐ:tiền sử dụng đất,tái sử dụng đất
++tsdđ:tiền sử dụng đất,tái sử dụng đất
++TSKH:Tiến sĩ Khoa học
++tskh:Tiến sĩ Khoa học
++TS:Tiến sĩ,Thí sinh
++ts:Tiến sĩ,Thí sinh
++TS-BS:Tiến sĩ Bác sĩ
++TS.BS:Tiến sĩ Bác sĩ
++TS-DS:Tiến sĩ Dược sĩ
++TT:thông tin,truyền thông,thị trường,trung tâm,thể thao,thị trấn
++tt:thông tin,truyền thông,thị trường,trung tâm,thể thao,thị trấn
++TTDN:trung tâm dạy nghề
++ttdn:trung tâm dạy nghề
++TTBĐS:thị trường bất động sản
++ttbđs:thị trường bất động sản
++TTBDVH:Trung tâm bồi dưỡng văn hóa
++ttbdvh:Trung tâm bồi dưỡng văn hóa
++TTBDVHNG:Trung tâm bồi dưỡng văn hóa ngoài giờ
++ttbdvhng:Trung tâm bồi dưỡng văn hóa ngoài giờ
++TTBVQTG:Trung tâm bảo vệ quyền tác giả
++ttbvqtg:Trung tâm bảo vệ quyền tác giả
++TTBYT:trang thiết bị y tế
++ttbyt:trang thiết bị y tế
++TTCK:Trung tâm chứng khoán,Thị trường Chứng khoán
++ttck:Trung tâm chứng khoán,Thị trường Chứng khoán
++TTCN:Trung tâm cai nghiện,tiểu thủ công nghiệp
++ttcn:Trung tâm cai nghiện,tiểu thủ công nghiệp
++TTCP:Thanh tra Chính phủ,Thủ tướng Chính phủ
++ttcp:Thanh tra Chính phủ,Thủ tướng Chính phủ
++TTCT:Thể Thao Cuối Tuần
++ttct:Thể Thao Cuối Tuần
++TTĐB:thuế Tiêu thụ đặc biệt
++ttđb:thuế Tiêu thụ đặc biệt
++TTDD:Trung tâm Dinh dưỡng
++ttdd:Trung tâm Dinh dưỡng
++TTĐM:Trung tâm Điện máy
++ttđm:Trung tâm Điện máy
++TTDV:Trung tâm Dịch vụ
++ttdv:Trung tâm Dịch vụ
++TTDVVL:Trung tâm Dịch vụ việc làm
++ttdvvl:Trung tâm Dịch vụ việc làm
++TTGDCK:Trung tâm giao dich chứng khoán
++ttgdck:Trung tâm giao dich chứng khoán
++TTGDTX:Trung tâm Giáo dục thường xuyên
++ttgdtx:Trung tâm Giáo dục thường xuyên
++TTGT:Trật tự Giao thông
++ttgt:Trật tự Giao thông
++TTH:Thừa Thiên Huế
++tth:Thừa Thiên Huế
++TTHTCĐ:Trung tâm học tập cộng đồng
++tthtcđ:Trung tâm học tập cộng đồng
++TTHTSV:trung tâm hỗ trợ sinh viên
++tthtsv:trung tâm hỗ trợ sinh viên
++TTK:Tổng thư ký
++ttk:Tổng thư ký
++TTLT:Thông tư liên tịch
++ttlt:Thông tư liên tịch
++TTN:thanh thiếu niên
++ttn:thanh thiếu niên
++TTNN:Trung tâm Ngoại Ngữ
++ttnn:Trung tâm Ngoại Ngữ
++TTO:Tuổi trẻ online
++tto:Tuổi trẻ online
++TTQLKT:trật tự quản lý kinh tế
++ttqlkt:trật tự quản lý kinh tế
++TTATGT:trật tự an toàn giao thông
++ttatgt:trật tự an toàn giao thông
++TTTT:Thông tin Truyền thông
++tttt:Thông tin Truyền thông
++TTTH:Trung tâm Tin học
++ttth:Trung tâm Tin học
++TTTM:Trung tâm Thương mại
++tttm:Trung tâm Thương mại
++TTTON:thụ tinh trong ống nghiệm
++ttton:thụ tinh trong ống nghiệm
++TTTTN:trí thức trẻ tình nguyện
++ttttn:trí thức trẻ tình nguyện
++TTVGT:trật tự viên giao thông
++ttvgt:trật tự viên giao thông
++TTVH:Trung tâm Văn hóa
++ttvh:Trung tâm Văn hóa
++TTVN:Thể thao Việt Nam,Trí tuệ Việt Nam,Trái tim Việt Nam
++ttvn:Thể thao Việt Nam,Trí tuệ Việt Nam,Trái tim Việt Nam
++TTXH:trật tự xã hội
++ttxh:trật tự xã hội
++TTXVN:Thông tấn xã Việt Nam
++ttxvn:Thông tấn xã Việt Nam
++TTX:Thông tấn xã
++ttx:Thông tấn xã
++TTYT:Trung tâm Y tế
++ttyt:Trung tâm T tế
++TTYTDP:Trung tâm Y tế dự phòng
++ttytdp:Trung tâm Y tế dự phòng
++TV:ti vi,thư viện
++tv:ti vi,thư viện
++TVHK:tiếp viên hàng không
++tvhk:tiếp viên hàng không
++TVN:Than Việt Nam
++tvn:Than Việt Nam
++TVQH:Thường vụ Quốc hội
++tvqh:Thường vụ Quốc hội
++TVV:tư vấn viên
++tvv:tư vấn viên
++TƯ:Trung Ương
++tư:Trung Ương
++TW:Trung ương
++tw:Trung ương
++TX:Thị xã
++tx:Thị xã
++UB:Ủy ban
++ub:Ủy ban
++UBĐT:Ủy ban Điều tra
++ubđt:Ủy ban Điều tra
++UBCKNN:Ủy ban Chứng khoán Nhà nước
++ubcknn:Ủy ban Chứng khoán Nhà nước
++UBKT:Uỷ ban Kiểm tra,Ủy ban Kinh tế
++ubkt:Uỷ ban Kiểm tra,Ủy ban Kinh tế
++UBMTTQ:Ủy ban Mặt trận Tổ quốc
++ubmttq:Ủy ban Mặt trận Tổ quốc
++UBND:Ủy ban Nhân dân
++ubnd:Ủy ban Nhân dân
++UBMTTQVN:Ủy ban Mặt trận Tổ quốc Việt Nam
++ubmttqvn:Ủy ban Mặt trận Tổ quốc Việt Nam
++UBNDTP:Ủy ban Nhân dân Thành phố
++ubndtp:Ủy ban Nhân dân Thành phố
++UBTƯ:Ủy ban Trung Ương
++ubtư:Ủy ban Trung Ương
++UBTW:Ủy ban Trung Ương
++ubtw:Ủy ban Trung Ương
++UBTDTT:Ủy ban Thể dục Thể thao
++ubtdtt:Ủy ban Thể dục Thể thao
++UBTVQH:Ủy ban Thường vụ Quốc hội
++ubtvqh:Ủy ban Thường vụ Quốc hội
++ƯCV:ứng cử viên
++ưcv:ứng cử viên
++UV:Ủy viên
++uv:Ủy viên
++UVBCH:Ủy viên Ban chấp hành
++uvbch:Ủy viên Ban chấp hành
++UVBCT:Ủy viên Bộ Chính trị
++uvbct:Ủy viên Bộ Chính trị
++VCB:Ngân hàng Ngoại thương Việt Nam
++vcb:Ngân hàng Ngoại thương Việt Nam
++VCK:vòng chung kết
++vck:vòng chung kết
++VD:ví dụ,vận dụng,vận động
++vd:ví dụ,vận dụng,vận động
++VĐ:vô địch
++vđ:vô địch
++VDC:vận dụng cao
++vdc:vận dụng cao
++VĐQG:vô địch Quốc gia
++vđqg:vô địch Quốc gia
++VĐTG:vô địch thế giới
++vđtg:vô địch thế giới
++VĐV:vận động viên
++vđv:vận động viên
++VĐVQG:Vận động viên Quốc gia
++vđvqg:Vận động viên Quốc gia
++VFF:Liên đoàn bóng đá Việt Nam
++vff:Liên đoàn bóng đá Việt Nam
++VH:Văn hóa
++vh:Văn hóa
++VHTH:Văn hóa tổng hợp
++vhth:Văn hóa tổng hợp
++VHGDTNTN:Văn hóa Giáo dục Thanh niên Thiếu niên
++vhgdtntn:Văn hóa Giáo dục Thanh niên Thiếu niên
++VHGDTTNNĐ:Văn hóa Giáo dục Thanh thiếu niên và Nhi đồng
++vhgdttnnđ:Văn hóa Giáo dục Thanh thiếu niên và Nhi đồng
++VHNT:Văn học Nghệ thuật
++vhnt:Văn học Nghệ thuật
++VHTT:Văn hóa thể thao,Văn hóa thông tin
++vhtt:Văn hóa thể thao,Văn hóa thông tin
++VH-TT:Văn hóa Thể thao
++VKS:Viện Kiểm sát
++vks:Viện Kiểm sát
++VKSND:Viện Kiểm sát Nhân dân
++vksnd:Viện Kiểm sát Nhân dân
++VKSNDTC:Viện Kiểm sát Nhân dân Tối cao
++vksndtc:Viện Kiểm sát Nhân dân Tối cao
++VL:Vật lý
++vl:Vật lý
++VLTK:Võ Lâm Truyền Kỳ
++vltk:Võ Lâm Truyền Kỳ
++VLXD:Vật liệu xây dựng
++vlxd:Vật liệu xây dựng
++VN:Việt Nam
++vn:Việt Nam
++VNCH:Việt Nam Cộng Hòa
++vnch:Việt Nam Cộng Hòa
++VNCC:Tổng Công ty Xi măng Việt Nam
++vncc:Tổng Công ty Xi măng Việt Nam
++VNM:Vinamilk
++vnm:Vinamilk
++VP:văn phòng
++vp:văn phòng
++VPCP:Văn phòng Chính phủ
++vpcp:Văn phòng Chính phủ
++VPĐD:văn phòng đại diện
++vpđd:văn phòng đại diện
++VQG:Vườn Quốc gia
++vqg:Vườn Quốc gia
++VS:vệ sinh
++vs:vệ sinh
++VT:vũ trụ,viễn thông,vi tính
++vt:vũ trụ,viễn thông,vi tính
++VTV:Đài truyền hình Việt Nam
++vtv:Đài truyền hình Việt Nam
++VYSA:Hội Thanh niên Sinh viên Việt Nam tại Nhật Bản
++vysa:Hội Thanh niên Sinh viên Việt Nam tại Nhật Bản
++WB:Ngân hàng thế giới
++wb:Ngân hàng thế giới
++WTO:Tổ chức Thương mại thế giới
++wto:Tổ chức Thương mại thế giới
++XD:Xây dựng
++xd:Xây dựng
++XDCB:xây dựng cơ bản
++xdcb:xây dựng cơ bản
++XDCĐ:xây dựng cầu đường
++xdcđ:xây dựng cầu đường
++XĐGN:xoá đói giảm nghèo
++xđgn:xoá đói giảm nghèo
++XDHK:xăng dầu hàng không
++xdhk:xăng dầu hàng không
++XH:xã hội
++xh:xã hội
++XHCN:xã hội chủ nghĩa
++xhcn:xã hội chủ nghĩa
++XHH:xã hội hóa
++xhh:xã hội hóa
++XK:xuất khẩu
++xk:xuất khẩu
++XKLĐ:xuất khẩu lao động
++xklđ:xuất khẩu lao động
++XN:xí nghiệp
++xn:xí nghiệp
++XNK:xuất nhập khẩu
++xnk:xuất nhập khẩu
++XSKT:xổ số kiến thiết
++xskt:xổ số kiến thiết
++XSMB:xổ số miền Bắc
++xsmb:xổ số miền Bắc
++XSMN:xổ số miền Nam
++xsmn:xổ số miền Nam
++XSMT:xổ số miền Tây
++xsmt:xổ số miền Tây
++XTTM:xúc tiến thương mại
++xttm:xúc tiến thương mại
++XX:xét xử
++xx:xét xử
++YKVN:Y khoa Việt Nam
++ykvn:Y khoa Việt Nam
++YTDP:Y tế Dự phòng
++ytdp:Y tế Dự phòng
++TB:thông báo,thương binh
++tb:thông báo,thương binh
++P:phố,phường
++PA:phương án
++p/a:phản ánh,phương án
++ĐA:đồ án,đề án
++đ/a:đồ án
++đ/c:đồng chí
++DA:dự án
++d/a:dự án
++BB:Biên bản
++bb:Biên bản
++BGN:Bản ghi nhớ
++bgn:Bản ghi nhớ
++BTT:Bản thỏa thuận
++btt:Bản thỏa thuận
++BTTTT:Bộ thông tin truyền thông
++btttt:Bộ thông tin truyền thông
++GUQ:Giấy Ủy Quyền
++guq:Giấy Ủy Quyền
++GM:Giấy Mời
++gm:Giấy Mời
++GGT:Giấy giới thiệu
++ggt:Giấy giới thiệu
++GNP:Giấy nghỉ phép
++gnp:Giấy nghỉ phép
++PG:phiếu gửi
++pg:phiếu gửi
++PC:phiếu chuyển
++pc:phiếu chuyển
++PB:phiếu báo
++pb:phiếu báo
++SY:Bản sao y
++sy:Bản sao y
++SL:Bản sao lục,số lượng
++sl:Bản sao lục,số lượng
++FB:facebook
++fb:facebook
++ThS:Thạc sĩ
++Ths:Thạc sĩ
++Th.s:Thạc sĩ
++TTg:Thủ tướng
++ttg:Thủ tướng
++TrS:Bản trích sao
++trs:Bản trích sao
++QyĐ:Quy định
++qyđ:Quy định
++YTế:Y tế
++ytế:Y tế
++TTr:tờ trình
++ttr:tờ trình
++thg:thân gửi
++th/g:thân gửi
++vv:về việc
++v.v:vân vân
++v/v:về việc
++cty:công ty
++ngta:người ta
++VNĐ:việt nam đồng
++vnđ:việt nam đồng
++USD:đô la mỹ
++usd:đô la mỹ
++KQXN:kết quả xét nghiệm
++kqxn:kết quả xét nghiệm
++LM:liên minh
++lm:liên minh
++K/G:kính gửi
++k/g:kính gửi
++AHLĐ:anh hùng lao động
++ahlđ:anh hùng lao động
++ahls:anh hùng liệt sĩ
++AHLS:anh hùng liệt sĩ
++ANQG:An ninh Quốc gia
++anqg:An ninh Quốc gia
++ANQP:An ninh Quốc phòng
++anqp:An ninh Quốc phòng
++ASXH:An sinh Xã hội
++asxh:An sinh Xã hội
++ATGTQG:An toàn Giao thông Quốc gia
++atgtqg:An toàn Giao thông Quốc gia
++ATLĐ:An toàn Lao động
++atlđ:An toàn Lao động
++BĐBP:Bộ đội Biên phòng
++bđbp:Bộ đội Biên phòng
++BGTVT:Bộ Giao thông Vận tải
++bgtvt:Bộ Giao thông Vận tải
++BHXHVN:Bảo hiểm Xã hội Việt Nam
++bhxhvn:Bảo hiểm Xã hội Việt Nam
++BLĐTBXH:Bộ Lao động Thương binh Xã hội
++blđtbxh:Bộ Lao động Thương binh Xã hội
++BNG:Bộ Ngoại giao
++bng:Bộ Ngoại giao
++BNN:Bộ Nông nghiệp
++bnn:Bộ Nông nghiệp
++BTNMT:Bộ Tài nguyên Môi trường
++btnmt:Bộ Tài nguyên Môi trường
++BTP:Bộ Tư pháp
++btp:Bộ Tư pháp
++BVTƯ:Bệnh viện trung ương
++bvtư:Bệnh viện trung ương
++BXD:Bộ Xây dựng
++bxd:Bộ Xây dựng
++BYT:Bộ Y tế
++byt:Bộ Y tế
++CATPHCM:Công an thành phố Hồ Chí Minh
++catphcm:Công an thành phố Hồ Chí Minh
++CBNV:cán bộ nhân viên
++cbnv:cán bộ nhân viên
++CBVC:cán bộ viên chức
++cbvc:cán bộ viên chức
++CBĐV:cán bộ đảng viên
++cbđv:cán bộ đảng viên
++CHCN:cứu hộ cứu nạn
++chcn:cứu hộ cứu nạn
++CHQS:chỉ huy quân sự
++chqs:chỉ huy quân sự
++CHXH:Cộng hòa Xã hội
++chxh:Cộng hòa Xã hội
++CLC:chất lượng cao
++clc:chất lượng cao
++CMTND:chứng minh thư nhân dân
++cmtnd:chứng minh thư nhân dân
++CNC:công nghệ cao
++cnc:công nghệ cao
++CNCH:cứu nạn cứu hộ
++CNPM:công nghệ phần mềm
++cnpm:công nghệ phần mềm
++CPN:chuyển phát nhanh
++cpn:chuyển phát nhanh
++CNXH:Chủ nghĩa Xã hội
++cnxh:Chủ nghĩa Xã hội
++CPTM:Cổ phần Thương mại
++cptm:Cổ phần hương mại
++CQCA:Cơ quan Công an
++cqca:Cơ quan Công an
++CQCSĐT:Cơ quan Cảnh sát điều tra
++cqcsđt:Cơ quan Cảnh sát điều tra
++CQNN:Cơ quan Nhà nước
++cqnn:Cơ quan Nhà nước
++CSHT:cơ sở hạ tầng
++csht:cơ sở hạ tầng
++CSND:Cảnh sát nhân dân
++csnd:Cảnh sát nhân dân
++CSPCCC:Cảnh sát phòng cháy chữa cháy
++cspccc:Cảnh sát phòng cháy chữa cháy
++CSSK:chăm sóc sức khỏe
++cssk:chăm sóc sức khỏe
++CTHĐQT:Chủ tịch hội đồng quản trị
++cthđqt:Chủ tịch hội đồng quản trị
++CTYTNHH:Công ty trách nhiệm hữu hạn
++ctytnhh:Công ty trách nhiệm hữu hạn
++DVTM:dịch vụ thương mại
++dvtm:dịch vụ thương mại
++ĐBSH:đồng bằng sông Hồng
++đbsh:đồng bằng sông Hồng
++ĐHKHXHNV:Đại học Khoa học Xã hội nhân văn
++đhkhxhnv:Đại học Khoa học Xã hội nhân văn
++ĐHYD:Đại học Y Dược
++đhyd:Đại học Y Dược
++ĐHL:Đại học luật
++đhl:Đại học luật
++ĐHNN:Đại học Nông nghiệp
++đhnn:Đại học Nông nghiệp
++ĐHSPKT:Đại học sư phạm kỹ thuật
++đhspkt:Đại học sư phạm kỹ thuật
++ĐHTH:Đại học Tổng hợp
++đhth:Đại học Tổng hợp
++ĐHXD:Đại học Xây dựng
++đhxd:Đại học Xây dựng
++ĐH-CĐ:Đại học Cao đẳng
++đh-cđ:Đại học Cao đẳng
++ĐKDN:đăng ký doanh nghiệp
++đkdn:đăng ký doanh nghiệp
++ĐPTTH:Đài phát thanh truyền hình
++đptth:Đài phát thanh truyền hình
++ĐSVN:Đường sắt Việt Nam
++đsvn:Đường sắt Việt Nam
++ĐTBĐQG:Đội tuyển bóng đá quốc gia
++đtbđqg:Đội tuyển bóng đá quốc gia
++ĐTCĐ:điện thoại cố định
++đtcđ:điện thoại cố định
++ĐTDD:điện thoại di động
++đtdd:điện thoại di động
++ĐTNCS:đoàn Thanh niên Cộng sản
++đtncs:Đoàn Thanh niên Cộng sản
++ĐTPT:đầu tư phát triển
++đtpt:đầu tư phát triển
++ĐTVT:điện tử viễn thông
++đtvt:điện tử viễn thông
++GCCN:giai cấp công nhân
++gccn:giai cấp công nhân
++GDCD:giáo dục công dân
++gdcd:giáo dục công dân
++GDMN:giáo dục mầm non
++gdmn:giáo dục mầm non
++GDTH:giáo dục tiểu học
++gdth:giáo dục tiểu học
++GPKD:giấy phép kinh doanh
++gpkd:giấy phép kinh doanh
++GĐCA:giám đốc công an
++gđca:giám đốc công an
++GĐVH:gia đình văn hóa
++gđvh:gia đình văn hóa
++HCLĐ:huân chương lao động
++hclđ:huân chương lao động
++HCMHS:hội cha mẹ học sinh
++hcmhs:hội cha mẹ học sinh
++HCTĐ:hội chữ thập đỏ
++hctd:hội chữ thập đỏ
++HHK:hãng hàng không
++hhk:hãng hàng không
++HKVN:Hàng không Việt Nam
++hkvn:Hàng không Việt Nam
++HNB:hội nhà báo
++hnb:hội nhà báo
++HSD:hạn sử dụng
++hsd:hạn sử dụng
++HĐBALHQ:Hội đồng Bảo an Liên Hợp Quốc
++hđbalhq:Hội đồng Bảo an Liên Hợp Quốc
++KQXS:kết quả xổ số
++kqxs:kết quả xổ số
++KTTM:kinh tế thương mại
++kttm:kinh tế thương mại
++KTTT:kinh tế thị trường
++kttt:kinh tế thị trường
++KTXH:kinh tế xã hội
++ktxh:kinh tế xã hội
++LĐPT:lao động phổ thông
++lđpt:lao động phổ thông
++XKLD:xuất khẩu lao động
++xkld:xuất khẩu lao động
++LLVT:lực lượng vũ trang
++llvt:lực lượng vũ trang
++LLVTND:lực lượng vũ trang nhân dân
++llvtnd:lực lượng vũ trang nhân dân
++LTTP:lương thực thực phẩm
++lttp:lương thực thực phẩm
++LĐLĐVN:Liên đoàn Lao động Việt Nam
++lđlđvn:Liên đoàn Lao động Việt Nam
++MST:mã số thuế
++mst:mã số thuế
++MVT:máy vi tính
++mvt:máy vi tính
++NCCDV:nhà cung cấp dịch vụ
++nccdv:nhà cung cấp dịch vụ
++NCT:người cao tuổi
++nct:người cao tuổi
++NHCP:ngân hàng cổ phần
++nhcp:ngân hàng cổ phần
++NHTG:ngân hàng thế giới
++nhtg:ngân hàng thế giới
++NHQD:ngân hàng quốc doanh
++nhqd:ngân hàng quốc doanh
++NLN:nông lâm nghiệp
++nln:nông lâm nghiệp
++NMNĐ:nhà máy nhiệt điện
++nmnđ:nhà máy nhiệt điện
++NMTĐ:nhà máy thủy điện
++nmtđ:nhà máy thủy điện
++NOXH:nhà ở xã hội
++NƠXH:nhà ở xã hội
++noxh:nhà ở xã hội
++NSDLĐ:Người sử dụng lao động
++nsdlđ:Người sử dụng lao động
++NSX:ngày sản xuất
++nsx:ngày sản xuất
++NTKTT:nhà thiết kế thời trang
++ntktt:nhà thiết kế thời trang
++NVKD:nhân viên kinh doanh
++nvkd:nhân viên kinh doanh
++NVNONN:người Việt Nam ở nước ngoài
++nvnonn:người Việt Nam ở nước ngoài
++NXBT:nhà xuất bản trẻ
++nxbt:nhà xuất bản trẻ
++PCCN:phòng chống cháy nổ
++pccn:phòng chống cháy nổ
++PCLB:phòng chống lụt bão
++pclb:phòng chống lụt bão
++PKKQ:phòng không không quân
++pkkq:phòng không không quân
++PNVN:phụ nữ việt nam
++pnvn:phụ nữ việt nam
++PTGĐ:Phó tổng giám đốc
++ptgd:Phó tổng giám đốc
++QĐNDVN:Quân đội Nhân dân Việt Nam
++qđndvn:Quân đội Nhân dân Việt Nam
++QHCC:quan hệ công chúng
++qhcc:quan hệ công chúng
++QHCT:quy hoạch chi tiết
++qhct:quy hoạch chi tiết
++QHQT:quan hệ quốc tế
++qhqt:quan hệ quốc tế
++QHVN:Quốc hội Việt Nam
++qhvn:Quốc hội Việt Nam
++QHXD:quy hoạch xây dựng
++qhxd:quy hoạch xây dựng
++QLCL:quản lý chất lượng
++qlcl:quản lý chất lượng
++QLĐĐ:quản lý đất đai
++qlđđ:quản lý đất đai
++QLGD:quản lý giáo dục
++qlgd:quản lý giáo dục
++QLKD:quản lý kinh doanh
++qlkd:quản lý kinh doanh
++QLNS:quản lý nhân sự
++qlns:quản lý nhân sự
++QSH:quyền sở hữu
++qsh:quyền sở hữu
++QTV:quản trị viên
++qtv:quản trị viên
++QTDN:quản trị doanh nghiệp
++qtdn:quản trị doanh nghiệp
++SDT:số điện thoại
++sdt:số điện thoại
++SDH:sau đại học
++sdh:sau đại học
++SGDCK:sở giao dịch chứng khoán
++sgdck:sở giao dịch chứng khoán
++SKCĐ:sức khoẻ cộng đồng
++skcđ:sức khoẻ cộng đồng
++SKLĐ:sức khỏe lao động
++sklđ:sức khỏe lao động
++SLĐTBXH:Sở Lao động Thương binh Xã hội
++slđtbxh:Sở Lao động Thương binh Xã hội
++SVĐQG:sân vận động quốc gia
++svđqg:sân vận động quốc gia
++SXCN:sản xuất công nghiệp
++sxcn:sản xuất công nghiệp
++SXD:Sở Xây dựng
++sxd:Sở Xây dựng
++TANDTP:Tòa án nhân dân thành phố
++tandtp:Tòa án nhân dân thành phố
++TANDTPHCM:Tòa án Nhân dân thành phố Hồ Chí Minh
++tandtphcm:Tòa án Nhân dân thành phố Hồ Chí Minh
++TBDĐ:thuê bao di động
++tbdđ:thuê bao di động
++TBYT:thiết bị y tế
++tbyt:thiết bị y tế
++TCDN:tài chính doanh nghiệp
++tcdn:tài chính doanh nghiệp
++TCYTTG:tổ chức y tế thế giới
++tcyttg:tổ chức y tế thế giới
++THADS:thi hành án dân sự
++thads:thi hành án dân sự
++TLD:tổng liên đoàn
++tld:tổng liên đoàn
++TPCP:trái phiếu chính phủ
++tpcp:trái phiếu chính phủ
++TPHN:Thành phố Hà Nội
++tphn:Thành phố Hà Nội
++TTATXH:trật tự an toàn xã hội
++ttatxh:trật tự an toàn xã hội
++TTCKVN:Thị trường chứng khoán Việt Nam
++ttckvn:Thị trường chứng khoán Việt Nam
++TTHLQG:Trung tâm huấn luyện quốc gia
++tthlqg:Trung tâm huấn luyện quốc gia
++TTHNQG:Trung tâm hội nghị quốc gia
++tthnqg:Trung tâm hội nghị quốc gia
++TTMS:Trung tâm mua sắm
++ttms:Trung tâm mua sắm
++TTXKLĐ:Trung tâm xuất khẩu lao động
++ttxklđ:Trung tâm xuất khẩu lao động
++TVPL:tư vấn pháp luật
++tvpl:tư vấn pháp luật
++TMDV:thương mại dịch vụ
++tmdv:thương mại dịch vụ
++UBNDTPHCM:Ủy ban Nhân dân thành phố Hồ Chí Minh
++ubndtphcm:Ủy ban Nhân dân thành phố Hồ Chí Minh
++UBKTTƯ:Ủy ban Kiểm tra Trung ương
++ubkttư:Ủy ban Kiểm tra Trung ương
++UBMT:Ủy ban Mặt trận
++ubmt:Ủy ban Mặt trận
++UBQG:Ủy ban Quốc gia
++ubqg:Ủy ban Quốc gia
++UBTV:Ủy ban Thường vụ
++ubtv:Ủy ban Thường vụ
++UCV:ứng cử viên
++ucv:ứng cử viên
++VBQPPL:văn bản quy phạm pháp luật
++vbqppl:văn bản quy phạm pháp luật
++VHTTDL:Văn hóa thể thao du lịch
++vhttdl:Văn hóa thể thao du lịch
++VND:việt nam đồng
++vnd:việt nam đồng
++VPQH:Văn phòng Quốc hội
++vpqh:Văn phòng Quốc hội
++VSATTP:vệ sinh an toàn thực phẩm
++vsattp:vệ sinh an toàn thực phẩm
++VSMT:vệ sinh môi trường
++vsmt:vệ sinh môi trường
++VTHH:vận tải hàng hóa
++vthh:vận tải hàng hóa
++XDCN:xây dựng công nghiệp
++xdcn:xây dựng công nghiệp
++XHCNVN:Xã hội Chủ nghĩa Việt Nam
++xhcnvn:Xã hội Chủ nghĩa Việt Nam
++XPHC:xử phạt hành chính
++xphc:xử phạt hành chính
++XTDL:xúc tiến du lịch
++xtdl:xúc tiến du lịch
++YT:y tế
++yt:y tế
++YHCT:y học cổ truyền
++yhct:y học cổ truyền
++KTCK:kinh tế cửa khẩu
++ktck:kinh tế cửa khẩu
++KKTCK:khu kinh tế cửa khẩu
++kktck:khu kinh tế cửa khẩu
++QLNĐ:quản lý nhà đất
++qlnđ:quản lý nhà đất
++VPLS:văn phòng luật sư
++vpls:văn phòng luật sư
++QLXD:quản lý xây dựng
++qlxd:quản lý xây dựng
++GDBĐS:giao dịch bất động sản
++gdbđs:giao dịch bất động sản
++TBĐT:thuê bao điện thoại
++tbđt:thuê bao điện thoại
++TTDBKTTVTW:Trung tâm dự báo khí tượng thủy văn trung ương
++ttdbkttvtw:Trung tâm dự báo khí tượng thủy văn trung ương
++TTCPQG:Trung tâm chiếu phim quốc gia
++ttcpqg:Trung tâm chiếu phim quốc gia
++BQLRPHĐN:Ban quản lý rừng phòng hộ đầu nguồn
++bqlrphđn:Ban quản lý rừng phòng hộ đầu nguồn
++AHLLVTND:anh hùng lực lượng vũ trang nhân dân
++ahllvtnd:anh hùng lực lượng vũ trang nhân dân
++BHXHTN:bảo hiểm xã hội tự nguyện
++bhxhtn:bảo hiểm xã hội tự nguyện
++DTNT:dân tộc nội trú
++dtnt:dân tộc nội trú
++TCTC:tổ chức tài chính
++tctc:tổ chức tài chính
++UBATGTQG:Ủy ban an toàn giao thông quốc gia
++ubatgtqg:Ủy ban an toàn giao thông quốc gia
++SBH:sổ bảo hiểm
++sbh:sổ bảo hiểm
++BHNT:bảo hiểm nhân thọ
++bhnt:bảo hiểm nhân thọ
++VDCN:vật dụng cá nhân
++vdcn:vật dụng cá nhân
++HCTH:hành chính tổng hợp
++hcth:hành chính tổng hợp
++PTDTNT:phổ thông dân tộc nội trú
++ptdtnt:phổ thông dân tộc nội trú
++SLL:số lượng lớn
++sll:số lượng lớn
++HĐGĐYK:hội đồng giám định y khoa
++hđgđyk:hội đồng giám định y khoa
++tthcm:tư tưởng Hồ Chí Minh
++TTHCM:tư tưởng Hồ Chí Minh
++qrtd:quấy rối tình dục
++QRTD:quấy rối tình dục
++bltths:bộ luật tố tụng hình sự
++BLTTHS:bộ luật tố tụng hình sự
++TTGTVL:Trung tâm giới thiệu việc làm
++ttgtvl:Trung tâm giới thiệu việc làm
+--- /dev/null
++++ b/assets/third-party/zerotts-text-norm/manifest.json
+@@ -0,0 +1,11 @@
++{
++  "package": "zerotts",
++  "version": "0.1.5",
++  "files": {
++    "LICENSE.ZeroTTS": "eac704e6c4ddfee14614fccb37130d7a2801ded3ca7fb32c7ec659ee4a6169fa",
++    "NOTICE": "815278baf8257d2d3b05cb7ef79011e9bbb003047ddaa66702b2b782419404af",
++    "vi_normalizer.py": "161f55b7a8f44213a9f2f5d1677f0df5693e0655c55bc1c8ca1389e087741b40",
++    "data/LICENSE.soe-vinorm": "2520b5387ca17d16866191b57f71198ff8ab9a42603695510249c5a975a147ee",
++    "data/abbreviations.txt": "f3ad7fec1bdf6cb854dd1ba66662206b2104ab199dbdab221c77b2ca114a75e3"
++  }
++}--- /dev/null
++++ b/assets/third-party/zerotts-text-norm/vi_normalizer.py
+@@ -0,0 +1,620 @@
++"""Vietnamese text normalization for TTS input: rewrites the written forms the
++model was never trained to voice (digits, dates, clock times, version strings,
++fractions, acronyms) into the words a speaker would actually say.
++
++    "Ngày 23/8/2024 lúc 15h30, giá 1.250.000 tăng 12,5"
++        -> "Ngày hai mươi ba tháng tám năm hai nghìn không trăm hai mươi tư lúc
++            mười lăm giờ ba mươi phút, giá một triệu hai trăm năm mươi nghìn
++            tăng mười hai phẩy năm"
++
++Provenance
++──────────
++The expansion rules (Vietnamese number chunking, the mười/lăm/mốt/tư sandhi,
++the time/date/version/fraction shapes) and ``data/abbreviations.txt`` are
++adapted from soe-vinorm (https://github.com/vinhdq842/soe-vinorm), MIT —
++see data/LICENSE.soe-vinorm. What is NOT carried over is its machinery: that
++project tags every token with a CRF (sklearn-crfsuite + a pickled model) and
++disambiguates acronyms with an ONNX scorer, both downloaded from the Hub on
++first use. Neither runs here — this module is pure stdlib regex, so the webui's
++ONNX-only, no-torch-anywhere backend stays that way and startup stays instant.
++
++Scope — the deliberately small set of cases this covers
++──────────────────────────────────────────────────────
++    date       23/8/2024, 23-8-2024, 23.8.2024, 8/2024, "ngày 23/8"
++    time       15h30, 15h, 15:30, 9g45, 15:30:20
++    version    v1.2, 1.2.3   (3+ dot-separated groups, or a v-prefix)
++    fraction   3/4           (when it isn't a date)
++    percent    25%, 12,5 %   -> "... phần trăm"
++    at         @             -> "a còng" (never inside an email — those are protected)
++    abbrev     TP.HCM, ATM, UBND  -> dictionary lookup, uppercase forms only
++    number     1.250.000, 12,5, -7, +3, 2+3, 5 * 4, 2^10
++                 (integer, decimal, sign, thousand separators, arithmetic ops)
++
++Everything else soe-vinorm handles — money, measurement units, Roman numerals,
++ranges, scores, quarters, URLs/emails, letter-by-letter spelling of unknown
++sequences — is intentionally left alone: those either need
++the CRF's context to tag safely or were out of scope for this integration.
++URLs and emails are actively *protected* (matched and skipped) so a normalizer
++pass can never mangle one.
++
++Ambiguity, without a tagger to resolve it
++─────────────────────────────────────────
++A CRF decides "3/4" by context; regexes cannot, so the choices are fixed and
++documented at each pattern below. The two that matter:
++
++  - ``D/M`` is a date only after a date cue word (ngày, mùng, mồng, hôm,
++    sáng, ...); otherwise it is read as a fraction. So "ngày 3/4" -> "ngày ba
++    tháng tư" but a bare "3/4" -> "ba trên bốn".
++  - ``M/YYYY`` (4-digit second group in 1000-2999) is a month-year. Unlike
++    soe-vinorm this emits the word "tháng" itself unless the text already has
++    it, since here no tagger guarantees the cue word is there.
++
++An acronym is only expanded when written in uppercase (``ATM``, ``TP.HCM``) and
++at least two letters long — a lowercase dictionary key like "ca" or "tư" is an
++ordinary Vietnamese word far more often than an acronym, and single letters are
++pure noise. When the dictionary holds several readings for one acronym (BCS =
++"ban cán sự" / "bao cao su"), soe-vinorm picks with its ONNX likelihood scorer;
++here the first listed reading wins.
++"""
++
++from __future__ import annotations
++
++import re
++import unicodedata
++from functools import lru_cache
++from pathlib import Path
++
++__all__ = ["normalize_vi_text", "expand_number", "load_abbreviations"]
++
++_DATA_DIR = Path(__file__).parent / "data"
++
++# ── Vietnamese number words ──────────────────────────────────────────────────
++
++_DIGIT = {
++    "0": "không", "1": "một", "2": "hai", "3": "ba", "4": "bốn",
++    "5": "năm", "6": "sáu", "7": "bảy", "8": "tám", "9": "chín",
++    ",": "phẩy",
++}
++
++# Position inside a 3-digit chunk: units, tens, hundreds.
++_UNIT_SINGLE = ["", "mươi", "trăm"]
++
++# Scale of each 3-digit chunk, from the least significant one up. A number with
++# more chunks than this raises IndexError, which expand_number catches and falls
++# back to reading the digits one by one.
++_UNIT_TRIPLE = ["", "nghìn", "triệu", "tỷ", "nghìn tỷ", "triệu tỷ", "tỷ tỷ"]
++
++# Arithmetic operators spoken inside a numeric expression ("2+3" -> "hai cộng
++# ba"). '=' is deliberately absent: soe-vinorm does not speak it either.
++_OP_WORDS = str.maketrans({"+": "cộng", "-": "trừ", "*": "nhân", "/": "chia", "^": "mũ"})
++
++
++def _apply_sandhi(text: str) -> str:
++    """Vietnamese number-pronunciation rules: 15 is "mười lăm" not "mười năm",
++    21 "hai mươi mốt" not "hai mươi một", 24 "hai mươi tư", 104 "một trăm linh
++    tư"."""
++    return (
++        text.replace("mười năm", "mười lăm")
++        .replace("mươi năm", "mươi lăm")
++        .replace("mươi bốn", "mươi tư")
++        .replace("mươi một", "mươi mốt")
++        .replace("linh bốn", "linh tư")
++    )
++
++
++def expand_digit(digits: str) -> str:
++    """Read a run of characters one symbol at a time ("2024" -> "hai không hai
++    bốn"). Used for the decimal tail and as the number fallback."""
++    return " ".join(_DIGIT.get(c, c) for c in digits.replace(" ", ""))
++
++
++def _split_chunks(number: str) -> list[str]:
++    """Split a digit string into 3-digit chunks, most significant first, with a
++    short leading chunk when the length isn't a multiple of 3."""
++    chunks = [number[i:i + 3] for i in range(len(number) - 3, -1, -3)][::-1]
++    if len(number) % 3:
++        chunks = [number[: len(number) % 3]] + chunks
++    return chunks
++
++
++def _speak_chunk(chunk: str, scale_index: int) -> str:
++    """One 3-digit chunk plus its scale word ("250" at scale 1 -> "hai trăm năm
++    mươi nghìn"). An all-zero chunk is silent."""
++    if chunk == "000":
++        return ""
++
++    result = ""
++    pos = len(chunk) - 1
++    while pos >= 0:
++        if pos == len(chunk) - 1 and chunk[pos] == "0" and len(chunk) > 1:
++            pass  # trailing zero: "hai mươi", not "hai mươi không"
++        elif pos == len(chunk) - 2 and chunk[pos] in ("1", "0"):
++            # Tens digit 1 -> "mười" (not "một mươi"); tens digit 0 -> "linh".
++            if pos == 0 and chunk[pos] == "0":
++                pass
++            elif chunk[pos] == "1":
++                result = (
++                    f"mười {_DIGIT[chunk[pos + 1]]}" if chunk[pos + 1] != "0" else "mười"
++                )
++            else:
++                result = "linh " + _DIGIT[chunk[pos + 1]] if chunk[pos + 1] != "0" else ""
++        else:
++            result = (
++                _DIGIT[chunk[pos]]
++                + " "
++                + _UNIT_SINGLE[len(chunk) - pos - 1]
++                + (" " + result if result else "")
++            )
++        pos -= 1
++
++    if scale_index >= len(_UNIT_TRIPLE):
++        raise IndexError("number is too large to speak")
++
++    return " ".join([result.strip(), _UNIT_TRIPLE[scale_index]]).strip()
++
++
++def expand_number(number: str) -> str:
++    """Speak an integer, a decimal, or a small arithmetic expression.
++
++    Handles the sign ("-7" -> "trừ bảy"), '.' as a thousands separator
++    ("1.250.000"), ',' as the Vietnamese decimal comma ("12,5" -> "mười hai
++    phẩy năm"), '.' as a decimal point when at most two digits follow it
++    ("3.14" -> "ba chấm một bốn"), and operators between numbers ("2+3" ->
++    "hai cộng ba"). Leading zeros are dropped; a number too large for the
++    scale table falls back to digit-by-digit reading.
++    """
++    try:
++        sign = ""
++        if number[0] in ("-", "+"):
++            sign = {"+": "cộng", "-": "trừ"}[number[0]]
++            number = number[1:]
++
++        while len(number) > 1 and number[0] == "0" and number[1].isdigit():
++            number = number[1:]
++
++        number = number.strip()
++
++        # More than one number in the string -> an expression: speak each
++        # number, then turn the operators between them into words.
++        matches = re.findall(r"[-+]?[0-9.,]+", number)
++        if len(matches) > 1 or (matches and matches[0] != number):
++            return (
++                re.sub(
++                    r"\s*([-+]?[0-9.,]+)\s*",
++                    lambda m: f" {expand_number(m.group(1))} ",
++                    number,
++                )
++                .strip()
++                .translate(_OP_WORDS)
++            )
++
++        number = re.sub(r"[^0-9.,]", "", number)
++
++        decimal_part = ""
++        if number.count(",") == 1:
++            number = number.replace(".", "")
++            decimal_part = f"phẩy {expand_digit(number.split(',')[-1])}"
++            number = "".join(number.split(",")[:-1])
++        elif number.count(".") == 1 and len(number[number.index("."):]) <= 3:
++            number = number.replace(",", "")
++            decimal_part = f"chấm {expand_digit(number.split('.')[-1])}"
++            number = "".join(number.split(".")[:-1])
++        else:
++            number = number.replace(".", "")
++
++        chunks = _split_chunks(number)
++        parts = []
++        for i, chunk in enumerate(chunks):
++            spoken = _speak_chunk(chunk, len(chunks) - i - 1)
++            if spoken:
++                parts.append(spoken)
++
++        return f"{sign} {_apply_sandhi(' '.join(parts))} {decimal_part}".strip()
++
++    except IndexError:
++        return expand_digit(number)
++
++
++def _num(value: str) -> str:
++    """expand_number for a plain integer group inside a date/time/version."""
++    return expand_number(value)
++
++
++#: Roman numerals as Vietnamese ordinals, for "quý III" / "lần thứ IV". Only the
++#: small values that actually occur in running text; anything larger is far more
++#: likely to be an acronym than a numeral.
++_ROMAN = {"I": "một", "II": "hai", "III": "ba", "IV": "bốn", "V": "năm",
++          "VI": "sáu", "VII": "bảy", "VIII": "tám", "IX": "chín", "X": "mười"}
++
++#: Words that mark the next token as an ordinal, so a following roman numeral is
++#: a number rather than an acronym ("quý III" vs. the country code "III").
++_ROMAN_CUES = ("quý", "thứ", "khóa", "kỳ", "đợt", "loại", "chương", "phần", "thế kỷ")
++
++#: Abbreviations that qualify a following proper noun, so "TP. HCM" is one unit
++#: and the dot abbreviates rather than ends a sentence. Deliberately a closed
++#: set: a general "dot before a capital is abbreviating" rule would eat the
++#: sentence break in "làm ở FPT. Sau đó ...".
++_PREFIX_ABBR = ("TP", "Q", "P", "H", "TX", "TT", "KP")
++
++
++def spell_letters(letters: str) -> str:
++    """Return a letter run as capitals, unchanged: "ab" -> "AB".
++
++    Deliberately NOT spaced into single letters, and deliberately NOT a
++    Vietnamese letter-name table. A capitalised run is already enough for the
++    model to spell it; "A B" adds nothing, and a letter-name table is a second
++    thing to get wrong — "W" alone is "vê kép", "đắp liu" or "vê đúp"
++    depending on the speaker.
++    """
++    return letters.upper()
++
++
++def _month(value: str) -> str:
++    """Month name. The fourth month is "tháng tư", never "tháng bốn" — the one
++    place this module knowingly departs from soe-vinorm, which runs months
++    through the plain cardinal reader."""
++    return "tư" if value.lstrip("0") == "4" else expand_number(value)
++
++
++# ── abbreviations ────────────────────────────────────────────────────────────
++
++@lru_cache(maxsize=1)
++def load_abbreviations() -> dict[str, list[str]]:
++    """Parse data/abbreviations.txt ("ABBR:reading[,reading...]" per line) into
++    {abbreviation: [reading, ...]}. Both the uppercase and lowercase spellings
++    of each acronym are keys in the file; only the uppercase ones are ever used
++    (see the module docstring)."""
++    path = _DATA_DIR / "abbreviations.txt"
++    table: dict[str, list[str]] = {}
++    with open(path, encoding="utf-8") as f:
++        for line in f:
++            line = line.strip()
++            if not line or line.startswith("#") or ":" not in line:
++                continue
++            abbr, readings = line.split(":", 1)
++            table.setdefault(abbr, []).extend(readings.split(","))
++    return table
++
++
++def _expand_abbreviation(token: str) -> str | None:
++    """Dictionary reading for an uppercase acronym, or None to leave it alone.
++
++    Tries the token as written, then with dots stripped ("TP.HCM" -> "TPHCM"),
++    then splits on dots and expands each part when every part is known
++    ("T.Ư" -> "trung ương" only if both halves resolve). Unknown acronyms come
++    back None — soe-vinorm would spell them out letter by letter, which this
++    module does not do.
++    """
++    table = load_abbreviations()
++
++    for key in (token, token.replace(".", "").replace("-", "")):
++        if key in table:
++            return table[key][0]
++
++    parts = [p for p in re.split(r"[.\-]", token) if p]
++    if len(parts) > 1 and all(len(p) >= 2 and p in table for p in parts):
++        return " ".join(table[p][0] for p in parts)
++
++    return None
++
++
++# ── pattern scanner ──────────────────────────────────────────────────────────
++# One ordered alternation over the whole text: the first alternative that
++# matches at a position wins, so more specific shapes must come first (a full
++# date before a month-year before a fraction). Each alternative uses distinctly
++# named groups so a single callback can dispatch on whichever one fired.
++
++_VN_UPPER = "A-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚÝĂĐĨŨƠƯẠ-Ỹ"
++_VN_LOWER = "a-zàáâãèéêìíòóôõùúýăđĩũơưạ-ỹ"
++
++# ── CamelCase splitting ──────────────────────────────────────────────────────
++# "ChatGPT" and "ZeroTTS" are a word glued to an acronym, and read as one token
++# they come out slurred. Splitting at the case boundary is all the model needs —
++# it spells a capitalised run correctly on its own, so no letter spacing and no
++# letter-name table:
++#
++#     OpenAI  -> Open AI        ChatGPT -> Chat GPT
++#     ZeroTTS -> Zero TTS       TTSModel -> TTS Model
++#
++# A pure acronym has no case boundary and is left exactly as it is ("ABC",
++# "WHO", "VN"), which is the point: capitalised is already enough.
++
++def split_camel_case(text: str) -> str:
++    """Insert a space at every internal case boundary of a mixed-case token.
++
++    Case is tested with ``str.isupper()``/``str.islower()``, NOT a regex letter
++    class: the precomposed Vietnamese letters live in Latin Extended Additional,
++    where upper and lower case interleave, so a range like ``Ạ-Ỹ`` also matches
++    "ế" and would split "Chiếc" into "Chi ếc".
++
++    Only an ACRONYM is split off — an uppercase run of two or more. That is the
++    difference between "Chat|GPT" and "MacBook": the first is a word glued to an
++    acronym, the second is an ordinary CamelCase brand that is read as one word
++    ("YouTube", "TikTok"), and splitting those makes the reading worse.
++
++    A single leading lowercase letter does not open a boundary either, so
++    "iPhone" and "eBay" survive intact.
++    """
++    out = []
++    for token in re.split(r"(\s+)", text):
++        if not token or token.isspace():
++            out.append(token)
++            continue
++        if not (any(c.isupper() for c in token) and any(c.islower() for c in token)):
++            out.append(token)          # all-lower or all-upper: nothing to split
++            continue
++        chars, lower_run = [], 0
++        for i, c in enumerate(token):
++            if c.isupper() and i > 0:
++                nxt = token[i + 1] if i + 1 < len(token) else ""
++                run = 0                                # length of this uppercase run
++                while i + run < len(token) and token[i + run].isupper():
++                    run += 1
++                if lower_run >= 2 and run >= 2:                   # openAI -> open AI
++                    chars.append(" ")
++                elif token[i - 1].isupper() and nxt.islower():    # TTSModel -> TTS Model
++                    chars.append(" ")
++            lower_run = lower_run + 1 if c.islower() else 0
++            chars.append(c)
++        out.append("".join(chars))
++    return "".join(out)
++
++
++# Cue words that force "D/M" to be read as a day-and-month rather than a
++# fraction. Matched case-insensitively, immediately before the number.
++_DATE_CUES = r"ngày|mùng|mồng|hôm|sáng|trưa|chiều|tối|đêm|từ|đến|và|hoặc"
++
++# Anything inside a URL or an email address is left untouched — normalizing
++# there produces nonsense, and this module has no URL reader.
++_PROTECTED_RE = re.compile(
++    r"""(?:(?:https?|ftp)://\S+
++        |www\.\S+
++        |[\w.+-]+@[\w-]+(?:\.[\w-]+)+
++        |\b[\w-]+(?:\.[\w-]+)*\.(?:com|net|org|vn|io|edu|gov|info|dev|ai)\b(?:/\S*)?
++        )""",
++    re.VERBOSE | re.IGNORECASE,
++)
++
++_SCANNER = re.compile(
++    rf"""
++    # ── time: HH:MM:SS / HHhMMmSS ────────────────────────────────────────────
++      (?<![\d:])(?P<t_h>[01]?\d|2[0-3])[:hg](?P<t_m>[0-5]?\d)[:mp](?P<t_s>[0-5]?\d)(?![\d:])
++    # ── date: DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY ─────────────────────────────
++    | (?<![\d/.\-])(?P<d_d>0?[1-9]|[12]\d|3[01])(?P<d_sep>[/.\-])(?P<d_m>0?[1-9]|1[0-2])(?P=d_sep)(?P<d_y>[12]\d{{3}})(?![\d/-])(?!\.\d)
++    # ── month-year: MM/YYYY, MM-YYYY ─────────────────────────────────────────
++    | (?<![\d/.\-])(?P<my_m>0?[1-9]|1[0-2])[/\-](?P<my_y>1\d{{3}}|20\d{{2}}|21\d{{2}})(?![\d/-])(?!\.\d)
++    # ── day-month: DD/MM after a date cue word only (else it's a fraction) ───
++    | (?<=\b)(?P<dm_cue>(?i:{_DATE_CUES}))(?P<dm_gap>\s+)(?P<dm_d>0?[1-9]|[12]\d|3[01])[/\-](?P<dm_m>0?[1-9]|1[0-2])(?![\d/-])(?!\.\d)
++    # ── time: HH:MM (2-digit minutes), HHhMM, HHgMM ──────────────────────────
++    | (?<![\d:])(?P<hm_h>[01]?\d|2[0-3]):(?P<hm_m>[0-5]\d)(?![\d:])
++    | (?<![\d:])(?P<hg_h>[01]?\d|2[0-3])[hg](?P<hg_m>[0-5]\d)(?![\dhg])
++    # ── time: HH h  ("15h", "9g") ────────────────────────────────────────────
++    | (?<![\d:])(?P<h_h>[01]?\d|2[0-3])[hg](?![\w])
++    # ── version: v1.2 / V1.2.3, or a bare 3+ group dotted number ─────────────
++    | (?<![\w.])(?P<vp>[vV])(?P<v_num>\d+(?:\.\d+)+)(?!\w|\.\d|,\d)
++    | (?<![\w.,])(?P<v_bare>\d+(?:\.\d+){{2,}})(?!\w|\.\d|,\d)
++    # ── fraction: a/b (dates already claimed above) ──────────────────────────
++    | (?<![\w/.,])(?P<f_a>\d+)\s*/\s*(?P<f_b>\d+)(?![\w/,])(?!\.\d)
++    # ── degree: 38°C / 38 °C ─────────────────────────────────────────────────
++    | (?<![\w.,])(?P<deg_n>-?\d[\d.,]*)\s*°\s*(?P<deg_u>[CF])?(?![{_VN_LOWER}])
++    # ── percent: 25%, 12,5 % — BEFORE the number branch, or that claims the
++    #    digits and leaves a bare '%' behind ───────────────────────────────────
++    | (?<![\w.,])(?P<pct_num>[-+]?\d[\d.,]*?)\s*%(?!\w)
++    # ── number: integer / decimal / thousand-separated / signed / arithmetic ─
++    | (?<![\w.,])(?P<n_num>[-+]?\d[\d.,]*(?:\s*[*^+]\s*[-+]?\d[\d.,]*|\s+[-/]\s+[-+]?\d[\d.,]*|[*^]\s*[-+]?\d[\d.,]*)*)(?![.,]?\d)
++    # ── prefix abbreviation + proper noun: "TP. HCM" — the dot belongs to the
++    #    abbreviation, so it is consumed here rather than left mid-sentence ────
++    | (?<![\w.])(?P<pfx>TP|TX|TT|KP|[QPH])\.(?=\s+[{_VN_UPPER}])
++    # ── acronym pair over a slash: USD/VND, KM/H. Left verbatim — expanding
++    #    each side invents a reading ("đô la mỹ/việt nam đồng") worse than the
++    #    source, and the model says "USD/VND" correctly as written. Matched
++    #    only so the abbreviation branch below cannot claim one half. ─────────
++    | (?<![\w/])(?P<ap>[{_VN_UPPER}]{{1,6}}/[{_VN_UPPER}]{{1,6}})(?![\w/])
++    # ── alphanumeric code: AB-1234, VN-215, SE1 — an identifier, so letters
++    #    are spelled and digits read one by one, never as a quantity ──────────
++    | (?<![\w-])(?P<code_a>[{_VN_UPPER}]{{1,4}})-?(?P<code_n>\d{{1,6}})(?![\w-])
++    # ── abbreviation: uppercase acronym, optionally dotted ───────────────────
++    | (?<![\w.])(?P<abbr>[{_VN_UPPER}][{_VN_UPPER}\d]+(?:\.[{_VN_UPPER}][{_VN_UPPER}\d]*)*)(?![{_VN_LOWER}\d])
++    # ── at sign: read as a word. Email addresses never reach here — they are
++    #    matched by _PROTECTED_RE and skipped ─────────────────────────────────
++    | (?P<at>@)
++    """,
++    re.VERBOSE,
++)
++
++# A dotted number whose every group after the first is exactly 3 digits is a
++# thousands-separated integer ("1.250.000"), not a version string.
++_THOUSANDS_RE = re.compile(r"^\d{1,3}(?:\.\d{3})+$")
++
++# Trailing sign/operator junk that the number alternative may have swallowed
++# ("5." at the end of a sentence).
++_NUM_TRAIL_RE = re.compile(r"[.,\s]+$")
++
++
++def _speak_time(h: str, m: str | None = None, s: str | None = None) -> str:
++    out = f"{_num(h)} giờ"
++    # "17:00" is "mười bảy giờ" out loud, not "mười bảy giờ không phút" —
++    # a whole hour drops its minutes unless the text also spelled out seconds.
++    if m is not None and (s is not None or m.strip("0")):
++        out += f" {_num(m)} phút"
++    if s is not None:
++        out += f" {_num(s)} giây"
++    return out
++
++
++def _replace(match: re.Match) -> str:
++    """re.sub callback: expand the match, then keep it a separate word.
++
++    A written form can sit flush against a unit or a letter ("1.250.000đ",
++    "5G"); the spoken form must not ("một triệu ...đ"), or the tokenizer sees
++    one impossible word. A space is inserted on whichever side abutted a
++    letter/digit, and only when the match actually changed."""
++    expanded = _expand_match(match)
++    if expanded == match.group(0):
++        return expanded
++
++    text = match.string
++    before = text[match.start() - 1] if match.start() else ""
++    after = text[match.end():match.end() + 1]
++    if before.isalnum() and not expanded[:1].isspace():
++        expanded = " " + expanded
++    if after.isalnum() and not expanded[-1:].isspace():
++        expanded = expanded + " "
++    return expanded
++
++
++def _expand_match(match: re.Match) -> str:
++    g = match.groupdict()
++
++    if g["t_h"] is not None:
++        return _speak_time(g["t_h"], g["t_m"], g["t_s"])
++
++    if g["d_d"] is not None:
++        return f"{_num(g['d_d'])} tháng {_month(g['d_m'])} năm {_num(g['d_y'])}"
++
++    if g["my_m"] is not None:
++        # Only add "tháng" when the text doesn't already say it right before.
++        before = match.string[max(0, match.start() - 8):match.start()].lower()
++        lead = "" if re.search(r"tháng\s*$", before) else "tháng "
++        return f"{lead}{_month(g['my_m'])} năm {_num(g['my_y'])}"
++
++    if g["dm_d"] is not None:
++        if g["dm_cue"].lower() in ("và", "hoặc"):
++            # Only a coordinating cue: require a genuine date cue nearby, else
++            # "3 và 4/5" is arithmetic, not the 4th of May.
++            before = match.string[max(0, match.start() - 40):match.start()].lower()
++            if not re.search(rf"\b(?:{_DATE_CUES})\b", before):
++                return match.group(0)
++        return f"{g['dm_cue']}{g['dm_gap']}{_num(g['dm_d'])} tháng {_month(g['dm_m'])}"
++
++    if g["hm_h"] is not None:
++        return _speak_time(g["hm_h"], g["hm_m"])
++
++    if g["hg_h"] is not None:
++        return _speak_time(g["hg_h"], g["hg_m"])
++
++    if g["h_h"] is not None:
++        return _speak_time(g["h_h"])
++
++    if g["v_num"] is not None:
++        return g["vp"] + " " + " chấm ".join(_num(p) for p in g["v_num"].split("."))
++
++    if g["v_bare"] is not None:
++        raw = g["v_bare"]
++        if _THOUSANDS_RE.match(raw):  # 1.250.000 — a number, not a version
++            return expand_number(raw)
++        return " chấm ".join(_num(p) for p in raw.split("."))
++
++    if g["f_a"] is not None:
++        return f"{_num(g['f_a'])} trên {_num(g['f_b'])}"
++
++    if g["pct_num"] is not None:
++        return f"{expand_number(g['pct_num'].rstrip('.,'))} phần trăm"
++
++    if g["n_num"] is not None:
++        raw = g["n_num"]
++        trail = _NUM_TRAIL_RE.search(raw)
++        suffix = ""
++        if trail and not raw[trail.start():].strip(" ").rstrip(".,") :
++            suffix = raw[trail.start():]
++            raw = raw[:trail.start()]
++        if not raw:
++            return match.group(0)
++        # A long separator-less digit run is an identifier, not a quantity — a
++        # phone number, an account number, a citizen id. Reading it as one huge
++        # cardinal ("chín trăm tám mươi bảy triệu...") is worse than leaving it
++        # alone, and reading it digit by digit is the NDIG case this module
++        # deliberately doesn't cover. soe-vinorm caps its own untagged fallback
++        # the same way, at 8 digits.
++        if re.fullmatch(r"[-+]?\d+", raw) and len(raw.lstrip("-+")) > 8:
++            return match.group(0)
++        # digit-letter-digit ("1m65", "3G4") is a compound written form — a
++        # height, a model number — not a quantity that happens to touch a unit.
++        # Speaking only its first half ("một m65") is worse than leaving it.
++        if re.match(r"^[^\W\d_]\d", match.string[match.end():match.end() + 2]):
++            return match.group(0)
++        return expand_number(raw) + suffix
++
++    if g["pfx"] is not None:
++        return _expand_abbreviation(g["pfx"]) or g["pfx"]
++
++    if g["ap"] is not None:
++        return g["ap"]
++
++    if g["code_a"] is not None:
++        # An identifier, not a quantity. The letters stay joined — a capitalised
++        # run is enough for the model to spell them — but the digits are spaced
++        # so they are read one at a time: "AB-1234" -> "AB 1 2 3 4", never the
++        # quantity "một nghìn hai trăm ba mươi tư".
++        return f"{spell_letters(g['code_a'])} {' '.join(g['code_n'])}"
++
++    if g["deg_n"] is not None:
++        unit = {"C": " xê", "F": " ép"}.get(g["deg_u"] or "", "")
++        return f"{expand_number(g['deg_n'])} độ{unit}"
++
++    if g["abbr"] is not None:
++        token = g["abbr"]
++        # A roman numeral after an ordinal cue is a number, not an acronym.
++        if token in _ROMAN:
++            before = match.string[max(0, match.start() - 12):match.start()].lower()
++            if any(re.search(rf"{cue}\s*$", before) for cue in _ROMAN_CUES):
++                return _ROMAN[token]
++        expansion = _expand_abbreviation(token)
++        if expansion is not None:
++            # If the sentence just said the expansion in full and the acronym is
++            # parenthesized right after it, the acronym is a gloss — spell it.
++            before = match.string[max(0, match.start() - len(expansion) - 4):match.start()]
++            if before.rstrip().endswith("(") and expansion.lower() in before.lower():
++                return spell_letters(token)
++        return expansion or token
++
++    if g["at"] is not None:
++        return "a còng"
++
++    return match.group(0)
++
++
++def normalize_vi_text(text: str) -> str:
++    """Expand the supported non-standard forms in `text` into spoken Vietnamese.
++
++    Punctuation, casing and every unsupported form are preserved verbatim, and
++    URLs/emails are skipped wholesale, so this is safe to run over text that
++    has already been punctuation-normalized (webui/text_chunking.py) and over
++    text that contains none of these forms at all — it is then a no-op beyond
++    Unicode NFC normalization.
++    """
++    if not text or not text.strip():
++        return text
++
++    # NFC first: the dictionary keys and the letter classes in the patterns are
++    # precomposed, so decomposed input ("Ð" + combining marks) would miss.
++    text = unicodedata.normalize("NFC", text)
++
++    # CamelCase runs first: the scanner's abbreviation branch needs "ChatGPT"
++    # already split into "Chat GPT" to see "GPT" as an acronym at all. URLs and
++    # emails are excluded here too — splitting inside one breaks it.
++    out: list[str] = []
++    last = 0
++    for protected in _PROTECTED_RE.finditer(text):
++        out.append(_SCANNER.sub(_replace, split_camel_case(text[last:protected.start()])))
++        out.append(protected.group(0))
++        last = protected.end()
++    out.append(_SCANNER.sub(_replace, split_camel_case(text[last:])))
++
++    # Expansions leave double spaces where a compact form used to be.
++    return re.sub(r"[ \t]{2,}", " ", "".join(out))
++
++
++if __name__ == "__main__":  # quick manual check: python -m text_norm.vi_normalizer
++    import sys
++
++    if len(sys.argv) > 1:
++        print(normalize_vi_text(" ".join(sys.argv[1:])))
++    else:
++        for sample in [
++            "Ngày 23/8/2024 lúc 15h30, giá là 1.250.000 đồng, tăng 12,5 điểm.",
++            "Phiên bản v1.2.3 phát hành tháng 8/2024, còn 3/4 số máy chạy 1.2.3.",
++            "UBND TP.HCM và ATM của NHNN, gửi mail tới abc@gmail.com nhé.",
++            "Tính 2+3, rồi 10 - 4, rồi 2^10 và 6 * 7 = 42.",
++        ]:
++            print(f"{sample}\n  -> {normalize_vi_text(sample)}\n")
+--- /dev/null
++++ b/docs/adr-smart-nam-minh.md
+@@ -0,0 +1,53 @@
++# Nam Minh mặc định + chuẩn hóa phát âm tiếng Việt
++
++Người dùng chọn chất giọng của clip hook sao làm giọng chính. Giọng đó là Edge TTS `vi-VN-NamMinhNeural`, tốc độ1,10×, pronunciation=original ở clip trước.
++
++## Quyết định
++
++- Video mới từ Studio, generator AI và source-only mặc định Nam Minh 1,10× với `voice.pronunciation: smart`, `settingsSource: script`. Không sửa .env.local, không đổi voice của dự án cũ đã chọn rõ provider/mode hoặc audio tải lên. ZeroTTS vẫn là lựa chọn.
++- Tận dụng đúng bộ chuẩn hóa text của zerotts **package0.1.5**, tách khỏi việc tổng hợp giọng. Module stdlib và dữ liệu từ viết tắt được đóng gói tại `assets/third-party/zerotts-text-norm/`, có manifest SHA256, MIT license ZeroWeight và soe-vinorm, cùng NOTICE upstream. Không nhầm package version với commit của model trên Hugging Face.
++- Helper Python3 chỉ nạp file chuẩn hóa qua importlib; không import package zerotts, ONNX, torch, model, không gọi mạng. Không cần cài ZeroTTS hoặc tải model để dùng Nam Minh smart. Python3 vốn đã dùng ở Edge fallback; lỗi helper được báo, không âm thầm đọc raw.
++- `src/tts/smart-pronunciation.ts`: bảo vệ URL/email/code, các cách đọc từ điển và override của người dùng; nhận diện version theo ngữ cảnh; mở rộng một số đơn vị công nghệ, K sao, tiền tệ, kích thước; chuẩn hóa số/ngày/giờ/phần trăm theo Zero rules; fallback đánh vần acronym chưa có. Số thập phân dấu chấm được đổi thành cách đọc “phẩy”, version giữ “chấm”. Không dùng LLM để đoán/sửa dữ kiện.
++- Từ điển cá nhân ưu tiên hơn cách đọc bổ sung. Không thay `config/lexicon.json` của người dùng. Thuật ngữ/tên repo chưa có vẫn cần nghe và chỉnh qua từ điển, không hứa mọi tên riêng đều đúng.
++- Nghe thử, báo cáo phát âm và cached TTS dùng chung `prepareSpeechText`; report hiển thị đúng chuỗi gửi TTS. Cache hash có chuỗi đã chuẩn hóa và revision; đổi mode/cách đọc sẽ tạo lại audio.
++- Captions và template giữ văn bản gốc. Khi chuẩn hóa thay đổi số lượng từ, timestamp provider không được dùng giả làm high cho chữ gốc; cache trả timing ước lượng low. Cải thiện alignment giữa chữ gốc và audio nằm ngoài lượt này.
++
++## Ví dụ đã chạy
++
++| Văn bản gốc | Cách gửi TTS trong smart |
++| --- | --- |
++| 29.9K sao | hai mươi chín phẩy chín nghìn sao |
++| RAM 16GB | ram mười sáu gi ga bai |
++| 120ms | một trăm hai mươi mi li giây |
++| Node.js 22.10 | nốt chấm gi ét hai mươi hai chấm mười |
++| 29/10/2026 | hai mươi chín tháng mười năm hai nghìn không trăm hai mươi sáu |
++| 1.250.000đ | một triệu hai trăm năm mươi nghìn đồng |
++| 12,5% | mười hai phẩy năm phần trăm |
++
++## Artifacts
++
++`output/nam-minh-smart-validation/before-original.mp3`: cùng câu, Nam Minh 1,10× nguyên bản.
++`voice/scene-hook.mp3`: cùng câu, Nam Minh 1,10× chuẩn hóa smart.
++`pronunciation-review.json`: cặp original/spoken, duration và accuracy thực tế.
++`video.mp4`: render hai cảnh giữ caption nguyên văn; dữ kiện chỉ là câu kiểm tra phát âm, không phải số liệu sản phẩm.
++
++Câu thử: “29.9K sao trên GitHub. RAM 16GB, phiên bản v1.2.3.” Cảnh sau thử ngày tháng và phần trăm. Không sao chép audio/model/giọng ZeroTTS. Chưa nghe hoặc chứng minh chất lượng bằng chấm điểm ASR/MOS; người dùng cần nghe cặp audio để đánh giá tên riêng/chất giọng.
++
++Kết quả kiểm chứng cuối sẽ ghi dưới đây. Không commit; diff riêng của lượt này tại `docs/smart-nam-minh-changes.patch`.
++
++
++## Kết quả cuối thực tế
++
++```text
++npx tsc --noEmit: exit 0
++npm test: 49 files passed, 238 tests passed; exit 0; 25,10 giây
++node --check public/studio.js / public/app.js: exit 0
++git diff --check: exit 0
++ffprobe MP4: 1080×1920, 30/1 fps, có audio; 12,833333 giây
++```
++
++Có kiểm thử số/ngày/giờ/phần trăm/version/đơn vị; bảo vệ link/email/code và collision placeholder; ưu tiên override; giữ original/lexicon; báo lỗi khi helper không chạy; API review trả đúng text gửi TTS; cache thay đổi khi đổi mode hoặc override; captions giữ chữ gốc và timing low khi có biến đổi. Xem log cạnh MP4. Bộ test không gọi TTS/LLM thật.
++
++Đã tạo TTS thật cho cặp before-original.mp3 / after-smart.mp3 với cùng đầu vào và cùng voice/rate. Render hai cảnh bằng voice smart; xem frame caption-original.png xác nhận chữ 29.9K/GitHub không đổi thành phiên âm. Browser QA xác nhận Edge Nam Minh,1,10× và smart được chọn mặc định; ảnh studio-defaults.png. Không sửa API key hoặc .env.local. Server QA riêng cổng3004 được dừng sau khi kiểm tra.
++
++Bổ sung tùy chọn `--workers=1` cho rerender để có thể giảm tiến trình Chrome khi cần; lần kiểm chứng này hoàn thành với hai worker,117,1 giây. Chưa kiểm chứng riêng lượt mới bằng một worker; mặc định vẫn là hai.
+--- a/public/app.js
++++ b/public/app.js
+@@ -243,7 +243,7 @@
+         source: { url: "local", domain: "apple.com", image: null },
+         channel: "DevPeek36",
+       },
+-      voice: { provider: "edge-tts", voiceId: "vi-VN-NamMinhNeural", speed: 1.2 },
++      voice: { provider: "edge-tts", voiceId: "vi-VN-NamMinhNeural", speed: 1.1, settingsSource:"script", pronunciation:"smart" },
+       scenes: [
+         {
+           id: "hook",
+--- a/public/index.html
++++ b/public/index.html
+@@ -50,7 +50,7 @@
+         </button>
+         <div class="status-pill free-badge" id="ttsStatusBadge" title="Giọng đang chọn trong Studio">
+           <span class="status-dot green"></span>
+-          <span class="status-text">ZeroTTS · Local</span>
++          <span class="status-text">Nam Minh · Edge TTS</span>
+         </div>
+         <div class="status-pill llm-badge" id="llmStatusBadge" title="Bấm để Cấu Hình Nhà Cung Cấp LLM & API Key (Gemini, OpenAI, Claude...)">
+           <span class="status-dot green" id="llmStatusDot"></span>
+@@ -122,7 +122,7 @@
+           </div>
+           <div class="form-row">
+             <div class="form-group col-6"><details class="studio-legacy-options"><summary>Màu sắc nâng cao</summary><label for="studioTheme">Bảng màu</label><select id="studioTheme"><option value="teal">Editorial · Xanh đen / cam</option><option value="midnight">Explainer · Navy / xanh sáng</option></select><p class="field-hint">Dành cho hai template có sẵn. Các phong cách MG có bảng màu riêng.</p></details></div>
+-            <div class="form-group col-6"><label for="studioPronunciation">Thuật ngữ tiếng Anh</label><select id="studioPronunciation"><option value="lexicon">Dùng từ điển phát âm · mặc định</option><option value="original">Đọc nguyên bản, bỏ qua từ điển</option></select><span class="field-hint">Chữ hiển thị giữ nguyên thuật ngữ. Từ điển chỉ sửa âm đọc, không đổi thuật ngữ hay phụ đề. Chỉnh trong tab Từ điển phát âm.</span></div>
++            <div class="form-group col-6"><label for="studioPronunciation">Cách xử lý phát âm</label><select id="studioPronunciation"><option value="smart">Thông minh · Số, ngày giờ & từ điển thuật ngữ</option><option value="lexicon">Chỉ dùng từ điển phát âm</option><option value="original">Đọc nguyên bản, bỏ qua từ điển</option></select><span class="field-hint">Chữ hiển thị giữ nguyên thuật ngữ. Từ điển chỉ sửa âm đọc, không đổi thuật ngữ hay phụ đề. Chỉnh trong tab Từ điển phát âm.</span></div>
+           </div>
+           <label class="custom-checkbox"><input id="studioBgmEnabled" type="checkbox" checked><span>Nhạc nền nhẹ · tự giảm khi có giọng nói</span></label>
+           <p class="field-hint">Bật sẵn cho mọi template. Có thể tắt nếu audio tải lên đã có nhạc nền.</p>
+@@ -136,13 +136,13 @@
+           </details>
+           <div id="studioTtsFields">
+             <div class="form-row">
+-              <div class="form-group col-6"><label for="studioProvider">Dịch vụ giọng</label><select id="studioProvider"><option value="zerotts">ZeroTTS · Tiếng Việt local</option><option value="edge-tts">Edge TTS</option><option value="vbee">Vbee</option><option value="elevenlabs">ElevenLabs</option><option value="lucylab">LucyLab</option></select></div>
++              <div class="form-group col-6"><label for="studioProvider">Dịch vụ giọng</label><select id="studioProvider"><option value="edge-tts">Edge TTS · Nam Minh mặc định</option><option value="zerotts">ZeroTTS · Tiếng Việt local</option><option value="vbee">Vbee</option><option value="elevenlabs">ElevenLabs</option><option value="lucylab">LucyLab</option></select></div>
+               <div class="form-group col-6" id="studioEdgeVoiceGroup"><label for="studioEdgeVoice">Giọng tiếng Việt</label><select id="studioEdgeVoice"><option value="vi-VN-NamMinhNeural">Nam Minh · Nam</option><option value="vi-VN-HoaiMyNeural">Hoài My · Nữ</option></select></div>
+               <div class="form-group col-6" id="studioZeroVoiceGroup" hidden><label for="studioZeroVoice">Giọng ZeroTTS</label><select id="studioZeroVoice"><option value="quangminh">Quang Minh · Nam · Tin tức</option></select></div>
+               <div class="form-group col-6" id="studioVoiceIdGroup" hidden><label for="studioVoiceId">Voice ID / Voice Code</label><input id="studioVoiceId" type="text" placeholder="Lấy từ tài khoản dịch vụ của bạn"></div>
+             </div>
+             <p class="field-hint" id="studioProviderHint"></p>
+-            <div class="form-group"><label for="studioSpeed">Tốc độ đọc <output id="studioSpeedValue">1.20x</output></label><input id="studioSpeed" type="range" min="0.5" max="2" step="0.05" value="1.2"></div>
++            <div class="form-group"><label for="studioSpeed">Tốc độ đọc <output id="studioSpeedValue">1.10x</output></label><input id="studioSpeed" type="range" min="0.5" max="2" step="0.05" value="1.1"></div>
+             <div class="form-group"><label for="studioPreviewText">Đoạn nghe thử</label><textarea id="studioPreviewText" rows="2">OpenDesign và Agent giúp bạn tạo giao diện. Theo dõi DevPeek36 để khám phá repo và tin tức công nghệ mới.</textarea></div>
+             <button class="btn btn-secondary" id="studioListen" type="button">▶ Nghe thử giọng</button>
+           </div>
+@@ -153,7 +153,7 @@
+           </div>
+           <audio id="studioAudio" controls hidden preload="none"></audio>
+           <p class="field-hint">Tạo voice từ dịch vụ: <a href="https://vbee.vn/" target="_blank" rel="noopener noreferrer">Vbee</a> · <a href="https://elevenlabs.io/text-to-speech/vietnamese" target="_blank" rel="noopener noreferrer">ElevenLabs</a>. Tải MP3/WAV về rồi đưa vào web ở trên.</p>
+-          <p id="studioStatus" role="status" aria-live="polite">Bắt đầu với ZeroTTS · Quang Minh ở 1.20x. Nghe thử để chọn giọng; Edge TTS vẫn có sẵn.</p>
++          <p id="studioStatus" role="status" aria-live="polite">Mặc định Nam Minh 1.10x · Chuẩn hóa tiếng Việt và thuật ngữ trước khi đọc. ZeroTTS vẫn chọn được.</p>
+ 
+         </section>
+ 
+--- a/rerender.ts
++++ b/rerender.ts
+@@ -204,7 +204,7 @@
+ 
+   // Render
+   const videoPath = join(outputDir, "video.mp4");
+-  await renderWithHyperframes({ compositionDir: outputDir, outputPath: videoPath, fps, quality:process.argv.includes('--draft')?'draft':'standard' });
++  await renderWithHyperframes({ compositionDir: outputDir, outputPath: videoPath, fps, workers:process.argv.includes('--workers=1')?1:2, quality:process.argv.includes('--draft')?'draft':'standard' });
+   await ensureVideoThumbnail(videoPath,join(outputDir,'cover.png'));
+   console.log(`\nDone: ${videoPath}`);
+ }
+--- /dev/null
++++ b/scripts/normalize-speech.py
+@@ -0,0 +1,13 @@
++"""Load only ZeroTTS's MIT stdlib text rules; no model, SDK startup or network."""
++import importlib.util
++import json
++from pathlib import Path
++import sys
++path = Path(__file__).resolve().parent.parent / 'assets/third-party/zerotts-text-norm/vi_normalizer.py'
++spec = importlib.util.spec_from_file_location('autogen_vi_normalizer', path)
++module = importlib.util.module_from_spec(spec)
++spec.loader.exec_module(module)
++payload = json.load(sys.stdin)
++if not isinstance(payload.get('text'), str) or len(payload['text']) > 100000:
++    raise ValueError('Invalid normalization input')
++print(json.dumps({'text': module.normalize_vi_text(payload['text'])}, ensure_ascii=False))
+--- a/src/channel-defaults.ts
++++ b/src/channel-defaults.ts
+@@ -1,6 +1,7 @@
+ /** DevPeek36 defaults for newly generated videos and publishing files. */
+ export const DEFAULT_HASHTAGS = ['#Ai', '#Github', '#xuhuong', '#DevPeek36'];
+-export const DEFAULT_VOICE_SPEED = 1.2;
++export const DEFAULT_VOICE = {provider:'edge-tts',voiceId:'vi-VN-NamMinhNeural',speed:1.1,settingsSource:'script',pronunciation:'smart'} as const;
++export const DEFAULT_VOICE_SPEED = 1.1;
+ export const DEFAULT_BGM = {enabled:true,src:'assets/bgm/devpeek36-soft-tech.mp3',volume:0.16,duck:true,duckVolume:0.06};
+ 
+ export function defaultCaption(title: string): string {
+--- a/src/pipeline.ts
++++ b/src/pipeline.ts
+@@ -1,6 +1,6 @@
+ import {hydrateGithubStars} from './script/github-stars.js';
+ import {referenceSettings} from './render/reference-design.js';
+-import {pronunciationReport} from "./tts/lexicon.js";
++import {preparedPronunciationReport} from "./tts/smart-pronunciation.js";
+ import {stripCssImports} from "./render/css.js";
+ import {fitVoiceDuration} from "./studio/duration.js";
+ import { readFile, writeFile, mkdir, copyFile } from "node:fs/promises";
+@@ -114,7 +114,7 @@
+ 
+   const mediaPromise = processSceneMedia(script, outputDir, stockProvider);
+ 
+-  if(!script.voice.uploadId)await writeFile(join(outputDir,'pronunciation-review.json'),JSON.stringify({mode:script.voice.pronunciation||'lexicon',scenes:script.scenes.map(s=>({id:s.id,original:s.voiceText,...pronunciationReport(s.voiceText,script.voice.pronunciation,script.voice.pronunciationOverrides)}))},null,2));
++  if(!script.voice.uploadId)await writeFile(join(outputDir,'pronunciation-review.json'),JSON.stringify({mode:script.voice.pronunciation||'lexicon',scenes:await Promise.all(script.scenes.map(async s=>({id:s.id,original:s.voiceText,...await preparedPronunciationReport(s.voiceText,script.voice.pronunciation,script.voice.pronunciationOverrides)})))},null,2));
+ 
+   // STEP 4
+   const limit = pLimit(cfg.ttsConcurrency);
+--- a/src/render/hyperframes-runner.ts
++++ b/src/render/hyperframes-runner.ts
+@@ -12,6 +12,7 @@
+   outputPath: string;
+   fps?: number;
+   quality?: 'draft' | 'standard' | 'high';
++  workers?:1|2;
+ }
+ 
+ /** Do not report a successful MP4 when a required image is missing or invalid. */
+@@ -38,13 +39,13 @@
+ }
+ 
+ export async function renderWithHyperframes(args: RenderArgs): Promise<void> {
+-  const { compositionDir, outputPath, fps = 30, quality = 'standard' } = args;
++  const { compositionDir, outputPath, fps = 30, quality = 'standard',workers=2 } = args;
+   const html = await readFile(join(compositionDir, 'index.html'), 'utf8');
+   await validateCompositionImages(compositionDir,html);
+   const expectedDuration = Number(html.match(/id="stage"[\s\S]*?data-duration="([\d.]+)"/)?.[1]) || undefined;
+   // Never let an existing MP4 satisfy the completion watchdog for a new run.
+   const temporaryOutput = resolve(outputPath.replace(/\.mp4$/i, '') + `.${randomUUID()}.rendering.mp4`);
+-  const spawnArgs = ['hyperframes','render',compositionDir,'--output',temporaryOutput,'--fps',String(fps),'--quality',quality,'--workers','2'];
++  const spawnArgs = ['hyperframes','render',compositionDir,'--output',temporaryOutput,'--fps',String(fps),'--quality',quality,'--workers',String(workers)];
+   try {
+     await new Promise<void>((resolveRender, reject) => {
+       const isWin = process.platform === 'win32';
+--- a/src/render/script-schema.ts
++++ b/src/render/script-schema.ts
+@@ -311,7 +311,7 @@
+     voiceId: z.string().min(1),
+     speed: z.number().min(0.5).max(2.0),
+     settingsSource: z.literal("script").optional(),
+-    pronunciation: z.enum(["original", "lexicon"]).optional(),
++    pronunciation: z.enum(["original", "lexicon", "smart"]).optional(),
+     pronunciationOverrides: z.record(z.string().min(1).max(100),z.string().min(1).max(200)).refine(d=>Object.keys(d).length<=80,"Tối đa 80 từ phát âm riêng").optional(),
+     uploadId: z.string().uuid().optional(),
+     captionsSrt: z.string().max(100000).optional(),
+--- a/src/script/generator.ts
++++ b/src/script/generator.ts
+@@ -1,6 +1,6 @@
+ import {applyReferenceDefaults,type CreativeSettings} from '../render/reference-design.js';
+ import {applyChannelOutro} from "./channel-outro.js";
+-import {DEFAULT_VOICE_SPEED,DEFAULT_BGM} from '../channel-defaults.js';
++import {DEFAULT_VOICE_SPEED,DEFAULT_BGM,DEFAULT_VOICE} from '../channel-defaults.js';
+ import {reviewStoryboard} from "./storyboard.js";
+ import { z } from "zod";
+ import { validateNarration } from "./narration-quality.js";
+@@ -214,6 +214,7 @@
+     throw new Error("Unexpected error: script was not generated");
+   }
+ 
++  parsedScript.voice={...parsedScript.voice,...DEFAULT_VOICE};
+   applyReferenceDefaults(parsedScript,opts.creative);
+ 
+   // 4. Fact check numbers against source content
+--- a/src/server.ts
++++ b/src/server.ts
+@@ -1,3 +1,4 @@
++import {DEFAULT_VOICE} from './channel-defaults.js';
+ import {hydrateGithubStars} from './script/github-stars.js';
+ import {applyReferenceDefaults,CreativeOptions} from './render/reference-design.js';
+ import {z} from "zod";
+@@ -498,6 +499,7 @@
+ 
+     // Apply explicit Studio choices after either LLM or offline generation.
+     if (req.body.voice) script.voice = ScriptSchema.shape.voice.parse(req.body.voice);
++    else script.voice={...script.voice,...DEFAULT_VOICE};
+     if (req.body.visualStyle) script.visualStyle = req.body.visualStyle;
+     if (req.body.captions) script.captions = req.body.captions;
+     if (req.body.preset) script.preset = req.body.preset;
+--- a/src/studio/routes.test.ts
++++ b/src/studio/routes.test.ts
+@@ -80,3 +80,9 @@
+  expect(data.script.captions.highlightMode).toBe('estimated');
+  const bad=await fetch(url+'/api/studio/validate-script',{method:'POST',headers:{'Content-Type':'application/json'},body:'{"script":{}}'});expect(bad.status).toBe(400);
+ });
++it('reviews smart speech with expanded dates/numbers while retaining the original script words',async()=>{
++ const script=JSON.parse(await readFile('tests/fixtures/studio-explainer.json','utf8'));
++ script.voice.pronunciation='smart';script.scenes[0].voiceText='GitHub có 29.9K sao, RAM 16GB. Ngày 29/10/2026.';
++ const response=await fetch(url+'/api/studio/pronunciation',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({script})});
++ expect(response.status).toBe(200);const result=await response.json();expect(result.scenes[0].spoken).toContain('hai mươi chín phẩy chín nghìn sao');expect(result.scenes[0].spoken).toContain('mười sáu gi ga bai');expect(result.scenes[0].spoken).toContain('tháng mười');expect(script.scenes[0].voiceText).toContain('29.9K');
++});
+--- a/src/studio/routes.ts
++++ b/src/studio/routes.ts
+@@ -1,3 +1,4 @@
++import {prepareSpeechText,preparedPronunciationReport} from '../tts/smart-pronunciation.js';
+ import {sceneBlocks,referenceSettings} from '../render/reference-design.js';
+ import {applyChannelOutro} from "../script/channel-outro.js";
+ import {sceneMediaEntries} from '../media/media-manager.js';
+@@ -20,7 +21,6 @@
+ import { saveUpload, readUpload, UPLOAD_DIR } from './uploads.js';
+ import { voiceConfig, studioTts } from './voice.js';
+ import { ScriptSchema } from '../render/script-schema.js';
+-import { speechText, pronunciationReport } from '../tts/lexicon.js';
+ 
+ export const studioRouter = express.Router();
+ const previewInput = z.object({ text: z.string().trim().min(1).max(500), voice: ScriptSchema.shape.voice });
+@@ -134,10 +134,10 @@
+   try { res.type('wav').sendFile((await readUpload(String(req.params.id))).path, { dotfiles: 'allow' }); }
+   catch (err: any) { res.status(404).json({ error: err.message }); }
+ });
+-studioRouter.post('/pronunciation', (req,res)=>{
++studioRouter.post('/pronunciation', async(req,res)=>{
+   try{
+     const script=ScriptSchema.parse(req.body.script);
+-    res.json({scenes:script.scenes.map(s=>({id:s.id,...pronunciationReport(s.voiceText,script.voice.pronunciation,script.voice.pronunciationOverrides)}))});
++    res.json({scenes:await Promise.all(script.scenes.map(async s=>({id:s.id,...await preparedPronunciationReport(s.voiceText,script.voice.pronunciation,script.voice.pronunciationOverrides)})))});
+   }catch(err:any){res.status(400).json({error:err.message});}
+ });
+ studioRouter.post('/preview', async (req, res) => {
+@@ -149,7 +149,7 @@
+     const cfg = voiceConfig({ ...voice, settingsSource: 'script' });
+     const { mkdir } = await import('node:fs/promises');
+     await mkdir(UPLOAD_DIR, { recursive: true });
+-    await studioTts(cfg, { ...voice, settingsSource: 'script' }).generate(speechText(text, voice.pronunciation, voice.pronunciationOverrides), path);
++    await studioTts(cfg, { ...voice, settingsSource: 'script' }).generate(await prepareSpeechText(text, voice.pronunciation, voice.pronunciationOverrides), path);
+     res.type('audio/mpeg').send(await readFile(path));
+     await rm(path, { force: true });
+   } catch (err: any) {
+--- a/src/studio/studio.test.ts
++++ b/src/studio/studio.test.ts
+@@ -110,3 +110,14 @@
+     expect(ScriptSchema.safeParse({...script,scenes:script.scenes.map((s,i)=>i===0?{...s,id:'../escape'}:s)}).success).toBe(false);
+   });
+ });
++it('invalidates cached speech when smart normalization or its explicit term override changes, retaining original caption text',async()=>{
++ const cfg=voiceConfig(script.voice);const out=join(dir,'smart.mp3');const source=join(dir,'test-tone.mp3');
++ await exec('ffmpeg',['-v','error','-y','-f','lavfi','-i','sine=frequency=440:duration=1','-c:a','libmp3lame',source]);
++ const inputs:string[]=[];const client={async generate(text:string,file:string){inputs.push(text);const {copyFile}=await import('node:fs/promises');await copyFile(source,file);return {accuracy:'high' as const,words:[{text,startMs:0,endMs:1000}]};}};
++ const original='API giảm 12,5%.';
++ await cachedSpeech(original,out,cfg,1.1,client,'original');
++ const a=await cachedSpeech(original,out,cfg,1.1,client,'smart');
++ await cachedSpeech(original,out,cfg,1.1,client,'smart');expect(inputs).toHaveLength(2);
++ expect(inputs[1]).toContain('mười hai phẩy năm phần trăm');expect(a.accuracy).toBe('low');expect(a.words.map(w=>w.text).join(' ')).toBe(original);
++ await cachedSpeech(original,out,cfg,1.1,client,'smart',{API:'ê pi ai riêng'});expect(inputs).toHaveLength(3);expect(inputs[2]).toContain('ê pi ai riêng');
++});
+--- a/src/studio/voice.ts
++++ b/src/studio/voice.ts
+@@ -1,3 +1,4 @@
++import {prepareSpeechText,SMART_SPEECH_REVISION,type PronunciationMode} from '../tts/smart-pronunciation.js';
+ import {ZERO_VOICES,ZEROTTS_REVISION} from '../tts/zerotts-settings.js';
+ import { createHash } from 'node:crypto';
+ import { execFile } from 'node:child_process';
+@@ -62,19 +63,20 @@
+   } };
+ }
+ 
+-export function speechFingerprint(text: string, cfg: Config, speed: number, pronunciation?: "original" | "lexicon", overrides?: LexiconMap): string {
++export function speechFingerprint(text: string, cfg: Config, speed: number, pronunciation?: PronunciationMode, overrides?: LexiconMap, prepared?:string): string {
+   // Credentials never enter persisted cache metadata.
+   const settings = { provider: cfg.ttsProvider, zero: [cfg.zeroTtsVoice,ZEROTTS_REVISION], speed, edge: [cfg.edgeTtsVoice, cfg.edgeTtsRate, cfg.edgeTtsPitch, cfg.edgeTtsVolume],
+     eleven: [cfg.elevenlabsVoiceId, cfg.elevenlabsModelId, cfg.elevenlabsEndpoint],
+     vbee: [cfg.vbeeVoiceCode, cfg.vbeeSpeedRate, cfg.vbeeEndpoint], lucy: [cfg.lucylabVoiceId, cfg.lucylabEndpoint] };
+-  return createHash('sha256').update(JSON.stringify({ text: speechText(text, pronunciation, overrides), settings })).digest('hex');
++  return createHash('sha256').update(JSON.stringify({ text: prepared??speechText(text, pronunciation==='smart'?'lexicon':pronunciation, overrides), normalizer:pronunciation==='smart'?SMART_SPEECH_REVISION:undefined, settings })).digest('hex');
+ }
+ 
+-export async function cachedSpeech(text: string, out: string, cfg: Config, speed: number, client: TtsClient, pronunciation?: "original" | "lexicon", overrides?: LexiconMap) {
++export async function cachedSpeech(text: string, out: string, cfg: Config, speed: number, client: TtsClient, pronunciation?: PronunciationMode, overrides?: LexiconMap) {
+   const srt = out.replace(/\.mp3$/, '.srt');
+   const wordsFile = out.replace(/\.mp3$/, '.words.json');
+   const metaFile = out + '.cache.json';
+-  const fingerprint = speechFingerprint(text, cfg, speed, pronunciation, overrides);
++  const spoken=await prepareSpeechText(text,pronunciation,overrides);
++  const fingerprint = speechFingerprint(text, cfg, speed, pronunciation, overrides,spoken);
+   let timing: TtsTimingResult | undefined;
+   try {
+     const meta = JSON.parse(await readFile(metaFile, 'utf8'));
+@@ -87,7 +89,6 @@
+     await Promise.all([rm(srt, { force: true }), rm(wordsFile, { force: true }), rm(metaFile, { force: true })]);
+     const temp = out + '.pending.mp3';
+     try {
+-      const spoken=speechText(text, pronunciation, overrides);
+       const generated = await client.generate(spoken, temp, srt);
+       const duration = await getDurationSec(temp);
+       timing = spoken===text && generated && generated.words.length ? generated : { accuracy: 'low', words: estimateWordTimings(text, duration) };
+--- /dev/null
++++ b/src/tts/smart-pronunciation.test.ts
+@@ -0,0 +1,27 @@
++import {expect,it,vi} from 'vitest';
++import {prepareSpeechText,preparedPronunciationReport} from './smart-pronunciation.js';
++it('uses the pinned Zero text rules for Vietnamese dates, times, prices and percentages without loading a voice model',async()=>{
++ const original='Ngày 29/10/2026 lúc 15h30, giá 1.250.000đ, giảm 12,5%.';
++ const spoken=await prepareSpeechText(original,'smart');
++ expect(spoken).toContain('hai mươi chín tháng mười năm hai nghìn');expect(spoken).toContain('mười lăm giờ ba mươi phút');
++ expect(spoken).toContain('một triệu hai trăm năm mươi nghìn đồng');expect(spoken).toContain('mười hai phẩy năm phần trăm');expect(original).toContain('1.250.000đ');
++});
++it('distinguishes version contexts from decimal counts and expands technical units',async()=>{
++ const spoken=await prepareSpeechText('Node.js 22.10 và pnpm 10.33.x. Repo có 29.9K sao trên GitHub; RAM 16GB, tải trong 120ms.','smart');
++ expect(spoken).toContain('hai mươi hai chấm mười');expect(spoken).toContain('mười chấm ba mươi ba chấm ích');
++ expect(spoken).toContain('hai mươi chín phẩy chín nghìn sao');expect(spoken).toContain('ram mười sáu gi ga bai');expect(spoken).toContain('một trăm hai mươi mi li giây');
++});
++it('prioritizes user pronunciations, does not cascade replacements and preserves URLs, emails and code',async()=>{
++ const text='API OpenAI; https://example.com/v1.2 user@example.com `npm install 1.2`. https://speech.invalid/keep0end';
++ const spoken=await prepareSpeechText(text,'smart',{API:'AI riêng',OpenAI:'tên riêng'});
++ expect(spoken).toContain('AI riêng tên riêng');expect(spoken).toContain('https://example.com/v1.2');expect(spoken).toContain('user@example.com');expect(spoken).toContain('`npm install 1.2`');expect(spoken).toContain('https://speech.invalid/keep0end');
++});
++it('keeps original and legacy modes intact and exposes the exact normalized text in pronunciation review',async()=>{
++ const fake=vi.fn(async s=>s);
++ expect(await prepareSpeechText('GitHub 16GB','original',undefined,fake)).toBe('GitHub 16GB');expect(fake).not.toHaveBeenCalled();
++ expect(await prepareSpeechText('API','lexicon')).toBe('ây pi ai');
++ const report=await preparedPronunciationReport('Giảm 12,5% với API.','smart');expect(report.spoken).toContain('mười hai phẩy năm phần trăm');expect(report.spoken).toContain('ây pi ai');expect(report.normalizer).toContain('zerotts-');
++});
++it('does not silently fall back to raw speech when the smart normalizer fails',async()=>{
++ await expect(prepareSpeechText('12,5%','smart',undefined,async()=>{throw Error('unavailable');})).rejects.toThrow('unavailable');
++});
+--- /dev/null
++++ b/src/tts/smart-pronunciation.ts
+@@ -0,0 +1,44 @@
++import {spawn} from 'node:child_process';
++import {join} from 'node:path';
++import {loadLexicon,speechText,pronunciationReport,type LexiconMap} from './lexicon.js';
++export type PronunciationMode='original'|'lexicon'|'smart';
++export const SMART_SPEECH_REVISION='zerotts-0.1.5-smart-v1';
++const escape=(s:string)=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
++/** A bounded stdlib subprocess, injectable for tests. Never starts the voice model. */
++export async function normalizeWithZeroRules(text:string):Promise<string>{
++ return new Promise((resolve,reject)=>{
++  const child=spawn('python3',[join(process.cwd(),'scripts/normalize-speech.py')],{stdio:['pipe','pipe','pipe'],env:{...process.env,PYTHONDONTWRITEBYTECODE:'1'}});
++  let output='';const timeout=setTimeout(()=>{child.kill();reject(Error('Chuẩn hóa phát âm quá thời gian.'));},10000);
++  child.stdout.on('data',c=>{output+=c.toString();if(output.length>1000000){child.kill();reject(Error('Văn bản chuẩn hóa quá dài.'));}});
++  child.stderr.on('data',()=>{});
++  child.on('error',()=>{clearTimeout(timeout);reject(Error('Không chạy được bộ chuẩn hóa tiếng Việt. Cần Python 3.'));});
++  child.on('close',code=>{clearTimeout(timeout);try{if(code!==0)throw Error();const data=JSON.parse(output);if(typeof data.text!=='string')throw Error();resolve(data.text);}catch{reject(Error('Bộ chuẩn hóa tiếng Việt không xử lý được văn bản.'));}});
++  child.stdin.on('error',()=>{});child.stdin.end(JSON.stringify({text}));
++ });
++}
++const EXTRA_TERMS:LexiconMap={GSAP:'gi ét ây pi',TTS:'ti ti ét',CPU:'xi pi diu',GPU:'gi pi diu',RAM:'ram',CSS:'xi ét ét',HTML:'âych ti em eo'};
++export async function prepareSpeechText(text:string,mode?:PronunciationMode,overrides?:LexiconMap,normalize:(s:string)=>Promise<string>=normalizeWithZeroRules):Promise<string>{
++ if(mode!=='smart')return speechText(text,mode,overrides);
++ const dict={...EXTRA_TERMS,...loadLexicon(),...overrides};
++ const lookup=new Map(Object.entries(dict).map(([k,v])=>[k.toLowerCase(),v]));
++ const keys=Object.keys(dict).sort((a,b)=>b.length-a.length).map(escape);
++ // Links/code are literal; protected dictionary readings cannot be re-expanded.
++ const protectedPattern=new RegExp('https?:\\/\\/[^\\s<>]+|[\\w.+-]+@[\\w.-]+\\.[A-Za-z]{2,}|`[^`]+`|(?<![\\p{L}\\p{N}_])(?:'+keys.join('|')+')(?![\\p{L}\\p{N}_])','giu');
++ let prefix='https://speech.invalid/keep';while(text.includes(prefix))prefix+='x';
++ const saved:string[]=[];const hold=(value:string)=>{const id=saved.push(value)-1;return `${prefix}${id}end`;};
++ // Mark explicit version contexts before numbers are expanded as decimals.
++ let prepared=text.normalize('NFC').replace(/((?:phiên bản|version|Node\.js|Python|pnpm|npm)\s+)(v?\d+(?:\.\d+){1,3}(?:\.[xX])?)/giu,(_m,prefix,version)=>prefix+hold(speechText(version,'lexicon')));
++ prepared=prepared.replace(protectedPattern,m=>m.startsWith(prefix)?m:hold(lookup.get(m.toLowerCase())||m));
++ const units:Record<string,string>={GB:'gi ga bai',MB:'mê ga bai',TB:'tê ra bai',KB:'ki lô bai',GHz:'gi ga héc',MHz:'mê ga héc',FPS:'khung hình mỗi giây',ms:'mi li giây',px:'điểm ảnh',USD:'đô la Mỹ',VND:'đồng'};
++ prepared=prepared.replace(/(\d[\d.,]*)\s*(GHz|MHz|GB|MB|TB|KB|FPS|ms|px|USD|VND)(?![\p{L}\p{N}_])/gu,(_m,n,u)=>n+' '+units[u]);
++ prepared=prepared.replace(/(\d[\d.,]*)\s*[₫đ](?!\p{L})/gu,'$1 đồng').replace(/(\d[\d.,]*)K(?=\s+(?:sao|stars|lượt|người))/giu,'$1 nghìn').replace(/(\d)\s*[×x]\s*(?=\d)/gu,'$1 nhân ');
++ prepared=prepared.replace(/(?<![\p{L}\p{N}_.])(\d+)\.(\d{1,2})(?![\d.])/gu,'$1,$2');
++ // Zero rules disambiguate dates/times/decimals; legacy fallback handles unknown acronyms.
++ const normalized=await normalize(prepared);
++ const spoken=speechText(normalized,'lexicon');
++ return spoken.replace(new RegExp(escape(prefix)+'(\\d+)end','g'),(_m,id)=>saved[Number(id)]??_m);
++}
++export async function preparedPronunciationReport(text:string,mode?:PronunciationMode,overrides?:LexiconMap){
++ const base=pronunciationReport(text,mode==='smart'?'lexicon':mode,mode==='smart'?{...EXTRA_TERMS,...loadLexicon(),...overrides}:overrides);
++ return {...base,spoken:await prepareSpeechText(text,mode,overrides),normalizer:mode==='smart'?SMART_SPEECH_REVISION:mode||'lexicon'};
++}
+--- a/src/utils/script-generator.ts
++++ b/src/utils/script-generator.ts
+@@ -1,6 +1,6 @@
+ import {applyReferenceDefaults} from '../render/reference-design.js';
+ import {channelOutroVoice} from "../script/channel-outro.js";
+-import {DEFAULT_VOICE_SPEED,DEFAULT_BGM} from '../channel-defaults.js';
++import {DEFAULT_VOICE_SPEED,DEFAULT_BGM,DEFAULT_VOICE} from '../channel-defaults.js';
+ import { buildHookSuggestions, sourceFacts, compactText } from "../script/hooks.js";
+ import type { Script } from "../render/script-schema.js";
+ 
+@@ -156,5 +156,6 @@
+     ],
+   };
+ 
++  if(!opts.voiceProvider&&!opts.voiceId)script.voice={...script.voice,...DEFAULT_VOICE};
+   return applyReferenceDefaults(script);
+ }

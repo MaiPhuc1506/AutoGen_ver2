@@ -95,3 +95,8 @@ describe("Caption Timing & Grouper (M1)", () => {
     });
   });
 });
+
+it('does not preview the next sentence during the spoken pause after a single-word cue',()=>{
+ const cues=groupWordsIntoCues([{text:'GitHub.',startMs:100,endMs:500},{text:'Gỡ',startMs:1200,endMs:1450},{text:'quảng',startMs:1450,endMs:1650},{text:'cáo.',startMs:1650,endMs:1900}]);
+ expect(cues[0].text).toBe('GitHub.');expect(cues[0].endMs).toBe(500);expect(cues[1].startMs).toBe(1200);
+});

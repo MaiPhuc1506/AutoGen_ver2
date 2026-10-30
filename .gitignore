@@ -22,3 +22,17 @@ __pycache__/
 *.pyc
 
 
+
+# Local narration uploads
+.uploads/
+
+# Isolated local ZeroTTS runtime and model cache
+.zerotts-venv/
+.zerotts-models/
+.zerotts-runtime/
+
+# Generated media, speech cache and local validation output
+.cache/
+
+# Local migration copies may contain API keys and private media
+backup/

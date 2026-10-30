@@ -1058,9 +1058,15 @@ html, body {
   overflow: hidden;
 }
 
+.desktop-frame {border-radius:20px;border-width:8px;max-width:100%;}
+.desktop-frame .phone-island,.image-unavailable .phone-island {display:none;}
+.image-unavailable {display:flex;align-items:center;justify-content:center;min-height:220px;padding:32px;background:#e4edf5;color:#18323d;font:700 28px 'Inter',sans-serif;box-sizing:border-box;text-align:center;}
+.phone-frame.image-unavailable {width:800px;max-width:100%;height:320px;border-radius:24px;}
+.mockup-source {font-size:22px;line-height:1.5;color:inherit;opacity:.7;margin-top:18px;}
+.gallery-img {object-fit:contain;max-height:650px;}
 .phone-screen-img {
   width: 100%; height: 100%;
-  object-fit: cover; display: block;
+  object-fit: contain; display: block;
 }
 
 .mockup-caption {
@@ -1093,3 +1099,6 @@ html, body {
 .safe-zone-guide-label.right { right: -90px; top: 50%; transform: rotate(90deg); transform-origin: center; }
 .safe-zone-guide-label.bottom { bottom: -240px; left: 50%; transform: translateX(-50%); }
 
+
+/* Bounded attribution, outside the channel header and inside the safe area. */
+.media-credit-badge{top:212px;left:84px;right:auto;max-width:700px;box-sizing:border-box;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:18px;line-height:1.35;z-index:12}

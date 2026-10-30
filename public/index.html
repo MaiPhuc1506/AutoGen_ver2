@@ -30,7 +30,7 @@
             <span>✨ Tạo Video</span>
           </button>
           <button class="mode-btn" id="btnModeFeeds" data-mode="feeds">
-            <span>📰 RSS Tin Tức</span>
+            <span>📡 AI News Radar</span>
           </button>
           <button class="mode-btn" id="btnModeTimeline" data-mode="timeline">
             <span>⏱️ Timeline Editor</span>
@@ -48,9 +48,9 @@
         <button class="btn btn-sm btn-outline" id="btnToggleTheme" title="Chuyển Theme Dark-Neon / Light-Pro (M3)">
           <span id="themeIcon">🌙</span> <span id="themeLabel">Dark Neon</span>
         </button>
-        <div class="status-pill free-badge" id="ttsStatusBadge" title="Đang sử dụng Microsoft Edge TTS miễn phí, không tốn tiền API">
+        <div class="status-pill free-badge" id="ttsStatusBadge" title="Giọng đang chọn trong Studio">
           <span class="status-dot green"></span>
-          <span class="status-text">Edge TTS (0đ)</span>
+          <span class="status-text">Nam Minh · Edge TTS</span>
         </div>
         <div class="status-pill llm-badge" id="llmStatusBadge" title="Bấm để Cấu Hình Nhà Cung Cấp LLM & API Key (Gemini, OpenAI, Claude...)">
           <span class="status-dot green" id="llmStatusDot"></span>
@@ -94,6 +94,72 @@
           </button>
         </div>
 
+        <section class="voice-studio" aria-label="Giọng đọc và phong cách">
+          <div class="studio-section-heading"><span class="studio-kicker">BẢN DỰNG CỦA BẠN</span><h3>Giọng đọc & phong cách</h3><p>Chọn giọng, nghe thử, duyệt từng cảnh rồi xuất video.</p></div>
+          <section class="pack-gallery" aria-label="Thư viện template video">
+            <div class="pack-gallery-heading"><div><span class="studio-kicker">PHONG CÁCH VIDEO MẪU · DÙNG CHO MỌI BỐ CỤC</span><h3>Một phong cách, nhiều cách kể</h3></div><span id="studioPackCount" class="pack-count">Đang tải…</span></div>
+            <p class="field-hint">Nền tối, thẻ kính, ánh sáng dịu và phụ đề trắng/cam theo video tham chiếu. Chọn bố cục để xem thử; khi dựng, hệ thống phối các bố cục theo nội dung của bạn.</p>
+            <div class="pack-browser"><div id="studioPackGrid" class="pack-grid" role="group" aria-label="Chọn phong cách"></div><aside class="pack-preview-panel"><span class="pack-preview-label">PREVIEW NHẸ · KHÔNG VOICE</span><h4 id="studioPackTitle">Studio tối · Theo video mẫu</h4><iframe id="studioStylePreview" src="/api/studio/style-preview?pack=reference" title="Preview template đang chọn" loading="lazy"></iframe><p id="studioPackDescription" class="field-hint"></p><a id="studioPackSource" target="_blank" rel="noopener noreferrer" hidden>Xem phong cách gốc</a><span class="field-hint">Mẫu bố cục 3 giây/cảnh, chưa có giọng. Bản dựng thật dùng lời đọc, timing và tư liệu của bạn.</span></aside></div>
+          </section>
+          <div class="form-row">
+            <div class="form-group col-6"><label for="studioHookType">Cách mở đầu</label><select id="studioHookType"><option value="problem-solution">Vấn đề → giải pháp → lợi ích</option><option value="question">Câu hỏi → bằng chứng trả lời</option></select></div>
+            <div class="form-group col-6"><label for="studioStructure">Cách kể nội dung</label><select id="studioStructure"><option value="explainer">Giải thích · cơ chế và cách dùng</option><option value="news">Tin tức · sự kiện và tác động</option><option value="review">Review · lợi ích và giới hạn</option></select></div>
+          </div>
+          <div class="studio-duration-controls">
+            <button id="studioQuickNews" class="btn btn-secondary studio-quick-news" type="button" aria-pressed="false">⚡ Tin nhanh · tối đa 60 giây</button>
+            <div class="form-group"><label for="studioDepth">Mức độ giải thích repo</label><select id="studioDepth"><option value="quick">Giải thích nhanh · tối đa 60 giây</option><option value="standard" selected>Giải thích vừa · trên 60 đến 90 giây</option><option value="detailed">Giải thích kỹ · từ 90 đến 120 giây</option></select></div>
+
+            <p id="studioDurationHint" class="field-hint" role="status"></p>
+          </div>
+          <div class="form-group"><label for="studioRenderMode">Chế độ xuất video</label><select id="studioRenderMode"><option value="fast">Nhanh · 1080p, 24 fps</option><option value="standard">Chuẩn · 1080p, 30 fps</option></select><p class="field-hint">24 fps giảm 20% số khung hình so với 30 fps; giữ 1080p, bố cục và hiệu ứng.</p></div>
+          <label class="custom-checkbox"><input id="studioAutoDirect" type="checkbox" checked><span>Tự dựng theo nội dung repo · storyboard, sơ đồ, ví dụ</span></label>
+          <label class="custom-checkbox"><input id="studioFitDuration" type="checkbox" checked><span>Tự viết lời, đo giọng đọc và chọn thời lượng trong mức đã chọn</span></label>
+          <p class="field-hint">Thời lượng và số cảnh linh hoạt theo nội dung repo, không ép đúng một mốc giây. Đọc README và tối đa 4 tài liệu/ví dụ liên quan. Minh họa không phải demo chạy thật. Sau hook tên repo và số sao là ví dụ đầu vào → xử lý → kết quả. Bản nhanh ưu tiên 1 ví dụ, bản vừa 2, bản kỹ 3 khi nguồn đủ thông tin. AI tự đo giọng đọc, chọn độ dài trong khoảng và giữ hook ngắn. Chỉ cân nhẹ audio khi xuất, không cắt câu hoặc thêm lời vô nghĩa.</p>
+          <div class="form-row">
+            <div class="form-group col-6"><label for="studioMode">Nguồn giọng đọc</label><select id="studioMode"><option value="tts">Tạo giọng AI</option><option value="upload">Tải MP3 / WAV có sẵn</option></select></div>
+            <div class="form-group col-6"><details class="studio-legacy-options"><summary>Giao diện cũ · tùy chọn</summary><label for="studioStyle">Giao diện tương thích</label><select id="studioStyle"><option value="tech-editorial">Dùng template đang chọn</option><option value="classic">Classic · Giao diện cũ</option></select></details></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group col-6"><label for="studioMotion">Nhịp chuyển động</label><select id="studioMotion"><option value="calm">Theo lời đọc · Thẻ bổ sung dần</option><option value="dynamic">Gọn nhanh · Thẻ vào ngắn hơn</option></select></div>
+            <div class="form-group col-6"><label class="custom-checkbox studio-sound-toggle"><input id="studioSoundDesign" type="checkbox" checked><span>Âm thanh nhấn cảnh nhẹ</span></label><span class="field-hint">Có thể tắt nếu voice của bạn đã có nhạc hoặc hiệu ứng.</span></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group col-6"><details class="studio-legacy-options"><summary>Màu sắc nâng cao</summary><label for="studioTheme">Bảng màu</label><select id="studioTheme"><option value="teal">Editorial · Xanh đen / cam</option><option value="midnight">Explainer · Navy / xanh sáng</option></select><p class="field-hint">Dành cho hai template có sẵn. Các phong cách MG có bảng màu riêng.</p></details></div>
+            <div class="form-group col-6"><label for="studioPronunciation">Cách xử lý phát âm</label><select id="studioPronunciation"><option value="smart">Thông minh · Số, ngày giờ & từ điển thuật ngữ</option><option value="lexicon">Chỉ dùng từ điển phát âm</option><option value="original">Đọc nguyên bản, bỏ qua từ điển</option></select><span class="field-hint">Chữ hiển thị giữ nguyên thuật ngữ. Từ điển chỉ sửa âm đọc, không đổi thuật ngữ hay phụ đề. Chỉnh trong tab Từ điển phát âm.</span></div>
+          </div>
+          <label class="custom-checkbox"><input id="studioBgmEnabled" type="checkbox" checked><span>Nhạc nền nhẹ · tự giảm khi có giọng nói</span></label>
+          <p class="field-hint">Bật sẵn cho mọi template. Có thể tắt nếu audio tải lên đã có nhạc nền.</p>
+          <details class="studio-bgm-preview"><summary>Nghe bản nhạc nền</summary><audio controls preload="none" src="/api/studio/bgm/soft-tech.mp3"></audio><p class="field-hint">Khi xuất video, nhạc sẽ nhỏ hơn giọng đọc và tự giảm trong lúc nói.</p></details>
+          <details class="studio-visuals" open><summary>Ảnh, screenshot & logo dự án</summary>
+            <p class="field-hint">Chụp trang GitHub, lấy tối đa 4 ảnh raster từ README và avatar tác giả. Avatar không mặc định là logo dự án. Chọn logo và ảnh cho từng cảnh trong bản duyệt.</p>
+            <label class="custom-checkbox"><input id="studioAutoVisuals" type="checkbox" checked><span>Tự lấy tư liệu khi tạo video từ link GitHub</span></label>
+            <div class="studio-asset-actions"><button class="btn btn-secondary" id="studioFetchVisuals" type="button">Lấy screenshot & ảnh GitHub</button><label class="btn btn-outline">Tải ảnh / logo<input id="studioVisualUpload" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden></label></div>
+            <p id="studioVisualStatus" role="status" class="field-hint"></p><div id="studioVisualLibrary" class="studio-visual-library"></div>
+            <label for="studioLogo">Logo đầu video & thẻ Follow</label><select id="studioLogo"><option value="">Logo kênh DevPeek36 · mặc định</option></select><p class="field-hint">Mặc định dùng logo DevPeek36 của kênh. Chọn ảnh đã tải lên nếu muốn thay logo cho bản dựng.</p>
+          </details>
+          <div id="studioTtsFields">
+            <div class="form-row">
+              <div class="form-group col-6"><label for="studioProvider">Dịch vụ giọng</label><select id="studioProvider"><option value="edge-tts">Edge TTS · Nam Minh mặc định</option><option value="zerotts">ZeroTTS · Tiếng Việt local</option><option value="vbee">Vbee</option><option value="elevenlabs">ElevenLabs</option><option value="lucylab">LucyLab</option></select></div>
+              <div class="form-group col-6" id="studioEdgeVoiceGroup"><label for="studioEdgeVoice">Giọng tiếng Việt</label><select id="studioEdgeVoice"><option value="vi-VN-NamMinhNeural">Nam Minh · Nam</option><option value="vi-VN-HoaiMyNeural">Hoài My · Nữ</option></select></div>
+              <div class="form-group col-6" id="studioZeroVoiceGroup" hidden><label for="studioZeroVoice">Giọng ZeroTTS</label><select id="studioZeroVoice"><option value="quangminh">Quang Minh · Nam · Tin tức</option></select></div>
+              <div class="form-group col-6" id="studioVoiceIdGroup" hidden><label for="studioVoiceId">Voice ID / Voice Code</label><input id="studioVoiceId" type="text" placeholder="Lấy từ tài khoản dịch vụ của bạn"></div>
+            </div>
+            <p class="field-hint" id="studioProviderHint"></p>
+            <div class="form-group"><label for="studioSpeed">Tốc độ đọc <output id="studioSpeedValue">1.20x</output></label><input id="studioSpeed" type="range" min="0.5" max="2" step="0.05" value="1.2"></div>
+            <div class="form-group"><label for="studioPreviewText">Đoạn nghe thử</label><textarea id="studioPreviewText" rows="2">OpenDesign và Agent giúp bạn tạo giao diện. Theo dõi DevPeek36 để khám phá repo và tin tức công nghệ mới.</textarea></div>
+            <button class="btn btn-secondary" id="studioListen" type="button">▶ Nghe thử giọng</button>
+          </div>
+          <div id="studioUploadFields" hidden>
+            <div class="form-group"><label for="studioUpload">File giọng đọc (MP3 / WAV, tối đa 30 MB, 10 phút)</label><input id="studioUpload" type="file" accept=".mp3,.wav,audio/mpeg,audio/wav"><span class="field-hint" id="studioUploadName"></span></div>
+            <div class="form-group"><label for="studioSrtFile">Phụ đề SRT có sẵn (không bắt buộc)</label><input id="studioSrtFile" type="file" accept=".srt"><textarea id="studioSrt" rows="3" placeholder="Hoặc dán SRT vào đây"></textarea></div>
+            <p class="field-hint">Dán đầy đủ lời đọc vào phần nội dung bên dưới. Audio giữ nguyên tốc độ. Không có SRT: phụ đề và mốc cảnh được ước lượng; bạn có thể sửa mốc cảnh trước khi render.</p>
+          </div>
+          <audio id="studioAudio" controls hidden preload="none"></audio>
+          <p class="field-hint">Tạo voice từ dịch vụ: <a href="https://vbee.vn/" target="_blank" rel="noopener noreferrer">Vbee</a> · <a href="https://elevenlabs.io/text-to-speech/vietnamese" target="_blank" rel="noopener noreferrer">ElevenLabs</a>. Tải MP3/WAV về rồi đưa vào web ở trên.</p>
+          <p id="studioStatus" role="status" aria-live="polite">Mặc định Nam Minh 1.20x · Chuẩn hóa tiếng Việt và thuật ngữ trước khi đọc. ZeroTTS vẫn chọn được.</p>
+
+        </section>
+
         <!-- Tab 1: URL Mode -->
         <div class="tab-pane active" id="paneUrl">
           <form id="formUrlMode" onsubmit="return false;">
@@ -105,7 +171,7 @@
                   <span class="btn-text">Quét Dữ Liệu</span>
                 </button>
               </div>
-              <span class="field-hint">Hỗ trợ các trang tin tức VnExpress, Dân Trí, GenK, TechCrunch, GitHub repositories,...</span>
+              <span class="field-hint">Hỗ trợ VnExpress, Dân Trí, GenK, TechCrunch, GitHub, Hacker News, Reddit, Product Hunt, Hugging Face, arXiv và blog AI công khai. X cần quyền API; Telegram chỉ nhận bài công khai.</span>
             </div>
 
             <!-- Preview Extracted Info -->
@@ -116,22 +182,22 @@
               <div class="extracted-meta">
                 <div class="extracted-badge" id="extractedDomain">domain.com</div>
                 <h4 class="extracted-title" id="extractedTitle">Tiêu đề bài báo</h4>
-                <p class="extracted-snippet" id="extractedSnippet">Đoạn trích dẫn nội dung...</p>
+                <p id="extractedScope" class="field-hint"></p><p class="extracted-snippet" id="extractedSnippet">Đoạn trích dẫn nội dung...</p>
               </div>
             </div>
 
             <!-- Channel & Voice Settings -->
             <div class="form-row">
               <div class="form-group col-6">
-                <label for="selectVoiceUrl">Giọng đọc (Edge TTS)</label>
-                <select id="selectVoiceUrl">
+                <label hidden for="selectVoiceUrl">Giọng đọc (Edge TTS)</label>
+                <select hidden id="selectVoiceUrl">
                   <option value="vi-VN-NamMinhNeural" selected>Nam Minh (Nam - Giọng chuẩn Miền Bắc)</option>
                   <option value="vi-VN-HoaiMyNeural">Hoài My (Nữ - Giọng chuẩn Miền Bắc)</option>
                 </select>
               </div>
               <div class="form-group col-6">
                 <label for="inputChannelUrl">Tên kênh hiển thị</label>
-                <input type="text" id="inputChannelUrl" value="Công Nghệ 24h">
+                <input type="text" id="inputChannelUrl" value="DevPeek36">
               </div>
             </div>
 
@@ -153,7 +219,7 @@
             <div class="advanced-studio-box">
               <div class="advanced-title">⚙️ Cấu Hình Nâng Cao (M1–M5)</div>
               <div class="form-row">
-                <div class="form-group col-4">
+                <div class="form-group col-6">
                   <label for="selectPresetUrl">Độ dài Preset</label>
                   <select id="selectPresetUrl">
                     <option value="news_45" selected>news_45 (~45s Bản tin)</option>
@@ -161,22 +227,13 @@
                     <option value="review_60">review_60 (~60s Đánh giá)</option>
                   </select>
                 </div>
-                <div class="form-group col-4">
+                <div class="form-group col-6">
                   <label for="selectCaptionStyleUrl">Kiểu Phụ Đề (M1)</label>
                   <select id="selectCaptionStyleUrl">
                     <option value="tiktok-bold" selected>tiktok-bold (Chữ lớn nổi bật)</option>
                     <option value="classic-sub">classic-sub (Cổ điển)</option>
                     <option value="minimal">minimal (Tối giản)</option>
                   </select>
-                </div>
-                <div class="form-group col-4">
-                  <label>Nhạc Nền & Ducking (M5)</label>
-                  <div class="checkbox-row" style="margin-top: 8px;">
-                    <label class="custom-checkbox">
-                      <input type="checkbox" id="checkEnableBgmUrl" checked>
-                      <span>Bật BGM Ducking</span>
-                    </label>
-                  </div>
                 </div>
               </div>
               <div class="form-row" style="margin-top: 8px;">
@@ -206,7 +263,7 @@
             <div class="form-actions">
               <button type="button" class="btn btn-primary btn-glow btn-large" id="btnSubmitUrl">
                 <span class="icon">⚡</span>
-                <span>Bắt Đầu Tạo Video Ngay</span>
+                <span>Chuẩn Bị & Duyệt Kịch Bản</span>
               </button>
             </div>
           </form>
@@ -227,15 +284,15 @@
 
             <div class="form-row">
               <div class="form-group col-6">
-                <label for="selectVoiceText">Giọng đọc</label>
-                <select id="selectVoiceText">
+                <label hidden for="selectVoiceText">Giọng đọc</label>
+                <select hidden id="selectVoiceText">
                   <option value="vi-VN-NamMinhNeural" selected>Nam Minh (Nam)</option>
                   <option value="vi-VN-HoaiMyNeural">Hoài My (Nữ)</option>
                 </select>
               </div>
               <div class="form-group col-6">
                 <label for="inputChannelText">Tên kênh hiển thị</label>
-                <input type="text" id="inputChannelText" value="Tin Tức AI 24h">
+                <input type="text" id="inputChannelText" value="DevPeek36">
               </div>
             </div>
 
@@ -256,7 +313,7 @@
             <div class="form-actions">
               <button type="button" class="btn btn-primary btn-glow btn-large" id="btnSubmitText">
                 <span class="icon">⚡</span>
-                <span>Tạo Video Từ Văn Bản</span>
+                <span>Chuẩn Bị & Duyệt Kịch Bản</span>
               </button>
             </div>
           </form>
@@ -274,7 +331,7 @@
           <div class="form-actions">
             <button type="button" class="btn btn-primary btn-glow" id="btnSubmitCustomScript">
               <span class="icon">🚀</span>
-              <span>Render Kịch Bản Này</span>
+              <span>Duyệt & Chỉnh Kịch Bản Này</span>
             </button>
           </div>
         </div>
@@ -291,7 +348,7 @@
           <div class="tip-item">
             <div class="tip-num">01</div>
             <div class="tip-body">
-              <strong>3 Giây Đầu Quyết Định:</strong> Cảnh Hook đầu tiên luôn có hiệu ứng chữ giật flash và số liệu gây tò mò để giữ chân người xem TikTok.
+              <strong>3 Giây Đầu Quyết Định:</strong> Mở bằng vấn đề hoặc câu hỏi cụ thể, rồi đưa bằng chứng từ nguồn. Thẻ và hình xuất hiện theo lời đọc.
             </div>
           </div>
           <div class="tip-item">
@@ -312,7 +369,7 @@
           <div class="summary-title">⚡ Các bước trong Pipeline tự động:</div>
           <ul class="summary-steps">
             <li><span class="step-badge">1</span> Đọc dữ liệu & Sinh kịch bản JSON</li>
-            <li><span class="step-badge">2</span> Thu âm giọng đọc Edge TTS (0đ)</li>
+            <li><span class="step-badge">2</span> Thu âm bằng giọng đã chọn</li>
             <li><span class="step-badge">3</span> Mix âm thanh, nhịp điệu & SFX</li>
             <li><span class="step-badge">4</span> Render HyperFrames thành MP4</li>
           </ul>
@@ -324,9 +381,26 @@
     <section class="feeds-section glass-card" id="feedsSection" style="display: none;">
       <div class="section-header">
         <div class="section-title-wrap">
-          <h3 class="section-title">📰 Quét Tin Tức RSS Tự Động (M7)</h3>
+          <h3 class="section-title">📡 AI News Radar</h3>
           <span class="badge" id="feedsCountBadge">0 Bài Viết</span>
         </div>
+
+      </div>
+
+      <p class="section-subtitle">Khám phá tin AI, repo, công cụ, model và nghiên cứu từ RSS / API công khai. Nhập vào Studio để đọc nguồn, duyệt kịch bản rồi tạo video.</p>
+      <div class="radar-toolbar" aria-label="Bộ lọc AI News Radar">
+        <label>Nguồn<select id="radarSource"><option value="">Tất cả nguồn</option></select></label>
+        <label>Danh mục<select id="radarCategory"><option value="">Tất cả danh mục</option><option value="news">Tin AI</option><option value="repos">GitHub repos</option><option value="tools">Công cụ AI</option><option value="models">Models</option><option value="research">Nghiên cứu</option></select></label>
+        <label>Sắp xếp<select id="radarSort"><option value="newest">Mới nhất</option><option value="trending">Trending · tín hiệu cộng đồng</option></select></label>
+        <label>Tìm kiếm<input id="radarSearch" type="search" placeholder="Tên model, repo, chủ đề…" maxlength="200"></label>
+        <button id="radarRefresh" class="btn btn-secondary" type="button">↻ Làm mới Radar</button>
+      </div>
+      <p class="field-hint">Tự cập nhật mỗi 5 phút khi mở Radar · Không sử dụng Gemini để quét tin.</p>
+      <p id="radarStatus" class="radar-status" role="status" aria-live="polite">Chọn Radar để quét các nguồn.</p>
+      <details class="radar-health"><summary>Trạng thái nguồn & giới hạn truy cập</summary>      <p class="field-hint">Tự cập nhật mỗi 5 phút khi mở Radar; dùng cache để hạn chế quota. Trending dựa trên chỉ số công khai và độ mới, không phải bảng Trending chính thức của GitHub. Repo GitHub: topic AI, có hoạt động trong 30 ngày, xếp theo sao. RSS không có chỉ số phổ biến sẽ được ghi rõ.</p><div id="radarSources" class="radar-source-status"></div></details>
+      <div id="radarCards" class="radar-grid" aria-label="Kết quả AI News Radar"></div>
+      <details id="legacyFeeds" class="radar-legacy"><summary>RSS cũ & Batch Queue</summary>
+      <p class="field-hint">Giữ lại công cụ RSS cũ. Batch dùng phần mô tả RSS; để đọc nguồn đầy đủ và duyệt lời, hãy dùng nút Import trên Radar.</p>
         <div class="header-actions-group">
           <button class="btn btn-sm btn-secondary" id="btnRefreshFeeds">
             <span class="icon">🔄</span>
@@ -337,10 +411,6 @@
             <span>Chạy Batch Queue (3 Bài)</span>
           </button>
         </div>
-      </div>
-
-      <p class="section-subtitle">Tự động lấy tin bài mới nhất từ VnExpress Số Hóa, Tuổi Trẻ, GenK, Thanh Niên. Bấm tạo video cho bất kỳ bài nào chỉ với 1 click:</p>
-
       <div class="feeds-table-wrapper">
         <table class="feeds-table" id="feedsTable">
           <thead>
@@ -361,6 +431,7 @@
           </tbody>
         </table>
       </div>
+      </details>
     </section>
 
     <!-- Lexicon Pronunciation Dictionary Section (Milestone M5) -->
@@ -516,6 +587,8 @@
               <textarea id="inspectorVoiceText" rows="4" placeholder="Nhập lời thoại của cảnh..."></textarea>
             </div>
 
+            <details class="form-group"><summary>Nhịp xuất hiện từng khối</summary><p class="field-hint">Mốc tính từ đầu cảnh. Để trống để tự khớp lời đọc; nhập giây để chỉnh tay. Lưu rồi render để cập nhật hình.</p><div id="inspectorBlockTiming"></div></details>
+            <button type="button" id="btnReferenceDesign" class="btn btn-secondary">Áp dụng thiết kế video mẫu cho dự án</button>
             <div class="form-row">
               <div class="form-group col-6">
                 <label for="inspectorTemplate">Template hiển thị</label>
@@ -528,7 +601,7 @@
                     <option value="callout">callout (Tuyên bố)</option>
                     <option value="outro">outro (Kết bài)</option>
                   </optgroup>
-                  <optgroup label="Mở rộng Review (M3)">
+                  <optgroup label="Giải thích"><option value="workflow">Workflow · từng bước</option><option value="code-window">Code / terminal</option><option value="data-flow">Luồng dữ liệu</option><option value="worked-example">Ví dụ minh họa</option></optgroup><optgroup label="Mở rộng Review (M3)">
                     <option value="spec-table">spec-table (Bảng cấu hình)</option>
                     <option value="pros-cons">pros-cons (Ưu & Nhược điểm)</option>
                     <option value="verdict-score">verdict-score (Điểm đánh giá)</option>
@@ -794,7 +867,7 @@
             </a>
             <a href="#" download id="btnDownloadCover" class="btn btn-outline" style="display: none;">
               <span class="icon">🖼️</span>
-              <span>Tải Ảnh Bìa TikTok (cover.png)</span>
+              <span>Tải Thumbnail PNG</span>
             </a>
             <button class="btn btn-outline" id="btnViewPublishChecklist">
               <span class="icon">📋</span>
@@ -932,15 +1005,15 @@ Chào mừng các bạn đến với bản tin..."></textarea>
           <div class="form-group col-6" style="margin: 0;">
             <label for="selectLlmModelPreset" style="font-weight: 700; color: #fff;">3. Chọn Model gợi ý</label>
             <select id="selectLlmModelPreset">
-              <option value="gemini-2.0-flash">gemini-2.0-flash (Mặc định · Cực nhanh)</option>
-              <option value="gemini-1.5-flash">gemini-1.5-flash (Ổn định)</option>
-              <option value="gemini-1.5-pro">gemini-1.5-pro (Mô hình lớn)</option>
+              <option value="gemini-flash-lite-latest">gemini-flash-lite-latest (Khuyên dùng · Siêu tốc 1s)</option>
+              <option value="gemini-3.5-flash-lite">gemini-3.5-flash-lite (Rất nhanh)</option>
+              <option value="gemini-3.8-flash">gemini-3.8-flash (Model mới · Tư duy cao)</option>
               <option value="custom">-- Nhập Model tùy chỉnh... --</option>
             </select>
           </div>
           <div class="form-group col-6" style="margin: 0;">
             <label for="inputLlmModelCustom" style="font-weight: 700; color: #fff;">Tên Model cụ thể</label>
-            <input type="text" id="inputLlmModelCustom" value="gemini-2.0-flash" placeholder="Ví dụ: gemini-2.0-flash" style="font-family: var(--font-mono);">
+            <input type="text" id="inputLlmModelCustom" value="gemini-flash-lite-latest" placeholder="Ví dụ: gemini-flash-lite-latest" style="font-family: var(--font-mono);">
           </div>
         </div>
 
@@ -972,6 +1045,21 @@ Chào mừng các bạn đến với bản tin..."></textarea>
     <span class="toast-message" id="toastMessage">Thông báo</span>
   </div>
 
-  <script src="app.js?v=2.3"></script>
+  <dialog id="studioLayoutPreview" class="studio-review-dialog"><header><h3>Xem bố cục · thời gian tạm, chưa có voice</h3><button id="studioLayoutPreviewClose" class="btn btn-outline" type="button">Đóng</button></header><iframe id="studioLayoutFrame" title="Xem trước bố cục đang sửa" sandbox="allow-scripts allow-same-origin" style="width:100%;height:65vh;border:0;background:#050d18"></iframe></dialog>
+  <dialog id="studioReview" class="studio-review-dialog">
+    <header><div><span class="studio-kicker">TRƯỚC KHI XUẤT VIDEO</span><h2>Duyệt kịch bản & giọng</h2></div><button id="studioReviewClose" class="btn btn-outline" type="button">Đóng</button></header>
+    <p id="studioReviewHint" role="status"></p>
+    <audio id="studioReviewAudio" controls hidden preload="none" style="width:100%;margin:12px 0"></audio>
+    <label for="studioReviewPack">Thiết kế của bản dựng · giữ nguyên nội dung</label><select id="studioReviewPack"></select>
+    <label class="custom-checkbox"><input type="checkbox" id="studioReferenceDesign" checked><span>Áp dụng phong cách video mẫu cho tất cả cảnh</span></label>
+    <details id="studioPronunciationReview" class="studio-coverage"><summary>Cách đọc thuật ngữ · kiểm tra trước khi xuất</summary><p>Chỉ đổi âm đọc, giữ nguyên chữ trên hình. Từ điển riêng cho video này có dạng {"Agent":"ây chình"}. Nghe thử các cảnh sau khi áp dụng.</p><label for="studioPronunciationOverrides">Từ điển riêng của video (JSON)</label><textarea id="studioPronunciationOverrides" rows="4">{}</textarea><button id="studioApplyPronunciation" class="btn btn-secondary" type="button">Áp dụng & xem cách đọc</button><div id="studioPronunciationReport" role="status"></div></details>
+    <section id="studioCoverage" class="studio-coverage" hidden></section>
+    <div id="studioHookOptions" class="studio-hook-options" hidden></div>
+    <div id="studioReviewList"></div>
+    <footer><button id="studioReviewPreview" class="btn btn-secondary" type="button">Xem thử bố cục · không voice</button><button id="studioReviewRender" class="btn btn-primary" type="button">Duyệt & Render Video</button></footer>
+  </dialog>
+  <script src="studio.js?v=2"></script>
+  <script src="app.js?v=2.4"></script>
+  <script src="radar.js?v=1"></script>
 </body>
 </html>

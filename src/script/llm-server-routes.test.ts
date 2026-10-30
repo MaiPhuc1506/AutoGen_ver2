@@ -1,12 +1,18 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import http from "node:http";
+import { readFile, writeFile, rm } from "node:fs/promises";
 import { app } from "../server.js";
+
+vi.mock("./llm-provider.js", () => ({ createLlmProvider: () => ({ name: "fake", generate: async () => "OK" }) }));
 
 describe("LLM Configuration & Settings Routes", () => {
   let server: http.Server;
   let baseUrl: string;
+  let savedConfig: Buffer | undefined;
+  const configPath = "config/llm.json";
 
   beforeAll(async () => {
+    try { savedConfig = await readFile(configPath); } catch {}
     process.env.NODE_ENV = "test";
     await new Promise<void>((resolve) => {
       server = app.listen(0, () => {
@@ -20,6 +26,8 @@ describe("LLM Configuration & Settings Routes", () => {
   });
 
   afterAll(async () => {
+    if (savedConfig) await writeFile(configPath, savedConfig);
+    else await rm(configPath, { force: true });
     await new Promise<void>((resolve) => {
       server.close(() => resolve());
     });

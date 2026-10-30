@@ -1,0 +1,13 @@
+{
+  "schemaVersion":2,"visualStyle":"tech-editorial","motionPreset":"dynamic","soundDesign":true,
+  "captions":{"enabled":true,"style":"minimal"},
+  "metadata":{"title":"Video của bạn đang quá tĩnh?","source":{"url":"local","domain":"Bản minh họa","image":null},"channel":"STUDIO CỦA BẠN"},
+  "voice":{"provider":"edge-tts","voiceId":"vi-VN-NamMinhNeural","speed":1.1,"settingsSource":"script"},
+  "scenes":[
+    {"id":"hook","type":"hook","voiceText":"Video của bạn đang quá tĩnh?","templateData":{"template":"hook","headline":"Video của bạn\nđang quá tĩnh?","subhead":"Thử một nhịp dựng khác."}},
+    {"id":"stat","type":"body","voiceText":"Ba điểm cần đổi. Lời mở, chuyển động và điểm nhấn.","templateData":{"template":"stat-hero","value":"03","label":"Điểm cần đổi","context":"Lời mở · Chuyển động · Điểm nhấn"}},
+    {"id":"features","type":"body","voiceText":"Hook vào thẳng vấn đề. Chữ và số có điểm nhấn. Duyệt lời trước khi xuất.","templateData":{"template":"feature-list","title":"Mỗi ý, một nhịp.","bullets":["Hook vào thẳng vấn đề","Chữ và số có điểm nhấn","Duyệt lời trước khi xuất"]}},
+    {"id":"callout","type":"body","voiceText":"Hiệu ứng phải phục vụ nội dung.","templateData":{"template":"callout","statement":"Hiệu ứng phải\nphục vụ nội dung.","tag":"GIỮ ĐÚNG Ý"}},
+    {"id":"outro","type":"outro","voiceText":"Thử lại bằng chính nội dung của bạn.","templateData":{"template":"outro","ctaTop":"Thử bằng nội dung của bạn","channelName":"Studio của bạn","source":"Bản minh họa"}}
+  ]
+}

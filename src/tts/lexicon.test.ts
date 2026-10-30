@@ -35,3 +35,13 @@ describe("Lexicon Pronunciation Dictionary (M5)", () => {
   });
 });
 
+
+it('reads OpenDesign and Agent through the dictionary, normalizes versions/acronyms and supports per-video overrides',async()=>{
+ const {speechText,pronunciationReport,resetLexiconCache}=await import('./lexicon.js');resetLexiconCache();
+ const original='OpenDesign, design agent, HyperFrames, MCP, pnpm 10.33.x và ABC.';
+ const spoken=speechText(original,'lexicon');expect(spoken).toContain('ô bình đi zai');expect(spoken).toContain('đi dai ây chình');expect(spoken).toContain('hai pờ phờ rêm');expect(spoken).toContain('em xi pi');expect(spoken).toContain('pi en pi em mười chấm ba mươi ba chấm ích');expect(spoken).toContain('ây bi xi');expect(spoken).not.toContain('chấm ít');
+ expect(speechText('Agent OpenDesign','lexicon',{Agent:'CÁCH RIÊNG'})).toBe('CÁCH RIÊNG ô bình đi zai');expect(speechText(original,'original')).toBe(original);
+ expect(pronunciationReport('NewRepo MCP OpenDesign').unreviewed).toContain('NewRepo');expect(pronunciationReport('NewRepo MCP',undefined,{NewRepo:'niu ri pô'}).unreviewed).not.toContain('NewRepo');
+ expect(original).toContain('10.33.x');
+ expect(speechText('Open, OPEN và OpenDesign; OpenAI.', 'lexicon')).toBe('ô bình, ô bình và ô bình đi zai; âu pừn ây ai.');
+});

@@ -1,25 +1,39 @@
+import {measureWithShortHook} from './script/measured-hook.js';
+import {measureNarration,assessNarration} from './studio/narration-timing.js';
+import {ensureRepositoryHero} from './studio/repository-hero.js';
+import {cleanScriptNarration,validateNarrationRepetition} from './script/narration-cleanup.js';
+import {hydrateGithubStars,applySpokenGithubHook} from './script/github-stars.js';
+import {referenceSettings} from './render/reference-design.js';
+import {preparedPronunciationReport} from "./tts/smart-pronunciation.js";
+import {stripCssImports} from "./render/css.js";
+import {fitVoiceDuration} from "./studio/duration.js";
 import { readFile, writeFile, mkdir, copyFile } from "node:fs/promises";
 import { join, dirname, basename } from "node:path";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import pLimit from "p-limit";
 import { ScriptSchema, type Script } from "./render/script-schema.js";
 import { loadConfig } from "./config.js";
-import { createTtsClient } from "./tts/tts-client.js";
 import { fetchImage } from "./assets/image-fetcher.js";
 import { getDurationSec, concatWithSilence, mixSfxOntoVoice, mixBgmWithVoice, type SfxMixSpec } from "./assets/audio-tools.js";
+import { ensureEditorialSfx } from "./assets/editorial-sfx.js";
 import { indexSfxLibrary, pickSfxForScene, defaultPlayback } from "./assets/sfx-selector.js";
 import { existsSync } from "node:fs";
 import { composeHtml } from "./render/html-composer.js";
 import { renderWithHyperframes } from "./render/hyperframes-runner.js";
+import { voiceConfig, studioTts, cachedSpeech } from "./studio/voice.js";
+import { prepareImportedVoice } from "./studio/uploads.js";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { log } from "./utils/logger.js";
 import { groupWordsIntoCues } from "./captions/grouper.js";
-import { generateSrt, parseSrt } from "./captions/srt.js";
-import { estimateWordTimings } from "./captions/estimator.js";
-import type { TimedWord, CaptionCue } from "./captions/types.js";
+import { generateSrt } from "./captions/srt.js";
+import type { CaptionCue } from "./captions/types.js";
 import { processSceneMedia } from "./media/media-manager.js";
 import { PexelsProvider, PixabayProvider } from "./media/stock-provider.js";
-import { applyLexicon } from "./tts/lexicon.js";
-import { generatePublishChecklist, extractCoverFrame } from "./ingest/publish-kit.js";
+import { generatePublishChecklist } from "./ingest/publish-kit.js";
+import {ensureVideoThumbnail} from './ingest/thumbnail.js';
+import {defaultCaption,DEFAULT_BGM} from './channel-defaults.js';
 
 const TOTAL_STEPS = 8;
 const DURATION_MIN_SEC = 48;
@@ -49,22 +63,51 @@ const HYPERFRAMES_CONFIG = {
 };
 
 export async function runPipeline(scriptPath: string): Promise<void> {
-  const cfg = loadConfig();
+  const raw = JSON.parse(await readFile(scriptPath, "utf8"));
+  let cfg = raw.voice?.settingsSource === "script" || raw.voice?.uploadId
+    ? loadConfig({ provider: "edge-tts" }) : loadConfig();
   const outputDir = dirname(scriptPath);
   log.info(`Output directory: ${outputDir}`);
 
   // STEP 1
-  log.step(1, TOTAL_STEPS, `Load env + validate script.json (TTS provider: ${cfg.ttsProvider})`);
-  const raw = JSON.parse(await readFile(scriptPath, "utf8"));
+
   // Substitute env placeholder before validation (works for all providers)
   if (raw.voice?.voiceId === "${VIETNAMESE_VOICEID}" || raw.voice?.voiceId === "${VOICE_ID}") {
     raw.voice.voiceId =
-      cfg.ttsProvider === "edge-tts" ? cfg.edgeTtsVoice
+      cfg.ttsProvider === "zerotts" ? cfg.zeroTtsVoice
+      : cfg.ttsProvider === "edge-tts" ? cfg.edgeTtsVoice
       : cfg.ttsProvider === "lucylab" ? cfg.lucylabVoiceId!
       : cfg.ttsProvider === "elevenlabs" ? cfg.elevenlabsVoiceId!
       : cfg.vbeeVoiceCode;
   }
   const script: Script = ScriptSchema.parse(raw);
+  if(!script.voice.uploadId&&referenceSettings(script)){
+    cleanScriptNarration(script);
+    validateNarrationRepetition(script);
+  }
+  if(referenceSettings(script))await ensureRepositoryHero(script);
+  await hydrateGithubStars(script);
+  if(script.narrationTiming||referenceSettings(script))applySpokenGithubHook(script);
+  if(script.explanationLevel&&!script.voice.uploadId){
+    const measurement=await measureWithShortHook(script,outputDir,measureNarration),report=assessNarration(script,measurement);
+    if(!report.accepted)throw new Error(report.feedback);
+    script.targetDurationSec=report.targetSec;script.fitDuration=true;
+    script.narrationTiming={targetSec:report.targetSec,speechSec:report.speechSec,tempo:report.tempo,hookSec:report.hookSec,attempts:script.narrationTiming?.attempts??1};
+    raw.targetDurationSec=script.targetDurationSec;raw.fitDuration=true;raw.narrationTiming=script.narrationTiming;
+  }
+  if(referenceSettings(script)){
+    if(script.metadata.githubStars)raw.metadata.githubStars=script.metadata.githubStars;else delete raw.metadata.githubStars;
+    for(const scene of raw.scenes){const updated=script.scenes.find(s=>s.id===scene.id)!;scene.voiceText=updated.voiceText;if(updated.githubHookStyle)scene.githubHookStyle=updated.githubHookStyle;if(updated.media)scene.media=updated.media;if(updated.storyboard)scene.storyboard=updated.storyboard;if(scene.templateData.template==='hook'){scene.githubStarLeadIn=Boolean(script.metadata.githubStars);if(updated.githubStarSpokenPrefix)scene.githubStarSpokenPrefix=updated.githubStarSpokenPrefix;}}
+    await writeFile(scriptPath,JSON.stringify(raw,null,2));
+  }
+  script.bgm ??= {...DEFAULT_BGM};
+  if(referenceSettings(script))script.visualStyle='tech-editorial';
+  if(script.templatePack){script.visualStyle="tech-editorial";if(script.templatePack==="explainer")script.colorTheme="midnight";}
+  cfg = voiceConfig(script.voice);
+  log.step(1, TOTAL_STEPS, `Validate script.json (${script.voice.uploadId ? "voice tải lên" : "TTS: " + cfg.ttsProvider})`);
+  const reference=referenceSettings(script);
+  const gapSec = script.voice.uploadId ? 0 : reference ? reference.gapSec : script.visualStyle === 'tech-editorial' ? 0.08 : SCENE_GAP_SEC;
+  const outroHoldSec = reference ? reference.outroHoldSec : script.visualStyle === 'tech-editorial' ? 0.6 : OUTRO_HOLD_SEC;
 
   // STEP 2
   log.step(2, TOTAL_STEPS, "Write script.txt for CapCut");
@@ -88,81 +131,30 @@ export async function runPipeline(scriptPath: string): Promise<void> {
 
   const mediaPromise = processSceneMedia(script, outputDir, stockProvider);
 
+  if(!script.voice.uploadId)await writeFile(join(outputDir,'pronunciation-review.json'),JSON.stringify({mode:script.voice.pronunciation||'lexicon',scenes:await Promise.all(script.scenes.map(async s=>({id:s.id,original:s.voiceText,...await preparedPronunciationReport(s.voiceText,script.voice.pronunciation,script.voice.pronunciationOverrides)})))},null,2));
+
   // STEP 4
-  const ttsClient = createTtsClient(cfg);
-  // Concurrency: LucyLab requires 1 (only 1 concurrent export per key);
-  // ElevenLabs supports parallel calls but we keep 1 by default to be polite.
-  const limit = pLimit(cfg.ttsConcurrency);
+  const limit = pLimit(cfg.ttsProvider==='edge-tts'?Math.max(2,cfg.ttsConcurrency):cfg.ttsConcurrency);
   const voiceDir = join(outputDir, "voice");
   await mkdir(voiceDir, { recursive: true });
+  const imported = script.voice.uploadId ? await prepareImportedVoice(script, outputDir) : undefined;
+  const ttsClient = imported ? undefined : studioTts(cfg, script.voice);
+  const sceneAudioPromises = imported ? imported.scenes.map(a => Promise.resolve(a)) : script.scenes.map(scene =>
+    limit(async () => ({ id: scene.id, ...await cachedSpeech(scene.voiceText,
+      join(voiceDir, `scene-${scene.id}.mp3`), cfg, script.voice.speed, ttsClient!, script.voice.pronunciation, script.voice.pronunciationOverrides) })));
 
-  const sceneAudioPromises = script.scenes.map((scene) =>
-    limit(async () => {
-      const out = join(voiceDir, `scene-${scene.id}.mp3`);
-      const srtOut = join(voiceDir, `scene-${scene.id}.srt`);
-      const wordsPath = join(voiceDir, `scene-${scene.id}.words.json`);
-      let words: TimedWord[] = [];
-      let accuracy: "high" | "low" = "low";
-
-      // IDEMPOTENT: skip TTS if voice file already exists.
-      // To force re-TTS for a scene, delete its mp3 file before running.
-      // This saves API quota when only some scenes' voiceText changed.
-      if (existsSync(out)) {
-        const dur = await getDurationSec(out);
-        log.info(`  scene ${scene.id}: REUSE existing mp3 (${dur.toFixed(2)}s) — delete to force re-TTS`);
-        if (existsSync(wordsPath)) {
-          try {
-            words = JSON.parse(await readFile(wordsPath, "utf8"));
-            accuracy = "high";
-          } catch {}
-        } else if (existsSync(srtOut)) {
-          try {
-            const srtCues = parseSrt(await readFile(srtOut, "utf8"));
-            words = srtCues.flatMap((c) => c.words);
-            accuracy = "high";
-          } catch {}
-        }
-        if (words.length === 0) {
-          words = estimateWordTimings(scene.voiceText, dur);
-          accuracy = "low";
-        }
-        return { id: scene.id, path: out, durationSec: dur, words, accuracy };
-      }
-
-      const spokenText = applyLexicon(scene.voiceText);
-      log.info(`  TTS scene ${scene.id} (${spokenText.length} chars)...`);
-      const timing = await ttsClient.generate(spokenText, out, srtOut);
-      const dur = await getDurationSec(out);
-      log.info(`  scene ${scene.id}: ${dur.toFixed(2)}s`);
-
-      if (timing && timing.words && timing.words.length > 0) {
-        words = timing.words;
-        accuracy = timing.accuracy;
-        await writeFile(wordsPath, JSON.stringify(words, null, 2), "utf8");
-      } else if (existsSync(srtOut)) {
-        try {
-          const srtCues = parseSrt(await readFile(srtOut, "utf8"));
-          words = srtCues.flatMap((c) => c.words);
-          accuracy = "high";
-          await writeFile(wordsPath, JSON.stringify(words, null, 2), "utf8");
-        } catch {}
-      }
-
-      if (words.length === 0) {
-        words = estimateWordTimings(scene.voiceText, dur);
-        accuracy = "low";
-        await writeFile(wordsPath, JSON.stringify(words, null, 2), "utf8");
-      }
-
-      return { id: scene.id, path: out, durationSec: dur, words, accuracy };
-    }),
-  );
-
-  const [imgResult, mediaResult, sceneAudio] = await Promise.all([
+  let [imgResult, mediaResult, sceneAudio] = await Promise.all([
     imgPromise,
     mediaPromise,
     Promise.all(sceneAudioPromises),
   ]);
+
+  if(script.fitDuration && script.targetDurationSec && !imported){
+    const result=await fitVoiceDuration(script,sceneAudio,outputDir,gapSec,outroHoldSec);
+    sceneAudio=result.voices;
+    await writeFile(join(outputDir,'duration-fit.json'),JSON.stringify({targetSec:script.targetDurationSec,tempo:result.tempo,expectedSec:sceneAudio.reduce((n,a)=>n+a.durationSec+gapSec,0)+outroHoldSec},null,2));
+    log.info(`Cân thời lượng ${script.targetDurationSec}s, tempo ${result.tempo.toFixed(3)}x; giữ toàn bộ lời đọc.`);
+  }
 
   let bgImageRelPath: string | null = null;
   if (imgResult.success) {
@@ -175,14 +167,16 @@ export async function runPipeline(scriptPath: string): Promise<void> {
   log.step(5, TOTAL_STEPS, "Concat voice scenes + mix SFX layer");
   const voiceRawMp3 = join(outputDir, "voice-raw.mp3");
   const voiceMp3 = join(outputDir, "voice.mp3");
-  await concatWithSilence(sceneAudio.map((a) => a.path), SCENE_GAP_SEC, voiceRawMp3);
+  if (imported) {
+    await promisify(execFile)('ffmpeg', ['-v', 'error', '-y', '-i', join(outputDir, 'imported-voice.wav'), '-c:a', 'libmp3lame', '-b:a', '192k', voiceRawMp3]);
+  } else await concatWithSilence(sceneAudio.map((a) => a.path), gapSec, voiceRawMp3);
 
   // Compute scene start times (cumulative voice durations + gaps)
   let cursor = 0;
   const sceneStarts: Record<string, number> = {};
   for (const a of sceneAudio) {
     sceneStarts[a.id] = cursor;
-    cursor += a.durationSec + SCENE_GAP_SEC;
+    cursor += a.durationSec + gapSec;
   }
 
   // Build SFX mix list using smart 3-tier selector
@@ -191,9 +185,11 @@ export async function runPipeline(scriptPath: string): Promise<void> {
   const indexFiles = Object.values(sfxIndex).reduce((s, a) => s + a.length, 0);
   log.info(`  SFX library: ${indexFiles} files in ${indexCats} categories`);
 
+  const editorialSfx = script.motionPreset === "dynamic" && script.soundDesign ? await ensureEditorialSfx(join(outputDir,"sfx")) : undefined;
   const sfxList: SfxMixSpec[] = [];
   for (const scene of script.scenes) {
     const startSec = sceneStarts[scene.id];
+    if (script.soundDesign === false) continue;
 
     // Tier 1: explicit override in script.json
     if (scene.sfx) {
@@ -208,6 +204,12 @@ export async function runPipeline(scriptPath: string): Promise<void> {
       } else {
         log.warn(`  scene ${scene.id}: explicit SFX not found, skipping: ${scene.sfx.name}.mp3`);
       }
+      continue;
+    }
+
+    if (editorialSfx) {
+      const path = scene.type === 'hook' || scene.type === 'outro' ? editorialSfx.whoosh : editorialSfx.tick;
+      sfxList.push({ path, startSec: startSec + 0.06, volume: scene.type === 'hook' ? 0.18 : 0.13 });
       continue;
     }
 
@@ -236,14 +238,14 @@ export async function runPipeline(scriptPath: string): Promise<void> {
   await mixSfxOntoVoice(voiceRawMp3, sfxList, voiceMp3);
 
   // STEP 5.1 (M5): Mix Background Music (BGM) with ducking
-  if (script.bgm?.src) {
+  if (script.bgm?.src && script.bgm.enabled !== false) {
     let bgmFile = script.bgm.src;
     if (!existsSync(bgmFile)) {
       const candidate = join(process.cwd(), bgmFile);
       if (existsSync(candidate)) bgmFile = candidate;
     }
     if (existsSync(bgmFile)) {
-      const vol = script.bgm.volume ?? 0.18;
+      const vol = script.bgm.volume ?? DEFAULT_BGM.volume;
       const duck = script.bgm.duck ?? true;
       const duckVol = script.bgm.duckVolume ?? 0.06;
       log.info(`  mixing BGM: ${script.bgm.src} (vol=${vol}, duck=${duck})`);
@@ -253,6 +255,7 @@ export async function runPipeline(scriptPath: string): Promise<void> {
         volume: vol,
         duck,
         duckVolume: duckVol,
+        durationSec: sceneAudio.reduce((n,a)=>n+a.durationSec+gapSec,0)+outroHoldSec,
       });
     } else {
       log.warn(`  BGM file not found: ${script.bgm.src} — skipping BGM`);
@@ -276,6 +279,10 @@ export async function runPipeline(scriptPath: string): Promise<void> {
     maxTolerance = 75;
   }
 
+  if(script.fitDuration && script.targetDurationSec){
+    minTolerance=script.targetDurationSec-outroHoldSec-.15;
+    maxTolerance=script.targetDurationSec+.15;
+  }
   if (totalAudioSec < minTolerance || totalAudioSec > maxTolerance) {
     log.warn(`Total duration ${totalAudioSec.toFixed(1)}s outside preset [${minTolerance}, ${maxTolerance}]s tolerance — proceeding anyway`);
   }
@@ -288,14 +295,35 @@ export async function runPipeline(scriptPath: string): Promise<void> {
     const sceneStartMs = Math.round(startSec * 1000);
     const sceneCues = groupWordsIntoCues(a.words, { sceneStartMs }, cueIdCounter);
     cueIdCounter += sceneCues.length;
-    allCues.push(...sceneCues);
+    allCues.push(...sceneCues.map(c => ({ ...c, accuracy: a.accuracy,
+      endMs: Math.min(c.endMs, sceneStartMs + Math.round(a.durationSec * 1000)),
+      endSec: Math.min(c.endSec, startSec + a.durationSec) })));
   }
+
+  if (imported?.cues) allCues.splice(0, allCues.length, ...imported.cues);
+  for (let i = 0; i < allCues.length - 1; i++) {
+    allCues[i].endMs = Math.min(allCues[i].endMs, allCues[i + 1].startMs);
+    allCues[i].endSec = allCues[i].endMs / 1000;
+  }
+  await writeFile(join(outputDir, 'timing-quality.json'), JSON.stringify({
+    source: imported ? (imported.cues ? 'imported-srt' : 'estimated') : 'tts',
+    wordAccuracy: allCues.every(c => c.accuracy === 'high') ? 'high' : 'low',
+    sceneTiming: imported && !script.voice.sceneBoundaries ? 'estimated' : 'audio'
+  }, null, 2));
 
   // Export captions.srt and captions.json for the full video
   const srtContent = generateSrt(allCues);
   await writeFile(join(outputDir, "captions.srt"), srtContent, "utf8");
   await writeFile(join(outputDir, "captions.json"), JSON.stringify(allCues, null, 2), "utf8");
   log.info(`  Captions: exported ${allCues.length} cues → captions.srt & captions.json`);
+
+  if (script.voice.settingsSource === 'script' || imported) {
+    script.schemaVersion = 2;
+    script.timeline = { scenes: Object.fromEntries(sceneAudio.map(a => [a.id, {
+      start: sceneStarts[a.id], duration: a.durationSec + gapSec + (script.scenes.find(s => s.id === a.id)?.type === 'outro' ? outroHoldSec : 0)
+    }])), captionCues: allCues.map(c => ({ start: c.startSec, end: c.endSec, text: c.text })) };
+    await writeFile(scriptPath, JSON.stringify(script, null, 2));
+  }
 
   // STEP 6 — Compose HTML + write hyperframes project files
   log.step(6, TOTAL_STEPS, "Compose HTML + project files");
@@ -324,19 +352,15 @@ export async function runPipeline(scriptPath: string): Promise<void> {
     await copyFile(bundledAvatar, ttAvatarOut);
   }
 
-  if (cfg.safeZoneOverlay && script.metadata.safeZoneOverlay === undefined) {
-    script.metadata.safeZoneOverlay = true;
-  }
-
   const html = composeHtml({
     script,
     sceneAudio: sceneAudio.map((a) => ({ id: a.id, durationSec: a.durationSec })),
-    gapSec: SCENE_GAP_SEC,
+    gapSec,
     bgImageRelPath,
     audioRelPath: "voice.mp3",
     tiktok: cfg.tiktok,
     tiktokAvatarRelPath: ttAvatarFile,
-    outroHoldSec: OUTRO_HOLD_SEC,
+    outroHoldSec,
     captionCues: allCues,
     mediaMap: mediaResult.mediaMap,
   });
@@ -357,13 +381,22 @@ export async function runPipeline(scriptPath: string): Promise<void> {
   // base.html.tmpl + animations.js are shared across themes (structure/behavior);
   // only styles.<theme>.css differs (visual look), and always lands as "styles.css".
   const themeFile = cfg.videoTheme === "light-pro" ? "styles.light-pro.css" : "styles.css";
-  await copyFile(join(TPL_DIR, themeFile),       join(outputDir, "styles.css"));
+  await copyFile(join(TPL_DIR, themeFile), join(outputDir, "styles.css"));
+  if (script.visualStyle === 'tech-editorial') {
+    const baseCss = stripCssImports(await readFile(join(TPL_DIR, 'styles.css'), 'utf8'));
+    await writeFile(join(outputDir, 'styles.css'), baseCss + '\n' + await readFile(join(TPL_DIR, 'styles.tech-editorial.css'), 'utf8'));
+    await mkdir(join(outputDir, 'fonts'), { recursive: true });
+    await copyFile(join(__dirname, '../assets/fonts/BeVietnamPro-Bold.ttf'), join(outputDir, 'fonts/BeVietnamPro-Bold.ttf'));
+    await copyFile(join(__dirname, '../assets/fonts/OFL.txt'), join(outputDir, 'fonts/OFL.txt'));
+    await copyFile(createRequire(import.meta.url).resolve('gsap/dist/gsap.min.js'), join(outputDir, 'gsap.min.js'));
+  }
+  await writeFile(join(outputDir,'styles.css'),await readFile(join(outputDir,'styles.css'),'utf8')+'\n'+await readFile(join(TPL_DIR,'styles.follow-card.css'),'utf8'));
   await copyFile(join(TPL_DIR, "animations.js"), join(outputDir, "animations.js"));
 
   // STEP 7
   log.step(7, TOTAL_STEPS, "Render with hyperframes");
   const videoPath = join(outputDir, "video.mp4");
-  await renderWithHyperframes({ compositionDir: outputDir, outputPath: videoPath });
+  await renderWithHyperframes({ compositionDir: outputDir, outputPath: videoPath,fps:script.renderSettings?.fps??30,workers:script.renderSettings?.workers??2,quality:script.renderSettings?.quality??'standard' });
 
   // STEP 8
   log.step(8, TOTAL_STEPS, "Generate publish kit (publish.md + cover.png) & Finalize");
@@ -377,12 +410,13 @@ export async function runPipeline(scriptPath: string): Promise<void> {
     script
   );
   await writeFile(join(outputDir, "publish.md"), publishMd, "utf8");
+  await writeFile(join(outputDir, 'caption.txt'), defaultCaption(script.metadata.title), 'utf8');
 
   // Extract cover frame if video exists
   const coverPath = join(outputDir, "cover.png");
   if (existsSync(videoPath)) {
     try {
-      await extractCoverFrame(videoPath, coverPath, 1.0);
+      await ensureVideoThumbnail(videoPath, coverPath);
       log.info(`  Cover thumbnail: ${coverPath}`);
     } catch (coverErr: any) {
       log.warn(`  Could not extract cover frame: ${coverErr.message}`);

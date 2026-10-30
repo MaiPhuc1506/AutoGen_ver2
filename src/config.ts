@@ -4,7 +4,7 @@ import { config as dotenvConfig } from "dotenv";
 dotenvConfig({ path: ".env.local" });
 dotenvConfig();
 
-export type TtsProvider = "edge-tts" | "lucylab" | "elevenlabs" | "vbee";
+export type TtsProvider = "edge-tts" | "lucylab" | "elevenlabs" | "vbee" | "zerotts";
 export type VideoTheme = "dark-neon" | "light-pro";
 
 export interface TiktokConfig {
@@ -17,6 +17,7 @@ export interface TiktokConfig {
 
 export interface Config {
   ttsProvider: TtsProvider;
+  zeroTtsVoice: string;
 
   // Edge TTS (Free, no API key required)
   edgeTtsVoice: string;
@@ -74,18 +75,19 @@ function floatDefault(name: string, def: number): number {
   return n;
 }
 
-export function loadConfig(): Config {
-  const rawProvider = (process.env.TTS_PROVIDER ?? "edge-tts").trim().toLowerCase();
+export function loadConfig(override?: { provider: TtsProvider; voiceId?: string }): Config {
+  const rawProvider = (override?.provider ?? process.env.TTS_PROVIDER ?? "edge-tts").trim().toLowerCase();
   const provider = (rawProvider === "edgetts" ? "edge-tts" : rawProvider) as TtsProvider;
 
   if (
     provider !== "edge-tts" &&
     provider !== "lucylab" &&
     provider !== "elevenlabs" &&
-    provider !== "vbee"
+    provider !== "vbee" &&
+    provider !== "zerotts"
   ) {
     throw new Error(
-      `TTS_PROVIDER must be "edge-tts", "lucylab", "elevenlabs" or "vbee", got "${rawProvider}"`
+      `TTS_PROVIDER must be "edge-tts", "lucylab", "elevenlabs", "vbee" or "zerotts", got "${rawProvider}"`
     );
   }
 
@@ -97,7 +99,7 @@ export function loadConfig(): Config {
         `Copy .env.example to .env.local and fill in your LucyLab API key.`
       );
     }
-    if (!process.env.VIETNAMESE_VOICEID || process.env.VIETNAMESE_VOICEID.trim() === "") {
+    if (!override?.voiceId && !process.env.VIETNAMESE_VOICEID?.trim()) {
       throw new Error(
         `Missing VIETNAMESE_VOICEID (required when TTS_PROVIDER=lucylab). ` +
         `Copy .env.example to .env.local and fill in your LucyLab voice ID.`
@@ -110,7 +112,7 @@ export function loadConfig(): Config {
         `Copy .env.example to .env.local and fill in your ElevenLabs API key.`
       );
     }
-    if (!process.env.ELEVENLABS_VOICE_ID || process.env.ELEVENLABS_VOICE_ID.trim() === "") {
+    if (!override?.voiceId && !process.env.ELEVENLABS_VOICE_ID?.trim()) {
       throw new Error(
         `Missing ELEVENLABS_VOICE_ID (required when TTS_PROVIDER=elevenlabs). ` +
         `Copy .env.example to .env.local and fill in your ElevenLabs voice ID.`
@@ -147,6 +149,7 @@ export function loadConfig(): Config {
 
   return {
     ttsProvider: provider,
+    zeroTtsVoice: override?.provider==='zerotts' && override.voiceId ? override.voiceId : process.env.ZEROTTS_VOICE || 'quangminh',
     edgeTtsVoice: process.env.EDGE_TTS_VOICE ?? "vi-VN-HoaiMyNeural",
     edgeTtsRate: process.env.EDGE_TTS_RATE ?? "+0%",
     edgeTtsPitch: process.env.EDGE_TTS_PITCH ?? "+0Hz",

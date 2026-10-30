@@ -1,0 +1,11 @@
+{
+  "package": "zerotts",
+  "version": "0.1.5",
+  "files": {
+    "LICENSE.ZeroTTS": "eac704e6c4ddfee14614fccb37130d7a2801ded3ca7fb32c7ec659ee4a6169fa",
+    "NOTICE": "815278baf8257d2d3b05cb7ef79011e9bbb003047ddaa66702b2b782419404af",
+    "vi_normalizer.py": "161f55b7a8f44213a9f2f5d1677f0df5693e0655c55bc1c8ca1389e087741b40",
+    "data/LICENSE.soe-vinorm": "2520b5387ca17d16866191b57f71198ff8ab9a42603695510249c5a975a147ee",
+    "data/abbreviations.txt": "f3ad7fec1bdf6cb854dd1ba66662206b2104ab199dbdab221c77b2ca114a75e3"
+  }
+}

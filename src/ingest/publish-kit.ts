@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { DEFAULT_HASHTAGS } from '../channel-defaults.js';
 import { existsSync } from "node:fs";
 import type { Script } from "../render/script-schema.js";
 import type { PublishChecklistOptions } from "./types.js";
@@ -11,13 +12,13 @@ export function generatePublishChecklist(
   script?: Script
 ): string {
   const title = opts.suggestedTitle || script?.metadata?.title || "Video Tin Tức Công Nghệ";
-  const channel = opts.channelName || script?.metadata?.channel || "Công Nghệ 24h";
+  const channel = opts.channelName || script?.metadata?.channel || "DevPeek36";
   const sourceUrl = opts.sourceUrl || script?.metadata?.source?.url || "N/A";
   const sourceDomain = script?.metadata?.source?.domain || "Nguồn tin báo chí";
 
   const hashtags = opts.hashtags && opts.hashtags.length > 0
     ? opts.hashtags
-    : ["#congnghe", "#thuthuat", "#cuongit", "#xuhuong", "#tintuc24h"];
+    : DEFAULT_HASHTAGS;
 
   const hashtagsStr = hashtags.join(" ");
 
@@ -37,7 +38,7 @@ Kênh: ${channel}
 ${hashtagsStr}
 \`\`\`
 
-### 🏷️ 4–5 Hashtag chính:
+### 🏷️ Hashtag chính:
 \`${hashtagsStr}\`
 
 ---
