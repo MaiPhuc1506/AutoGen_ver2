@@ -139,22 +139,6 @@ export function distributeSentencesAcoustically(
   const validSegs = segments.filter((s) => s.endSec > s.startSec + 0.05);
   const activeSegs = validSegs.length > 0 ? validSegs : [{ startSec: 0, endSec: usableDuration }];
 
-  if (sentences.length === 1) {
-    const startSec = Math.max(0, activeSegs[0].startSec - 0.06);
-    const endSec = Math.min(usableDuration, activeSegs[activeSegs.length - 1].endSec + 0.1);
-    const dur = endSec - startSec;
-    return [{
-      id: 1,
-      startMs: Math.round(startSec * 1000),
-      endMs: Math.round(endSec * 1000),
-      startSec: Math.round(startSec * 1000) / 1000,
-      endSec: Math.round(endSec * 1000) / 1000,
-      text: sentences[0],
-      words: estimateWordTimings(sentences[0], dur, Math.round(startSec * 1000)),
-      accuracy: "low",
-    }];
-  }
-
   // Extract all acoustic silence pauses between consecutive segments
   interface CandidatePause {
     index: number;
@@ -186,7 +170,11 @@ export function distributeSentencesAcoustically(
   const neededBoundaries = sentences.length - 1;
   let chosenBoundaries: { startSec: number; endSec: number }[] | null = null;
 
-  if (pauses.length >= neededBoundaries) {
+  if (sentences.length === 1) {
+    const startSec = 0;
+    const endSec = Math.min(usableDuration, activeSegs[activeSegs.length - 1].endSec);
+    chosenBoundaries = [{ startSec, endSec }];
+  } else if (pauses.length >= neededBoundaries) {
     // Target speech progress for each sentence boundary
     let curW = 0;
     const targets: number[] = [];
@@ -247,12 +235,12 @@ export function distributeSentencesAcoustically(
       for (let i = 0; i < sentences.length; i++) {
         const isFirst = i === 0;
         const isLast = i === sentences.length - 1;
-        // 60ms subtle visual lead-in so subtitles appear right as voice starts
+        // Strictly start on or after acoustic speech onset (NO early lead-in)
         const rawStart = isFirst ? activeSegs[0].startSec : selectedPauses[i - 1].pauseEnd;
         const rawEnd = isLast ? activeSegs[activeSegs.length - 1].endSec : selectedPauses[i].pauseStart;
 
-        const startSec = isFirst ? 0 : Math.max(0, rawStart - 0.06);
-        const endSec = Math.min(usableDuration, rawEnd + 0.08);
+        const startSec = isFirst ? 0 : rawStart;
+        const endSec = Math.min(usableDuration, rawEnd);
         chosenBoundaries.push({ startSec, endSec });
       }
     }
@@ -288,7 +276,7 @@ export function distributeSentencesAcoustically(
       const isFirst = i === 0;
       const rawStart = getTimeAtFraction(cumFractions[i]);
       const rawEnd = getTimeAtFraction(cumFractions[i + 1]);
-      const startSec = isFirst ? 0 : Math.max(0, rawStart - 0.06);
+      const startSec = isFirst ? 0 : rawStart;
       const endSec = Math.min(usableDuration, rawEnd);
       chosenBoundaries.push({ startSec, endSec });
     }
@@ -309,19 +297,71 @@ export function distributeSentencesAcoustically(
     prevEnd = endSec;
 
     const dur = endSec - startSec;
-    const startMs = Math.round(startSec * 1000);
-    const endMs = Math.round(endSec * 1000);
+    const sentenceWords = estimateWordTimings(sentences[i], dur, Math.round(startSec * 1000));
 
-    cues.push({
-      id: i + 1,
-      startMs,
-      endMs,
-      startSec: Math.round(startSec * 1000) / 1000,
-      endSec: Math.round(endSec * 1000) / 1000,
-      text: sentences[i],
-      words: estimateWordTimings(sentences[i], dur, startMs),
-      accuracy: "low",
-    });
+    // Balanced 3-5 word chunking to prevent subtitle overflow on vertical video
+    const minWords = 2;
+    const maxWords = 5;
+    const maxChars = 34;
+
+    if (sentenceWords.length <= 6 && sentences[i].length <= maxChars) {
+      cues.push({
+        id: cues.length + 1,
+        startMs: Math.round(startSec * 1000),
+        endMs: Math.round(endSec * 1000),
+        startSec: Math.round(startSec * 1000) / 1000,
+        endSec: Math.round(endSec * 1000) / 1000,
+        text: sentences[i],
+        words: sentenceWords,
+        accuracy: "low",
+      });
+      continue;
+    }
+
+    const groups: typeof sentenceWords[] = [];
+    let wIdx = 0;
+    while (wIdx < sentenceWords.length) {
+      const remaining = sentenceWords.length - wIdx;
+      if (remaining <= maxWords && sentenceWords.slice(wIdx).map(w => w.text).join(" ").length <= maxChars) {
+        groups.push(sentenceWords.slice(wIdx));
+        break;
+      }
+
+      let take = maxWords;
+      if (remaining - take < minWords) {
+        take = Math.ceil(remaining / 2);
+      }
+
+      // Respect punctuation breaks (commas, semicolons)
+      for (let k = minWords; k <= take && wIdx + k < sentenceWords.length; k++) {
+        if (/[.,!?;:]$/.test(sentenceWords[wIdx + k - 1].text) && (remaining - k >= minWords || remaining - k === 0)) {
+          take = k;
+          break;
+        }
+      }
+
+      groups.push(sentenceWords.slice(wIdx, wIdx + take));
+      wIdx += take;
+    }
+
+    for (let g = 0; g < groups.length; g++) {
+      const grp = groups[g];
+      const isFirstGrp = g === 0;
+      const isLastGrp = g === groups.length - 1;
+      const cueStartMs = isFirstGrp ? Math.round(startSec * 1000) : grp[0].startMs;
+      const cueEndMs = isLastGrp ? Math.round(endSec * 1000) : grp[grp.length - 1].endMs;
+
+      cues.push({
+        id: cues.length + 1,
+        startMs: cueStartMs,
+        endMs: cueEndMs,
+        startSec: Math.round(cueStartMs) / 1000,
+        endSec: Math.round(cueEndMs) / 1000,
+        text: grp.map(w => w.text).join(" "),
+        words: grp,
+        accuracy: "low",
+      });
+    }
   }
 
   return cues;
@@ -500,11 +540,11 @@ export async function alignCreativeAudioAndSubtitles(params: {
         timingQuality: {
           source: "imported-srt",
           wordAccuracy: "low",
-          cueAccuracy: "verified",
+          cueAccuracy: "unverified",
           sceneTiming: "audio-mapped",
           mismatchWarning,
         },
-        highlightMode: "estimated",
+        highlightMode: "accurate-only",
       };
     }
   }
@@ -539,11 +579,11 @@ export async function alignCreativeAudioAndSubtitles(params: {
     timingQuality: {
       source: "acoustic-speech-segments",
       wordAccuracy: "low",
-      cueAccuracy: "acoustic-verified",
+      cueAccuracy: "unverified",
       sceneTiming: "audio-mapped",
       mismatchWarning:
-        "Chưa có file SRT: Đã căn chỉnh phụ đề theo khoảng phát âm âm học thực tế từ file audio. Hiệu ứng phụ đề hiển thị theo câu; chưa bật karaoke từng từ.",
+        "Fast Mode (chưa có STT/forced alignment): Phụ đề hiển thị Clean Captions theo cụm 3-5 từ bám vào khoảng lặng âm học. KHÔNG bật karaoke từng từ.",
     },
-    highlightMode: "estimated",
+    highlightMode: "accurate-only",
   };
 }
