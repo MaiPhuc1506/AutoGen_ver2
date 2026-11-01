@@ -77,8 +77,8 @@ Tự động dựng toàn bộ phân cảnh từ GitHub
     expect(res.cues.length).toBe(2);
     expect(res.timingQuality.source).toBe("imported-srt");
     expect(res.timingQuality.wordAccuracy).toBe("low");
-    expect(res.timingQuality.cueAccuracy).toBe("verified");
-    expect(res.highlightMode).toBe("estimated");
+    expect(res.timingQuality.cueAccuracy).toBe("unverified");
+    expect(res.highlightMode).toBe("accurate-only");
     expect(res.timingQuality.mismatchWarning).toBeUndefined();
   });
 
@@ -147,11 +147,11 @@ This is completely different subtitle content
     }
   });
 
-  it("aligns sentence boundaries directly to acoustic pauses with a subtle visual lead-in", () => {
+  it("aligns sentence boundaries strictly to acoustic pauses without premature lead-in", () => {
     const sentences = [
-      "Câu thứ nhất giới thiệu dự án.",
-      "Câu thứ hai nêu tính năng nổi bật.",
-      "Câu thứ ba kết luận video.",
+      "Câu thứ nhất mở đầu.",
+      "Câu thứ hai nổi bật.",
+      "Câu thứ ba kết luận.",
     ];
 
     // Three distinct speech blocks separated by ~0.5s pauses
@@ -166,10 +166,32 @@ This is completely different subtitle content
 
     // Cue 1 starts at 0
     expect(cues[0].startSec).toBe(0.0);
-    // Cue 2 starts right as segment 2 starts (with 60ms visual lead-in: 2.5 - 0.06 = 2.44)
-    expect(cues[1].startSec).toBeCloseTo(2.44, 1);
-    // Cue 3 starts right as segment 3 starts (with 60ms visual lead-in: 5.6 - 0.06 = 5.54)
-    expect(cues[2].startSec).toBeCloseTo(5.54, 1);
+    // Cue 2 starts strictly at segment 2 start (2.50s, NO -60ms lead-in)
+    expect(cues[1].startSec).toBe(2.5);
+    // Cue 3 starts strictly at segment 3 start (5.60s, NO -60ms lead-in)
+    expect(cues[2].startSec).toBe(5.6);
+
+    // All cues must have low accuracy in Fast Mode and word limits <= 6
+    for (const cue of cues) {
+      expect(cue.accuracy).toBe("low");
+      expect(cue.text.split(" ").length).toBeLessThanOrEqual(6);
+    }
+  });
+
+  it("chunks long sentences into balanced 3-5 word cues without orphan single words", () => {
+    const sentences = [
+      "Theo nhóm phát triển, mô hình được huấn luyện trên dữ liệu từ hơn 45 sàn giao dịch toàn cầu.",
+    ];
+    const segments = [{ startSec: 0.0, endSec: 5.0 }];
+    const cues = distributeSentencesAcoustically(sentences, segments, 5.0);
+
+    expect(cues.length).toBeGreaterThan(1);
+    for (const cue of cues) {
+      const words = cue.text.split(" ");
+      expect(words.length).toBeGreaterThanOrEqual(2);
+      expect(words.length).toBeLessThanOrEqual(6);
+      expect(cue.text.length).toBeLessThanOrEqual(35);
+    }
   });
 
   it("anchors outro scene to the end of the video and prevents early outro triggers", () => {

@@ -420,10 +420,11 @@ window.__timelines["news-video"] = tl;
     tl.set(cue, { opacity: 1, visibility: "visible" }, cueStart);
     tl.set(cue, { opacity: 0, visibility: "hidden" }, cueEnd);
 
-    // Word-level highlight
+    // Word-level highlight (Karaoke) — STRICT POLICY: only enable when word timestamps are verified
     const words = Array.from(cue.querySelectorAll(".caption-word"));
     words.forEach((w) => {
-      if (document.body.classList.contains('tech-editorial') && cue.dataset.accuracy !== 'high' && cue.dataset.highlightMode !== 'estimated') return;
+      const isWordVerified = cue.dataset.accuracy === 'high' || cue.dataset.accuracy === 'verified';
+      if (!isWordVerified) return;
       const wStart = parseFloat(w.dataset.wordStart || w.dataset.start || "0");
       const wDur   = parseFloat(w.dataset.wordDuration || w.dataset.duration || "0.2");
       const wEnd   = wStart + wDur;

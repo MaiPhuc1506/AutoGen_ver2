@@ -16,11 +16,11 @@ export interface CaptionCue {
   endSec: number;
   text: string;
   words: TimedWord[];
-  accuracy?: "high" | "low";
+  accuracy?: "high" | "low" | "model-estimated" | "unverified" | "verified";
 }
 
 export interface TimingExtractionResult {
-  accuracy: "high" | "low";
+  accuracy: "high" | "low" | "model-estimated" | "unverified" | "verified";
   words: TimedWord[];
 }
 

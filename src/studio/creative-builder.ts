@@ -3,8 +3,9 @@ import { collectGithubVisuals, type VisualAsset } from "./visuals.js";
 import { captureUrlScreenshot } from "../media/screenshot.js";
 import { readUpload, uploadPath } from "./uploads.js";
 import { planCreativeVisuals } from "./creative-planner.js";
+import { createSttProvider, type SttProvider, type SttResult } from "../captions/stt.js";
 import { alignCreativeAudioAndSubtitles, validateTimelineSanity } from "../captions/audio-aligner.js";
-import { generateSrt } from "../captions/srt.js";
+import { generateSrt, parseSrt } from "../captions/srt.js";
 import { ScriptSchema, type Script } from "../render/script-schema.js";
 import type { LLMProvider } from "../script/types.js";
 import { DEFAULT_BGM } from "../channel-defaults.js";
@@ -15,18 +16,20 @@ import { UPLOAD_DIR } from "./uploads.js";
 
 export interface BuildCreativeScriptParams {
   url: string;
-  transcript: string;
+  transcript?: string;
   audioUploadId: string;
   srtContent?: string;
   templatePack?: string;
   channelName?: string;
   llmProvider?: LLMProvider | null;
+  sttProvider?: SttProvider;
 }
 
 export interface BuildCreativeScriptResult {
   script: Script;
   alignment: Awaited<ReturnType<typeof alignCreativeAudioAndSubtitles>>;
   sourceTitle: string;
+  transcript: string;
 }
 
 /**
@@ -50,6 +53,43 @@ export async function buildCreativeScript(
   const audioDurationSec = audioInfo.durationSec;
   log.info(`[Creative Builder] Uploaded audio duration: ${audioDurationSec.toFixed(2)}s`);
 
+  let activeTranscript = transcript?.trim() || "";
+  let sttResult: SttResult | undefined;
+
+  // 1. If SRT is provided and transcript is empty: auto-extract transcript directly from SRT!
+  if (!activeTranscript && srtContent && srtContent.trim()) {
+    try {
+      const srtCues = parseSrt(srtContent.trim());
+      if (srtCues.length > 0) {
+        activeTranscript = srtCues.map((c) => c.text.trim()).join(" ");
+        log.info(`[Creative Builder] Extracted transcript (${activeTranscript.length} chars) directly from uploaded SRT file.`);
+      }
+    } catch (e: any) {
+      log.warn(`[Creative Builder] Could not parse SRT for transcript: ${e.message}`);
+    }
+  }
+
+  // 2. If no transcript or SRT is provided, run Speech-to-Text on the uploaded audio
+  if (!activeTranscript) {
+    log.info(`[Creative Builder] No transcript provided. Invoking Vietnamese Speech-to-Text...`);
+    try {
+      const stt = params.sttProvider || createSttProvider();
+      sttResult = await stt.transcribe(audioInfo.path, { language: "vi" });
+      activeTranscript = sttResult.text;
+      log.info(`[Creative Builder] STT recognized ${sttResult.segments.length} speech segments (${sttResult.provider}).`);
+    } catch (sttErr: any) {
+      log.warn(`[Creative Builder] STT failed (${sttErr.message}). Falling back to URL context.`);
+      activeTranscript = "Dự án công nghệ mã nguồn mở nổi bật trên GitHub.";
+    }
+  } else if (params.sttProvider && (!srtContent || !srtContent.trim())) {
+    try {
+      sttResult = await params.sttProvider.transcribe(audioInfo.path, {
+        language: "vi",
+        referenceScript: activeTranscript,
+      });
+    } catch {}
+  }
+
   // 2. Extract context and real visual assets from URL
   let source;
   try {
@@ -58,7 +98,7 @@ export async function buildCreativeScript(
     log.warn(`[Creative Builder] Could not fetch URL content: ${err.message}. Using fallback metadata.`);
     source = {
       title: "Công nghệ nổi bật",
-      content: transcript,
+      content: activeTranscript,
       url: url || "https://github.com",
       domain: url ? new URL(url).hostname : "github.com",
       ogImage: null,
@@ -95,7 +135,7 @@ export async function buildCreativeScript(
 
   // 3. Plan scenes using AI Visual Planner (with safe fallback)
   const plannedScenes = await planCreativeVisuals({
-    transcript,
+    transcript: activeTranscript,
     url,
     source,
     availableAssets,
@@ -108,9 +148,10 @@ export async function buildCreativeScript(
   const alignment = await alignCreativeAudioAndSubtitles({
     audioPath: audioInfo.path,
     totalDurationSec: audioDurationSec,
-    transcript,
+    transcript: activeTranscript,
     sceneTexts,
     srtContent,
+    sttResult,
   });
 
   // Verify timeline sanity
@@ -184,5 +225,6 @@ export async function buildCreativeScript(
     script: validated,
     alignment,
     sourceTitle: source.title,
+    transcript: activeTranscript,
   };
 }

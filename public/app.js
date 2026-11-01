@@ -2214,10 +2214,34 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  creativeSrtFile?.addEventListener("change", () => {
+  creativeSrtFile?.addEventListener("change", async () => {
     if (creativeSrtFile.files.length) {
-      creativeSrtStatus.textContent = `✅ Đã chọn phụ đề: ${creativeSrtFile.files[0].name}`;
+      const file = creativeSrtFile.files[0];
+      creativeSrtStatus.textContent = `✅ Đã chọn phụ đề: ${file.name}`;
       creativeSrtStatus.style.color = "#52c41a";
+
+      try {
+        const text = await file.text();
+        const extracted = text
+          .replace(/^\uFEFF/, "")
+          .replace(/\r\n/g, "\n")
+          .split(/\n\n+/)
+          .map(block => {
+            const lines = block.trim().split("\n");
+            const content = lines.filter(l => !/^\d+$/.test(l.trim()) && !l.includes("-->"));
+            return content.join(" ").trim();
+          })
+          .filter(Boolean)
+          .join(" ");
+
+        if (extracted && (!creativeTranscript.value || !creativeTranscript.value.trim())) {
+          creativeTranscript.value = extracted;
+          creativeSrtStatus.textContent = `✅ Đã chọn: ${file.name} (Tự động lấy lời thoại từ SRT)`;
+          showToast("Đã tự động trích xuất kịch bản từ file SRT!");
+        }
+      } catch (err) {
+        console.warn("Could not parse SRT preview:", err);
+      }
     } else {
       creativeSrtStatus.textContent = "Nếu có SRT, phụ đề sẽ hiển thị theo cue chính xác. Nếu không, hệ thống tự động căn chỉnh theo khoảng ngắt âm thanh thực tế.";
       creativeSrtStatus.style.color = "";
@@ -2225,12 +2249,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   btnSubmitCreative?.addEventListener("click", async () => {
-    const transcript = creativeTranscript.value.trim();
-    if (!transcript) {
-      showToast("Vui lòng dán kịch bản lời đọc (voice script)!");
-      creativeTranscript.focus();
-      return;
-    }
+    const transcript = creativeTranscript ? creativeTranscript.value.trim() : "";
 
     if (!uploadedAudioData && !creativeAudioFile.files.length) {
       showToast("Vui lòng chọn file âm thanh MP3/WAV!");
@@ -2240,7 +2259,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const origBtnHtml = btnSubmitCreative.innerHTML;
     btnSubmitCreative.disabled = true;
-    btnSubmitCreative.innerHTML = `<span>⏳</span><span>Đang chuẩn bị dữ liệu kịch bản & audio...</span>`;
+    btnSubmitCreative.innerHTML = transcript
+      ? `<span>⏳</span><span>Đang chuẩn bị dữ liệu kịch bản & audio...</span>`
+      : `<span>🎙️</span><span>Đang nhận diện giọng nói tiếng Việt từ Audio...</span>`;
 
     try {
       // 1. Ensure audio is uploaded
@@ -2270,7 +2291,9 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       // 3. Call AI Visual Planner & Builder
-      btnSubmitCreative.innerHTML = `<span>🧠</span><span>AI Visual Planner đang chọn bố cục...</span>`;
+      btnSubmitCreative.innerHTML = transcript
+        ? `<span>🧠</span><span>AI Visual Planner đang chọn bố cục...</span>`
+        : `<span>🎙️</span><span>Đang phân tích Speech-to-Text & bố cục...</span>`;
       const buildRes = await fetch("/api/studio/creative-build", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2286,6 +2309,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const buildData = await buildRes.json();
       if (!buildRes.ok) throw new Error(buildData.error || "Lỗi tạo bản dựng Creative");
+
+      // Auto-fill recognized transcript into textarea if user left it blank
+      if (!transcript && buildData.transcript && creativeTranscript) {
+        creativeTranscript.value = buildData.transcript;
+      }
 
       if (buildData.alignment?.timingQuality?.mismatchWarning) {
         showToast(buildData.alignment.timingQuality.mismatchWarning);
