@@ -68,7 +68,7 @@ it('separates product identity from narration and keeps accumulated board blocks
  for(const block of sceneBlocks(body))expect(html).toContain(`data-block-id="${block.id}"`);
  expect(html).toContain('data-block-id="detail-0" data-reveal-at="2.400"');
  expect(html).toContain('data-block-id="metric-0" data-reveal-at="3.100"');
- expect(html).toContain("filter:'blur(14px)'");expect(html).toContain("filter:'blur(12px)'");
+ expect(html).toContain("filter:isHookGlass?'blur(4px)':'blur(0px)'");expect(html).toContain("filter:'blur(4px)'");
  expect(ScriptSchema.safeParse(script).success).toBe(true);
 });
 it('allows approximate caption highlighting only with an explicit option, preserving timestamp accuracy',async()=>{

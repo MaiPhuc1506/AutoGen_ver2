@@ -16,45 +16,121 @@ export interface CreativePlannerParams {
   channelName?: string;
 }
 
+/**
+ * Condenses verbose narrative text into punchy on-screen visual cues (2-6 words).
+ * Strips conversational filler, narrative prefixes, and avoids cutting words mid-sentence.
+ */
+export function condenseVisualText(
+  input: string | undefined | null,
+  maxWords = 5,
+  fallback = "ĐIỂM NỔI BẬT"
+): string {
+  if (!input || typeof input !== "string") return fallback;
+  let text = input.trim();
+  if (!text) return fallback;
+
+  // 1. Remove narrative filler prefixes common in conversational/voice scripts
+  const fillerPrefixes = [
+    /^(?:theo\s+(?:nhóm\s+phát\s+triển|báo\s+cáo|tác\s+giả|nghiên\s+cứu)|theo\s+đó)[,:\s]*/i,
+    /^(?:thông\s+thường|như\s+thường\s+lệ|trên\s+thực\s+tế|thực\s+tế\s+là)[,:\s]*/i,
+    /^(?:khi\s+nhìn\s+vào|khi\s+quan\s+sát|khi\s+xem)[,:\s]*/i,
+    /^(?:chúng\s+ta\s+(?:sẽ\s+thấy|thấy|có\s+thể\s+thấy)|ta\s+thấy)[,:\s]*/i,
+    /^(?:và\s+đây\s+là|đây\s+là|nó\s+tên\s+là|có\s+tên\s+là)[,:\s]*/i,
+    /^(?:nhưng\s+làm\s+sao\s+để|làm\s+sao\s+để|bằng\s+cách\s+nào)[,:\s]*/i,
+    /^(?:sau\s+đó|tiếp\s+theo|bước\s+kế\s+tiếp)[,:\s]*/i,
+    /^(?:điểm\s+hay\s+là|điểm\s+đặc\s+biệt\s+là|thú\s+vị\s+là)[,:\s]*/i,
+    /^(?:bạn\s+có\s+thể|người\s+dùng\s+có\s+thể|chúng\s+ta\s+có\s+thể)[,:\s]*/i,
+    /^(?:repo\s+cũng|dự\s+án\s+cũng|mô\s+hình\s+cũng)[,:\s]*/i,
+    /^(?:nhưng\s+đừng\s+nhầm|đừng\s+quên\s+rằng|cần\s+lưu\s+ý\s+rằng)[,:\s]*/i,
+    /^(?:nếu\s+bạn\s+đang|nếu\s+muốn|nếu\s+cần)[,:\s]*/i,
+  ];
+
+  for (const rx of fillerPrefixes) {
+    text = text.replace(rx, "").trim();
+  }
+
+  // 2. Domain-aware punchy cues for technical scripts
+  const lower = text.toLowerCase();
+  if (lower.includes("rủi ro") || lower.includes("nhiễu") || (lower.includes("thất bại") && lower.includes("giao dịch"))) {
+    if (lower.includes("kiếm tiền")) return "DỰ BÁO ≠ KIẾM TIỀN";
+    return "RỦI RO THỊ TRƯỜNG";
+  }
+  if ((lower.includes("nến") || lower.includes("ohlcv")) && lower.includes("token")) {
+    return "NẾN GIÁ → TOKEN";
+  }
+  if (lower.includes("45") && lower.includes("sàn")) {
+    return "45+ SÀN GIAO DỊCH";
+  }
+  if (lower.includes("bitcoin") && (lower.includes("đọc") || lower.includes("biểu đồ"))) {
+    return "AI ĐỌC BIỂU ĐỒ BITCOIN?";
+  }
+
+  // 3. Take first clause if sentence has comma, colon, or question mark
+  const firstClauseMatch = text.match(/^([^,;:?!.]+)/);
+  if (firstClauseMatch && firstClauseMatch[1].trim().split(/\s+/).length <= maxWords + 1) {
+    text = firstClauseMatch[1].trim();
+  }
+
+  // 4. Tokenize by whitespace and limit to maxWords without slicing words
+  const tokens = text.split(/\s+/).filter(Boolean);
+  if (tokens.length <= maxWords) {
+    return text.replace(/[.,;:]+$/, "");
+  }
+
+  const shortened = tokens.slice(0, maxWords).join(" ").replace(/[.,;:]+$/, "");
+  return shortened || fallback;
+}
+
 const CREATIVE_PLANNER_SYSTEM_PROMPT = `
 Bạn là Đạo diễn Hình ảnh & Chuyển động (AI Visual Director) cho video công nghệ ngắn 9:16 (TikTok/Reels/Shorts).
 Nhiệm vụ: Bạn nhận được kịch bản lời đọc (Voice Script) và danh sách tài nguyên hình ảnh thực tế (ASSETS ĐANG CÓ). Bạn phải phân tích ngữ nghĩa từng câu để chọn bố cục thị giác và đồ họa minh chứng phù hợp nhất.
 
 QUY TẮC BẮT BUỘC:
 1. GIỮ NGUYÊN 100% LỜI ĐỌC (VOICE TEXT):
-   - Tuyệt đối KHÔNG thay đổi, KHÔNG cắt xén, KHÔNG thêm bớt câu chữ trong lời đọc.
+   - Tuyệt đối KHÔNG thay đổi, KHÔNG cắt xén, KHÔNG thêm bớt câu chữ trong trường "voiceText".
    - Khi nối trường "voiceText" của tất cả các cảnh theo thứ tự lại, phải khớp 100% kịch bản gốc.
-   
-2. CẤU TRÚC PHÂN CẢNH VÀ TRƯỜNG "type":
+
+2. TÁCH BIỆT HOÀN TOÀN GIỮA LỜI ĐỌC VÀ CHỮ TRÊN MÀN HÌNH (VISUAL TEXT):
+   - Phụ đề (captions) chạy bên dưới đã hiển thị toàn bộ lời nói của người thuyết minh.
+   - Chữ hiển thị trên card (Visual Text) CHỈ LÀ TIÊU ĐỀ THỊ GIÁC NGẮN GỌN (Punchy Visual Cues), TUYỆT ĐỐI KHÔNG COPY NGUYÊN VĂN CÂU NÓI!
+   - Quy tắc độ dài nghiêm ngặt:
+     * Hook headline: 3–6 từ (VD: "AI ĐỌC BIỂU ĐỒ BITCOIN?", "KRONOS AI DỰ BÁO TÀI CHÍNH").
+     * Headline scene / Callout statement: 2–5 từ (VD: "45+ SÀN GIAO DỊCH", "NẾN GIÁ → TOKEN", "DỰ BÁO ≠ KIẾM TIỀN").
+     * Subhead / Context: Tối đa 8 từ (VD: "Mô hình ngôn ngữ cho chuỗi thời gian").
+     * Bullets (feature-list): 2–6 từ (VD: "Model Mini & Base", "Code Python dự báo").
+     * Nodes (data-flow): label 2-4 từ, detail 3-5 từ.
+   - Mỗi scene chỉ có một thông điệp thị giác chính. KHÔNG cố hiển thị toàn bộ thông tin của lời đọc lên scene.
+    
+3. CẤU TRÚC PHÂN CẢNH VÀ TRƯỜNG "type":
    - Cảnh 1 (đầu tiên): BẮT BUỘC "type": "hook"
    - Cảnh cuối cùng: BẮT BUỘC "type": "outro"
    - Tất cả các cảnh ở giữa: BẮT BUỘC "type": "body" (TUYỆT ĐỐI KHÔNG dùng type "intro", "feature", "code", "warning").
 
-3. BẢNG TEMPLATE CHUẨN (CHỈ ĐƯỢC CHỌN TRONG CÁC TEMPLATE DƯỚI ĐÂY):
+4. BẢNG TEMPLATE CHUẨN (CHỈ ĐƯỢC CHỌN TRONG CÁC TEMPLATE DƯỚI ĐÂY):
    * "hook" (Chỉ dùng cho cảnh 1):
-     { "template": "hook", "headline": "TIÊU ĐỀ CHÍNH", "subhead": "Nguồn hoặc tóm tắt", "kenBurns": "zoom-in" }
+     { "template": "hook", "headline": "TIÊU ĐỀ 3-6 TỪ", "subhead": "Nguồn hoặc tóm tắt tối đa 8 từ", "kenBurns": "zoom-in" }
    * "data-flow" (Kiến trúc, luồng dữ liệu, pipeline mô hình, ví dụ: Tokenizer -> Transformer -> Dự báo):
-     { "template": "data-flow", "title": "KIẾN TRÚC HỆ THỐNG", "nodes": [{ "label": "BƯỚC 1", "detail": "Chi tiết ngắn" }, { "label": "BƯỚC 2", "detail": "Chi tiết ngắn" }], "caption": "Mô tả luồng" }
+     { "template": "data-flow", "title": "KIẾN TRÚC MÔ HÌNH", "nodes": [{ "label": "BƯỚC 1", "detail": "Nến giá thô" }, { "label": "BƯỚC 2", "detail": "Mã hóa token" }], "caption": "Quy trình chuyển đổi nến thành token" }
    * "worked-example" (Quy trình biến đổi cụ thể: Đầu vào -> Xử lý -> Đầu ra):
-     { "template": "worked-example", "title": "CÁCH THỨC HOẠT ĐỘNG", "input": "Dữ liệu đầu vào", "operation": "Cách xử lý", "output": "Kết quả đầu ra", "basis": "source-example" }
+     { "template": "worked-example", "title": "CÁCH THỨC HOẠT ĐỘNG", "input": "Dữ liệu nến OHLCV", "operation": "Nến giá → Token", "output": "Dự báo BTC 24h", "basis": "source-example" }
    * "code-window" (Đoạn mã Python, lệnh CLI, fine-tune, tối đa 8 dòng code):
-     { "template": "code-window", "title": "ĐOẠN MÃ THỰC THI", "language": "python", "code": "# mã nguồn ngắn gọn", "note": "Ghi chú ngắn" }
+     { "template": "code-window", "title": "MÃ NGUỒN PYTHON", "language": "python", "code": "# mã nguồn ngắn gọn", "note": "Hỗ trợ fine-tune" }
    * "comparison" (So sánh 2 phương án, 2 model, hoặc Thử nghiệm vs Giao dịch thực tế):
-     { "template": "comparison", "left": { "label": "Thử Nghiệm", "value": "Độ chính xác cao", "color": "cyan" }, "right": { "label": "Thực Tế", "value": "Thị trường nhiễu", "color": "purple", "winner": false } }
+     { "template": "comparison", "left": { "label": "Thử Nghiệm", "value": "Chính xác cao", "color": "cyan" }, "right": { "label": "Thực Tế", "value": "Thị trường nhiễu", "color": "purple", "winner": false } }
    * "stat-hero" (Con số ấn tượng, số sàn giao dịch, số sao):
-     { "template": "stat-hero", "value": "45+", "label": "SÀN GIAO DỊCH TOÀN CẦU", "context": "Dữ liệu huấn luyện" }
+     { "template": "stat-hero", "value": "45+", "label": "45+ SÀN GIAO DỊCH", "context": "Dữ liệu huấn luyện toàn cầu" }
    * "workflow" (Quy trình 2-4 bước triển khai):
-     { "template": "workflow", "title": "QUY TRÌNH DỰ BÁO", "steps": [{ "label": "Bước 1", "detail": "Mô tả" }, { "label": "Bước 2", "detail": "Mô tả" }] }
-   * "feature-list" (Chỉ chứa KEYWORD hoặc TÍNH NĂNG CHÍNH, KHÔNG lặp nguyên văn câu nói):
-     { "template": "feature-list", "title": "CÁC PHIÊN BẢN MODEL", "bullets": ["Phiên bản Mini", "Phiên bản Base", "Code fine-tune"] }
-   * "callout" (Nhận định ngắn, cảnh báo rủi ro, điểm cốt lõi):
-     { "template": "callout", "statement": "Nhận định ngắn gọn", "tag": "LƯU Ý RỦI RO" }
+     { "template": "workflow", "title": "QUY TRÌNH DỰ BÁO", "steps": [{ "label": "Bước 1", "detail": "Mô tả ngắn" }, { "label": "Bước 2", "detail": "Mô tả ngắn" }] }
+   * "feature-list" (Chỉ chứa KEYWORD hoặc TÍNH NĂNG CHÍNH 2-6 từ, KHÔNG lặp nguyên văn câu nói):
+     { "template": "feature-list", "title": "CÁC PHIÊN BẢN MODEL", "bullets": ["Phiên bản Mini & Base", "Code Python dự báo", "Fine-tune dữ liệu riêng"] }
+   * "callout" (Nhận định ngắn 2-5 từ, cảnh báo rủi ro, điểm cốt lõi):
+     { "template": "callout", "statement": "DỰ BÁO ≠ KIẾM TIỀN", "tag": "LƯU Ý RỦI RO" }
    * "phone-mockup" (Hiển thị screenshot demo, giao diện ứng dụng):
-     { "template": "phone-mockup", "title": "GIAO DIỆN DEMO", "screenSrc": "previewUrl_của_asset", "caption": "Mô tả demo" }
+     { "template": "phone-mockup", "title": "GIAO DIỆN DEMO", "screenSrc": "previewUrl_của_asset", "caption": "Giao diện kiểm thử" }
    * "outro" (Chỉ dùng cho cảnh cuối):
      { "template": "outro", "ctaTop": "Khám phá repo ngay", "channelName": "DevPeek36", "source": "github.com" }
 
-4. GÁN MEDIA THỰC TẾ (TẬN DỤNG ASSETS ĐANG CÓ):
+5. GÁN MEDIA THỰC TẾ (TẬN DỤNG ASSETS ĐANG CÓ):
    - Khi cảnh đề cập đến ảnh sơ đồ (overview), dự báo (prediction), hoặc kết quả backtest, HÃY gán vào trường "media":
      "media": {
        "type": "image",
@@ -66,7 +142,7 @@ QUY TẮC BẮT BUỘC:
    - KHÔNG dùng cùng 1 screenshot cho nhiều cảnh liên tiếp. Nếu không có ảnh thích hợp, dùng visual templates đồ họa (data-flow, code-window, worked-example, stat-hero).
    - "presentation" có thể là "card" (hiển thị khung cửa sổ browser mockup tinh tế) hoặc "background" (làm hình nền phóng to).
 
-5. ĐỊNH DẠNG ĐẦU RA:
+6. ĐỊNH DẠNG ĐẦU RA:
    Chỉ trả về JSON thuần túy:
    {
      "scenes": [
@@ -128,21 +204,21 @@ export function repairAndNormalizeLlmPlan(
       }
       td = {
         template: "callout",
-        statement: td.caption || td.title || s.voiceText.slice(0, 75),
+        statement: condenseVisualText(td.caption || td.title || td.statement || s.voiceText, 5, "TIÊU ĐIỂM CÔNG NGHỆ"),
         tag: "MINH HỌA",
       };
     } else if (tName === "code-file" || tName === "code") {
       td = {
         template: "code-window",
-        title: td.title || td.filename || "MÃ NGUỒN THỰC THI",
+        title: condenseVisualText(td.title || td.filename || "MÃ NGUỒN THỰC THI", 5, "MÃ NGUỒN"),
         language: td.language || "python",
         code: typeof td.code === "string" ? td.code.split("\n").slice(0, 8).join("\n") : "# Mã nguồn kiểm thử",
-        note: td.note || "Hỗ trợ tùy biến",
+        note: td.note ? condenseVisualText(td.note, 6, "Hỗ trợ tùy biến") : "Hỗ trợ tùy biến",
       };
     } else if (tName === "cta") {
       td = {
         template: "outro",
-        ctaTop: td.title || td.action || "Khám phá repo ngay",
+        ctaTop: condenseVisualText(td.title || td.action || "Khám phá repo ngay", 5, "Khám phá repo ngay"),
         channelName: "DevPeek36",
         source: td.repoName || "GitHub",
       };
@@ -151,18 +227,18 @@ export function repairAndNormalizeLlmPlan(
       td.template = "data-flow";
     }
 
-    // Ensure templateData structure validity
+    // Ensure templateData structure validity with concise 2-5 word visual cues
     if (s.type === "hook") {
       td = {
         template: "hook",
-        headline: td.headline || td.title || "CÔNG NGHỆ NỔI BẬT",
-        subhead: td.subhead || td.subtitle || undefined,
+        headline: condenseVisualText(td.headline || td.title || s.voiceText, 5, "CÔNG NGHỆ MỚI").toUpperCase(),
+        subhead: td.subhead ? condenseVisualText(td.subhead, 7, "Mã nguồn mở") : undefined,
         kenBurns: "zoom-in",
       };
     } else if (s.type === "outro") {
       td = {
         template: "outro",
-        ctaTop: td.ctaTop || "Khám phá ngay",
+        ctaTop: condenseVisualText(td.ctaTop || "Khám phá ngay", 5, "Khám phá ngay"),
         channelName: "DevPeek36",
         source: td.source || "GitHub",
       };
@@ -170,9 +246,9 @@ export function repairAndNormalizeLlmPlan(
       // Body templates
       if (td.template === "data-flow") {
         const nodes = Array.isArray(td.nodes) && td.nodes.length >= 2
-          ? td.nodes.slice(0, 4).map((n: any, nIdx: number) => ({
-              label: String(n.label || `BƯỚC ${nIdx + 1}`).slice(0, 24),
-              detail: String(n.detail || "Xử lý dữ liệu").slice(0, 65),
+          ? td.nodes.slice(0, 3).map((n: any, nIdx: number) => ({
+              label: condenseVisualText(n.label || `BƯỚC ${nIdx + 1}`, 3, `BƯỚC ${nIdx + 1}`),
+              detail: condenseVisualText(n.detail || "Xử lý dữ liệu", 5, "Xử lý dữ liệu"),
             }))
           : [
               { label: "ĐẦU VÀO", detail: "Dữ liệu nến & token" },
@@ -181,17 +257,17 @@ export function repairAndNormalizeLlmPlan(
             ];
         td = {
           template: "data-flow",
-          title: String(td.title || "KIẾN TRÚC MÔ HÌNH").slice(0, 40),
+          title: condenseVisualText(td.title || "KIẾN TRÚC MÔ HÌNH", 4, "LUỒNG DỮ LIỆU").toUpperCase(),
           nodes,
-          caption: td.caption ? String(td.caption).slice(0, 90) : undefined,
+          caption: td.caption ? condenseVisualText(td.caption, 7, "Mô hình chuỗi thời gian") : undefined,
         };
       } else if (td.template === "worked-example") {
         td = {
           template: "worked-example",
-          title: String(td.title || "CÁCH THỨC HOẠT ĐỘNG").slice(0, 40),
-          input: String(td.input || "Dữ liệu nến OHLCV").slice(0, 180),
-          operation: String(td.operation || "Tokenizer xử lý").slice(0, 65),
-          output: String(td.output || "Chuỗi token số hóa").slice(0, 180),
+          title: condenseVisualText(td.title || "CÁCH THỨC HOẠT ĐỘNG", 4, "VÍ DỤ THỰC TẾ").toUpperCase(),
+          input: condenseVisualText(td.input || "Dữ liệu nến OHLCV", 5, "Dữ liệu nến OHLCV"),
+          operation: condenseVisualText(td.operation || "Tokenizer xử lý", 5, "Nến giá → Token"),
+          output: condenseVisualText(td.output || "Chuỗi token số hóa", 5, "Dự báo BTC 24h"),
           basis: td.basis === "conceptual" ? "conceptual" : "source-example",
         };
       } else if (td.template === "code-window") {
@@ -199,22 +275,22 @@ export function repairAndNormalizeLlmPlan(
         const lines = rawCode.split("\n").slice(0, 8);
         td = {
           template: "code-window",
-          title: String(td.title || "MÃ NGUỒN").slice(0, 40),
+          title: condenseVisualText(td.title || "MÃ NGUỒN PYTHON", 4, "CODE PYTHON").toUpperCase(),
           language: String(td.language || "python").slice(0, 20),
           code: lines.join("\n"),
-          note: td.note ? String(td.note).slice(0, 70) : undefined,
+          note: td.note ? condenseVisualText(td.note, 6, "Hỗ trợ fine-tune") : undefined,
         };
       } else if (td.template === "comparison") {
         td = {
           template: "comparison",
           left: {
-            label: String(td.left?.label || "Thử Nghiệm").slice(0, 30),
-            value: String(td.left?.value || "Chính xác cao").slice(0, 30),
+            label: condenseVisualText(td.left?.label || "Thử Nghiệm", 3, "TRƯỚC"),
+            value: condenseVisualText(td.left?.value || "Chính xác cao", 4, "Lý thuyết"),
             color: "cyan",
           },
           right: {
-            label: String(td.right?.label || "Thực Tế").slice(0, 30),
-            value: String(td.right?.value || "Nhiễu thị trường").slice(0, 30),
+            label: condenseVisualText(td.right?.label || "Thực Tế", 3, "SAU"),
+            value: condenseVisualText(td.right?.value || "Nhiễu thị trường", 4, "Rủi ro"),
             color: "purple",
             winner: Boolean(td.right?.winner),
           },
@@ -223,24 +299,24 @@ export function repairAndNormalizeLlmPlan(
         const numMatch = s.voiceText.match(/\b\d+([.,]\d+)?(%|x|k|M|GB|TB|sao|\+)?\b/i);
         td = {
           template: "stat-hero",
-          value: String(td.value || (numMatch ? numMatch[0] : "45+")).slice(0, 20),
-          label: String(td.label || "THÔNG SỐ NỔI BẬT").slice(0, 40),
-          context: td.context ? String(td.context).slice(0, 40) : undefined,
+          value: String(td.value || (numMatch ? numMatch[0] : "45+")).slice(0, 16),
+          label: condenseVisualText(td.label || "THÔNG SỐ NỔI BẬT", 4, "CHỈ SỐ TOÀN CẦU").toUpperCase(),
+          context: td.context ? condenseVisualText(td.context, 6, "Dữ liệu toàn cầu") : undefined,
         };
       } else if (td.template === "feature-list") {
         const rawBullets = Array.isArray(td.bullets) ? td.bullets : [s.voiceText];
-        const bullets = rawBullets.slice(0, 3).map((b: any) => String(b).trim().slice(0, 48));
+        const bullets = rawBullets.slice(0, 3).map((b: any) => condenseVisualText(b, 5, "Hỗ trợ mã nguồn mở"));
         td = {
           template: "feature-list",
-          title: String(td.title || "TÍNH NĂNG CHÍNH").slice(0, 40),
+          title: condenseVisualText(td.title || "TÍNH NĂNG CHÍNH", 4, "ĐẶC ĐIỂM").toUpperCase(),
           bullets: bullets.length >= 2 ? bullets : [...bullets, "Hỗ trợ mã nguồn mở"],
         };
       } else {
-        // Fallback to callout
+        // Fallback to callout with punchy 2-5 word statement
         td = {
           template: "callout",
-          statement: String(td.statement || s.voiceText).slice(0, 78),
-          tag: String(td.tag || "TIÊU ĐIỂM").slice(0, 20),
+          statement: condenseVisualText(td.statement || s.voiceText, 5, "TIÊU ĐIỂM CÔNG NGHỆ"),
+          tag: condenseVisualText(td.tag || "ĐIỂM CỐT LÕI", 3, "LƯU Ý"),
         };
       }
     }
@@ -362,14 +438,15 @@ export function deterministicVisualPlanner(
 
   const scenes: SceneType[] = [];
 
-  // Scene 1: Hook
+  // Scene 1: Hook with concise punchy headline (3-6 words)
+  const hookHeadline = condenseVisualText(sceneChunks[0], 5, repoName.toUpperCase().slice(0, 28));
   scenes.push({
     id: "scene-1",
     type: "hook",
     voiceText: sceneChunks[0],
     templateData: {
       template: "hook",
-      headline: repoName.toUpperCase().slice(0, 32),
+      headline: hookHeadline.toUpperCase(),
       subhead: source.domain ? `Nguồn: ${source.domain}` : "MÃ NGUỒN MỞ",
       kenBurns: "zoom-in",
     },
@@ -392,7 +469,7 @@ export function deterministicVisualPlanner(
       sceneMedia = { type: "image" as const, src: img.previewUrl, fit: "cover" as const, fx: "kenburns" as const, presentation: "card" as const };
     }
 
-    // Choose semantic template based on content keywords
+    // Choose semantic template based on content keywords with concise 2-5 word visual text
     if (numMatch && (text.includes("sàn") || text.includes("dữ liệu") || text.includes("triệu") || text.includes("nghìn"))) {
       scenes.push({
         id: sId,
@@ -401,8 +478,8 @@ export function deterministicVisualPlanner(
         templateData: {
           template: "stat-hero",
           value: numMatch[0],
-          label: "DỮ LIỆU HUẤN LUYỆN TOÀN CẦU",
-          context: source.domain || "Thị trường tài chính",
+          label: condenseVisualText(text, 4, "CHỈ SỐ TOÀN CẦU").toUpperCase(),
+          context: source.domain ? `Dữ liệu ${source.domain}` : "Thị trường tài chính",
         },
         media: sceneMedia,
       });
@@ -413,10 +490,10 @@ export function deterministicVisualPlanner(
         voiceText: text,
         templateData: {
           template: "worked-example",
-          title: "BỘ TOKENIZER TÀI CHÍNH",
-          input: "Dữ liệu nến OHLCV (Mở/Đóng/Cao/Thấp)",
-          operation: "Mã hóa nến thành chuỗi token",
-          output: "Chuỗi token cho Transformer",
+          title: "CÁCH THỨC HOẠT ĐỘNG",
+          input: "Dữ liệu nến OHLCV",
+          operation: "Nến giá → Token",
+          output: "Chuỗi token số hóa",
           basis: "source-example",
         },
         media: sceneMedia,
@@ -428,13 +505,13 @@ export function deterministicVisualPlanner(
         voiceText: text,
         templateData: {
           template: "data-flow",
-          title: "LUỒNG DỰ BÁO TRANSFORMER",
+          title: "LUỒNG DỰ BÁO",
           nodes: [
-            { label: "Token Input", detail: "Nhận chuỗi token nến" },
-            { label: "Transformer", detail: "Phân tích diễn biến chuỗi" },
-            { label: "Forecast 24h", detail: "Dự báo giá tiếp theo" },
+            { label: "Nến OHLCV", detail: "Dữ liệu nến thô" },
+            { label: "Tokenizer", detail: "Mã hóa token" },
+            { label: "Transformer", detail: "Dự báo 24 giờ" },
           ],
-          caption: "Mô hình học chuỗi thời gian",
+          caption: "Mô hình chuỗi thời gian",
         },
         media: sceneMedia,
       });
@@ -448,7 +525,7 @@ export function deterministicVisualPlanner(
           title: "CODE PYTHON DỰ BÁO",
           language: "python",
           code: "from kronos import KronosModel\n\nmodel = KronosModel.from_pretrained('base')\nforecast = model.predict(btc_usdt_candles)",
-          note: "Hỗ trợ nhiều kích thước model",
+          note: "Hỗ trợ fine-tune",
         },
         media: sceneMedia,
       });
@@ -458,22 +535,34 @@ export function deterministicVisualPlanner(
         type: "body",
         voiceText: text,
         templateData: {
-          template: "comparison",
-          left: { label: "Thử Nghiệm", value: "Dự đoán khả quan", color: "cyan" },
-          right: { label: "Thực Tế", value: "Thị trường nhiễu cao", color: "purple", winner: false },
+          template: "callout",
+          statement: "DỰ BÁO ≠ KIẾM TIỀN",
+          tag: "LƯU Ý RỦI RO",
+        },
+        media: sceneMedia,
+      });
+    } else if (i === 1 && screenshot) {
+      scenes.push({
+        id: sId,
+        type: "body",
+        voiceText: text,
+        templateData: {
+          template: "callout",
+          statement: condenseVisualText(source.title || repoName, 4, "MÃ NGUỒN MỞ").toUpperCase(),
+          tag: "TIÊU ĐIỂM",
         },
         media: sceneMedia,
       });
     } else {
       const phrases = text.split(/[,;–—]\s+/).map((p) => p.trim()).filter((p) => p.length >= 3);
-      const bullets = phrases.length >= 2 ? phrases.slice(0, 3).map((p) => p.slice(0, 48)) : [text.slice(0, 48), "Mã nguồn mở"];
+      const bullets = phrases.length >= 2 ? phrases.slice(0, 3).map((p) => condenseVisualText(p, 5, "Tính năng chính")) : ["Phiên bản Mini & Base", "Code Python dự báo", "Fine-tune dữ liệu riêng"];
       scenes.push({
         id: sId,
         type: "body",
         voiceText: text,
         templateData: {
           template: "feature-list",
-          title: "ĐẶC ĐIỂM NỔI BẬT",
+          title: "CÁC BẢN MODEL",
           bullets,
         },
         media: sceneMedia,
