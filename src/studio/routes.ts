@@ -127,7 +127,9 @@ studioRouter.get('/options', (_req, res) => {
 studioRouter.post('/uploads', express.raw({ type: 'application/octet-stream', limit: '30mb' }), async (req, res) => {
   try {
     if (!Buffer.isBuffer(req.body)) throw new Error('Gửi file audio dạng nhị phân.');
-    const name = typeof req.query.name === 'string' ? req.query.name : '';
+    const name = (typeof req.query.name === 'string' && req.query.name.trim()) 
+      ? req.query.name.trim() 
+      : (typeof req.headers['x-filename'] === 'string' ? req.headers['x-filename'].trim() : '');
     res.json(await saveUpload(req.body, name));
   } catch (err: any) { res.status(400).json({ error: err.message }); }
 });

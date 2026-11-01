@@ -362,6 +362,7 @@
                 <label for="creativeAudioFile">File âm thanh MP3 / WAV (từ ElevenLabs) <span class="required">*</span></label>
                 <input type="file" id="creativeAudioFile" accept="audio/mpeg,audio/wav,.mp3,.wav" />
                 <span class="field-hint" id="creativeAudioStatus">Chưa chọn file (tối đa 30 MB).</span>
+                <audio id="creativeAudioPlayer" controls hidden style="width: 100%; margin-top: 8px; border-radius: 8px;"></audio>
               </div>
               <div class="form-group col-6">
                 <label for="creativeSrtFile">File phụ đề SRT (Tùy chọn)</label>
@@ -1125,7 +1126,7 @@ Chào mừng các bạn đến với bản tin..."></textarea>
     <footer><button id="studioReviewPreview" class="btn btn-secondary" type="button">Xem thử bố cục · không voice</button><button id="studioReviewRender" class="btn btn-primary" type="button">Duyệt & Render Video</button></footer>
   </dialog>
   <script src="studio.js?v=2"></script>
-  <script src="app.js?v=2.4"></script>
+  <script src="app.js?v=2.5"></script>
   <script src="radar.js?v=1"></script>
 </body>
 </html>

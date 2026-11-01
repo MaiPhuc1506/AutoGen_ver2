@@ -2145,26 +2145,82 @@ document.addEventListener("DOMContentLoaded", () => {
   const creativeAudioFile = document.getElementById("creativeAudioFile");
   const creativeSrtFile = document.getElementById("creativeSrtFile");
   const creativeAudioStatus = document.getElementById("creativeAudioStatus");
+  const creativeAudioPlayer = document.getElementById("creativeAudioPlayer");
   const creativeSrtStatus = document.getElementById("creativeSrtStatus");
   const creativeStylePack = document.getElementById("creativeStylePack");
   const creativeChannel = document.getElementById("creativeChannel");
   const btnSubmitCreative = document.getElementById("btnSubmitCreative");
   const creativeStatusAlert = document.getElementById("creativeStatusAlert");
 
-  creativeAudioFile?.addEventListener("change", () => {
-    if (creativeAudioFile.files.length) {
-      const f = creativeAudioFile.files[0];
-      creativeAudioStatus.textContent = `Đã chọn: ${f.name} (${(f.size / 1024 / 1024).toFixed(2)} MB)`;
-    } else {
+  let uploadedAudioData = null;
+
+  creativeAudioFile?.addEventListener("change", async () => {
+    uploadedAudioData = null;
+    if (creativeAudioPlayer) {
+      creativeAudioPlayer.pause();
+      creativeAudioPlayer.removeAttribute("src");
+      creativeAudioPlayer.hidden = true;
+    }
+
+    if (!creativeAudioFile.files.length) {
       creativeAudioStatus.textContent = "Chưa chọn file (tối đa 30 MB).";
+      creativeAudioStatus.style.color = "";
+      return;
+    }
+
+    const file = creativeAudioFile.files[0];
+    if (!/\.(mp3|wav)$/i.test(file.name)) {
+      showToast("Chỉ nhận file âm thanh .mp3 hoặc .wav");
+      creativeAudioStatus.textContent = "❌ Định dạng không hỗ trợ. Hãy chọn file .mp3 hoặc .wav";
+      creativeAudioStatus.style.color = "#ff4d4f";
+      return;
+    }
+
+    if (file.size > 30 * 1024 * 1024) {
+      showToast("File vượt quá 30 MB");
+      creativeAudioStatus.textContent = "❌ File vượt quá 30 MB.";
+      creativeAudioStatus.style.color = "#ff4d4f";
+      return;
+    }
+
+    creativeAudioStatus.textContent = `⏳ Đang tải và kiểm tra audio: ${file.name}...`;
+    creativeAudioStatus.style.color = "var(--accent-cyan, #00f2fe)";
+
+    try {
+      const res = await fetch(`/api/studio/uploads?name=${encodeURIComponent(file.name)}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/octet-stream",
+          "x-filename": file.name,
+        },
+        body: file,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Không thể tải lên file âm thanh");
+
+      uploadedAudioData = data;
+      creativeAudioStatus.textContent = `✅ Đã nhận: ${data.name} · ${data.durationSec.toFixed(1)} giây`;
+      creativeAudioStatus.style.color = "#52c41a";
+
+      if (creativeAudioPlayer && data.audioUrl) {
+        creativeAudioPlayer.src = data.audioUrl;
+        creativeAudioPlayer.hidden = false;
+      }
+      showToast(`Đã nhận file âm thanh (${data.durationSec.toFixed(1)}s)`);
+    } catch (err) {
+      creativeAudioStatus.textContent = `❌ Lỗi: ${err.message}`;
+      creativeAudioStatus.style.color = "#ff4d4f";
+      showToast(`Lỗi nhận audio: ${err.message}`);
     }
   });
 
   creativeSrtFile?.addEventListener("change", () => {
     if (creativeSrtFile.files.length) {
-      creativeSrtStatus.textContent = `Đã chọn phụ đề: ${creativeSrtFile.files[0].name}`;
+      creativeSrtStatus.textContent = `✅ Đã chọn phụ đề: ${creativeSrtFile.files[0].name}`;
+      creativeSrtStatus.style.color = "#52c41a";
     } else {
       creativeSrtStatus.textContent = "Nếu có SRT, phụ đề sẽ hiển thị theo cue chính xác. Nếu không, hệ thống tự động căn chỉnh theo khoảng ngắt âm thanh thực tế.";
+      creativeSrtStatus.style.color = "";
     }
   });
 
@@ -2176,7 +2232,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    if (!creativeAudioFile.files.length) {
+    if (!uploadedAudioData && !creativeAudioFile.files.length) {
       showToast("Vui lòng chọn file âm thanh MP3/WAV!");
       creativeAudioFile.focus();
       return;
@@ -2184,23 +2240,28 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const origBtnHtml = btnSubmitCreative.innerHTML;
     btnSubmitCreative.disabled = true;
-    btnSubmitCreative.innerHTML = `<span>⏳</span><span>Đang tải audio & lập kế hoạch hình ảnh...</span>`;
+    btnSubmitCreative.innerHTML = `<span>⏳</span><span>Đang chuẩn bị dữ liệu kịch bản & audio...</span>`;
 
     try {
-      // 1. Upload audio file
-      const audioFile = creativeAudioFile.files[0];
-      const audioBytes = await audioFile.arrayBuffer();
-      const uploadRes = await fetch("/api/studio/uploads", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/octet-stream",
-          "x-filename": audioFile.name,
-        },
-        body: audioBytes,
-      });
+      // 1. Ensure audio is uploaded
+      let audioUploadId = uploadedAudioData?.uploadId;
+      if (!audioUploadId) {
+        const audioFile = creativeAudioFile.files[0];
+        btnSubmitCreative.innerHTML = `<span>⏳</span><span>Đang tải audio lên hệ thống...</span>`;
+        const uploadRes = await fetch(`/api/studio/uploads?name=${encodeURIComponent(audioFile.name)}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/octet-stream",
+            "x-filename": audioFile.name,
+          },
+          body: audioFile,
+        });
 
-      const uploadData = await uploadRes.json();
-      if (!uploadRes.ok) throw new Error(uploadData.error || "Không thể tải lên file âm thanh");
+        const uploadData = await uploadRes.json();
+        if (!uploadRes.ok) throw new Error(uploadData.error || "Không thể tải lên file âm thanh");
+        audioUploadId = uploadData.uploadId;
+        uploadedAudioData = uploadData;
+      }
 
       // 2. Read SRT if provided
       let srtContent = undefined;
@@ -2216,7 +2277,7 @@ document.addEventListener("DOMContentLoaded", () => {
         body: JSON.stringify({
           url: creativeUrl?.value.trim() || "",
           transcript,
-          audioUploadId: uploadData.uploadId,
+          audioUploadId,
           srtContent,
           templatePack: creativeStylePack?.value || "reference",
           channelName: creativeChannel?.value.trim() || "DevPeek36",
