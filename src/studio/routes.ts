@@ -21,6 +21,7 @@ import { z } from 'zod';
 import { saveUpload, readUpload, UPLOAD_DIR } from './uploads.js';
 import { voiceConfig, studioTts } from './voice.js';
 import { ScriptSchema } from '../render/script-schema.js';
+import { buildCreativeScript } from './creative-builder.js';
 
 export const studioRouter = express.Router();
 const previewInput = z.object({ text: z.string().trim().min(1).max(500), voice: ScriptSchema.shape.voice });
@@ -126,7 +127,9 @@ studioRouter.get('/options', (_req, res) => {
 studioRouter.post('/uploads', express.raw({ type: 'application/octet-stream', limit: '30mb' }), async (req, res) => {
   try {
     if (!Buffer.isBuffer(req.body)) throw new Error('Gửi file audio dạng nhị phân.');
-    const name = typeof req.query.name === 'string' ? req.query.name : '';
+    const name = (typeof req.query.name === 'string' && req.query.name.trim()) 
+      ? req.query.name.trim() 
+      : (typeof req.headers['x-filename'] === 'string' ? req.headers['x-filename'].trim() : '');
     res.json(await saveUpload(req.body, name));
   } catch (err: any) { res.status(400).json({ error: err.message }); }
 });
@@ -157,6 +160,47 @@ studioRouter.post('/preview', async (req, res) => {
     res.status(400).json({ error: err.message });
   }
 });
+studioRouter.post('/creative-build', async (req, res) => {
+  try {
+    const { url, transcript, audioUploadId, srtContent, templatePack, channelName } = req.body;
+    if (!transcript?.trim()) throw new Error('Cần cung cấp kịch bản lời đọc (transcript).');
+    if (!audioUploadId) throw new Error('Cần tải lên file MP3 âm thanh.');
+
+    let llmProvider: any = null;
+    try {
+      const cfg = JSON.parse(await readFile(join(ROOT, 'config/llm.json'), 'utf8'));
+      if (cfg.provider !== 'offline' && cfg.apiKey) {
+        const { createLlmProvider } = await import('../script/llm-provider.js');
+        llmProvider = createLlmProvider({
+          provider: cfg.provider,
+          apiKey: cfg.apiKey,
+          model: cfg.model,
+          baseUrl: cfg.baseUrl,
+        });
+      }
+    } catch {}
+
+    const result = await buildCreativeScript({
+      url: url || '',
+      transcript: transcript.trim(),
+      audioUploadId,
+      srtContent: srtContent?.trim(),
+      templatePack,
+      channelName,
+      llmProvider,
+    });
+
+    res.json({
+      success: true,
+      script: result.script,
+      alignment: result.alignment,
+      sourceTitle: result.sourceTitle,
+    });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 studioRouter.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   res.status(err.type === 'entity.too.large' ? 413 : 400).json({ error: err.type === 'entity.too.large' ? 'File vượt quá 30 MB.' : 'Không đọc được audio.' });
 });
