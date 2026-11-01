@@ -147,6 +147,31 @@ This is completely different subtitle content
     }
   });
 
+  it("aligns sentence boundaries directly to acoustic pauses with a subtle visual lead-in", () => {
+    const sentences = [
+      "Câu thứ nhất giới thiệu dự án.",
+      "Câu thứ hai nêu tính năng nổi bật.",
+      "Câu thứ ba kết luận video.",
+    ];
+
+    // Three distinct speech blocks separated by ~0.5s pauses
+    const segments = [
+      { startSec: 0.0, endSec: 2.0 },
+      { startSec: 2.5, endSec: 5.0 },
+      { startSec: 5.6, endSec: 8.0 },
+    ];
+
+    const cues = distributeSentencesAcoustically(sentences, segments, 8.5);
+    expect(cues.length).toBe(3);
+
+    // Cue 1 starts at 0
+    expect(cues[0].startSec).toBe(0.0);
+    // Cue 2 starts right as segment 2 starts (with 60ms visual lead-in: 2.5 - 0.06 = 2.44)
+    expect(cues[1].startSec).toBeCloseTo(2.44, 1);
+    // Cue 3 starts right as segment 3 starts (with 60ms visual lead-in: 5.6 - 0.06 = 5.54)
+    expect(cues[2].startSec).toBeCloseTo(5.54, 1);
+  });
+
   it("anchors outro scene to the end of the video and prevents early outro triggers", () => {
     const sceneTexts = [
       "AI không chỉ biết viết code. Giờ nó còn học cách đọc biểu đồ giá Bitcoin.",

@@ -74,7 +74,36 @@ export function resolveBlockTiming(scene:SceneType,block:SceneBlock,index:number
     if(target.every((t,k)=>tokens[i+k]===t)&&++seen===(setting?.occurrence||1))return {atSec:clamp(words[i].startMs/1000-start-0.04),basis:'word' as const};
   }}
   if(scene.type==='hook')return {atSec:clamp(block.id==='stars'?.03:block.id==='heading'?(scene.githubStarLeadIn?1.05:.34):block.id==='benefit'?(scene.githubStarLeadIn?1.3:.55):(scene.githubStarLeadIn?.9:.16)),basis:'estimated' as const};
-  return {atSec:clamp(block.id==='media'?0.08:index===0?0.04:Math.min(duration*.65,0.2+index*profile.fallbackStepSec)),basis:'estimated' as const};
+
+  // Visual Beats for body scenes: Audio-synchronized 2-3 visual beats
+  const sceneCues = cues.filter((c) => c.startSec >= start - 0.1 && c.startSec < start + duration - 0.4);
+  let beat2At = Math.max(1.4, Math.min(duration * 0.45, 3.2));
+  if (sceneCues.length >= 2) {
+    const relCue2 = sceneCues[1].startSec - start;
+    if (relCue2 >= 1.0 && relCue2 < duration - 1.2) {
+      beat2At = relCue2;
+    }
+  }
+
+  let beat3At = Math.max(beat2At + 1.2, Math.min(duration - 1.0, duration * 0.72));
+  if (sceneCues.length >= 3) {
+    const relCue3 = sceneCues[2].startSec - start;
+    if (relCue3 > beat2At + 0.8 && relCue3 < duration - 0.8) {
+      beat3At = relCue3;
+    }
+  }
+
+  if (block.id === 'media') {
+    // Media enters on Beat 2 when accompanying a headline/card, or at 0.04s if alone
+    return { atSec: clamp(index === 0 ? 0.04 : beat2At), basis: 'estimated' as const };
+  }
+  if (index === 0) {
+    return { atSec: clamp(0.04), basis: 'estimated' as const };
+  }
+  if (index === 1) {
+    return { atSec: clamp(beat2At), basis: 'estimated' as const };
+  }
+  return { atSec: clamp(beat3At), basis: 'estimated' as const };
 }
 
 /** Attach resolved, inert data to renderer-owned nodes. Text is escaped by composer. */
