@@ -4,6 +4,8 @@ import {
   mapScenesToAudioTimestamps,
   alignCreativeAudioAndSubtitles,
   normalizeText,
+  distributeSentencesAcoustically,
+  validateTimelineSanity,
 } from "./audio-aligner.js";
 import type { CaptionCue } from "./types.js";
 
@@ -103,5 +105,101 @@ This is completely different subtitle content
 
     expect(res.timingQuality.mismatchWarning).toBeDefined();
     expect(res.timingQuality.mismatchWarning).toContain("Cảnh báo");
+  });
+
+  it("distributes sentences across all speech segments to cover the entire audio duration", () => {
+    const sentences = [
+      "Câu 1 mở đầu.",
+      "Câu 2 giới thiệu.",
+      "Câu 3 phân tích.",
+      "Câu 4 tính năng.",
+      "Câu 5 kết thúc.",
+    ];
+
+    // Simulate 10 speech segments spanning 0 to 50 seconds
+    const segments = [
+      { startSec: 0.0, endSec: 4.5 },
+      { startSec: 5.0, endSec: 9.5 },
+      { startSec: 10.0, endSec: 14.5 },
+      { startSec: 15.0, endSec: 19.5 },
+      { startSec: 20.0, endSec: 24.5 },
+      { startSec: 25.0, endSec: 29.5 },
+      { startSec: 30.0, endSec: 34.5 },
+      { startSec: 35.0, endSec: 39.5 },
+      { startSec: 40.0, endSec: 44.5 },
+      { startSec: 45.0, endSec: 49.8 },
+    ];
+
+    const totalDur = 50.0;
+    const cues = distributeSentencesAcoustically(sentences, segments, totalDur);
+
+    expect(cues.length).toBe(sentences.length);
+    // First cue starts at 0
+    expect(cues[0].startSec).toBe(0.0);
+    // Last cue finishes at the end of speech, not halfway!
+    expect(cues[cues.length - 1].endSec).toBeGreaterThan(45.0);
+    expect(cues[cues.length - 1].endSec).toBeLessThanOrEqual(totalDur);
+
+    // Cues must be monotonically increasing
+    for (let i = 1; i < cues.length; i++) {
+      expect(cues[i].startSec).toBeGreaterThanOrEqual(cues[i - 1].startSec);
+      expect(cues[i].endSec).toBeGreaterThan(cues[i].startSec);
+    }
+  });
+
+  it("anchors outro scene to the end of the video and prevents early outro triggers", () => {
+    const sceneTexts = [
+      "AI không chỉ biết viết code. Giờ nó còn học cách đọc biểu đồ giá Bitcoin.",
+      "Và đây là một dự án mã nguồn mở khá thú vị.",
+      "Theo nhóm phát triển, mô hình được huấn luyện trên dữ liệu 45 sàn.",
+      "Kronos sử dụng một bộ tokenizer chuyên biệt.",
+      "Sau đó mô hình Transformer học các chuỗi token.",
+      "Bạn có thể mở ra để xem kết quả trực quan.",
+      "Nhưng đừng nhầm dự báo với khả năng kiếm tiền.",
+      "Nếu bạn đang học AI, Kronos là một repo đáng khám phá. Link GitHub ở mô tả.",
+    ];
+
+    // Cues spanning across 76.4 seconds
+    const cues: CaptionCue[] = [
+      { id: 1, startMs: 0, endMs: 5000, startSec: 0, endSec: 5, text: sceneTexts[0], words: [], accuracy: "low" },
+      { id: 2, startMs: 5000, endMs: 14000, startSec: 5, endSec: 14, text: sceneTexts[1], words: [], accuracy: "low" },
+      { id: 3, startMs: 14000, endMs: 25000, startSec: 14, endSec: 25, text: sceneTexts[2], words: [], accuracy: "low" },
+      { id: 4, startMs: 25000, endMs: 38000, startSec: 25, endSec: 38, text: sceneTexts[3], words: [], accuracy: "low" },
+      { id: 5, startMs: 38000, endMs: 49000, startSec: 38, endSec: 49, text: sceneTexts[4], words: [], accuracy: "low" },
+      { id: 6, startMs: 49000, endMs: 60000, startSec: 49, endSec: 60, text: sceneTexts[5], words: [], accuracy: "low" },
+      { id: 7, startMs: 60000, endMs: 70000, startSec: 60, endSec: 70, text: sceneTexts[6], words: [], accuracy: "low" },
+      { id: 8, startMs: 70000, endMs: 76400, startSec: 70, endSec: 76.4, text: sceneTexts[7], words: [], accuracy: "low" },
+    ];
+
+    const totalDur = 76.4;
+    const boundaries = mapScenesToAudioTimestamps(sceneTexts, cues, totalDur);
+
+    expect(boundaries.length).toBe(7);
+    // The last boundary (into Outro) must be near the end of video, NOT at 32 seconds!
+    const outroStart = boundaries[boundaries.length - 1];
+    expect(outroStart).toBeGreaterThan(65.0);
+    expect(totalDur - outroStart).toBeLessThanOrEqual(10.0);
+    expect(totalDur - outroStart).toBeGreaterThanOrEqual(2.0);
+  });
+
+  it("validates timeline sanity and detects abnormal outro duration", () => {
+    // Case 1: Healthy timeline
+    const healthy = validateTimelineSanity({
+      sceneBoundaries: [10, 20, 30, 40, 50, 60, 71],
+      totalDurationSec: 76.4,
+      sceneCount: 8,
+      isOutroLast: true,
+    });
+    expect(healthy.valid).toBe(true);
+
+    // Case 2: Outro triggered too early (lasting 44 seconds!)
+    const broken = validateTimelineSanity({
+      sceneBoundaries: [5, 9, 14, 20, 22, 27, 32.42],
+      totalDurationSec: 76.4,
+      sceneCount: 8,
+      isOutroLast: true,
+    });
+    expect(broken.valid).toBe(false);
+    expect(broken.errors.some((e: string) => e.includes("Outro xuất hiện quá sớm"))).toBe(true);
   });
 });

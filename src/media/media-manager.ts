@@ -75,11 +75,13 @@ export async function processSceneMedia(script:Script,outputDir:string,stockProv
     let copyrightWarning: string | undefined;
     const inProject=spec.src.startsWith('media/')&&!spec.src.split(/[\\/]/).includes('..')?join(outputDir,spec.src):undefined;
 
-    // Validated local Studio asset identifier, copied into the self-contained render.
-    if (spec.src.startsWith('studio-asset:')) {
-      const asset=await readVisual(spec.src.slice('studio-asset:'.length));
-      await copyFile(asset.path,join(mediaDir,`${destFileName}.png`));
-      resolvedRelPath=`media/${destFileName}.png`;credit=credit||asset.source;
+    // Validated local Studio asset identifier or visual URL, copied into the self-contained render.
+    const studioMatch = spec.src.match(/^(?:studio-asset:|\/api\/studio\/visuals\/)([0-9a-f-]{36})/i);
+    if (studioMatch) {
+      const asset = await readVisual(studioMatch[1]);
+      await copyFile(asset.path, join(mediaDir, `${destFileName}.png`));
+      resolvedRelPath = `media/${destFileName}.png`;
+      credit = credit || asset.source;
     }
     // Case 1: Local file path
     else if (existsSync(spec.src) || inProject&&existsSync(inProject)) {

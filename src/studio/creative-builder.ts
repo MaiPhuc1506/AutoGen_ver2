@@ -3,7 +3,7 @@ import { collectGithubVisuals, type VisualAsset } from "./visuals.js";
 import { captureUrlScreenshot } from "../media/screenshot.js";
 import { readUpload, uploadPath } from "./uploads.js";
 import { planCreativeVisuals } from "./creative-planner.js";
-import { alignCreativeAudioAndSubtitles } from "../captions/audio-aligner.js";
+import { alignCreativeAudioAndSubtitles, validateTimelineSanity } from "../captions/audio-aligner.js";
 import { generateSrt } from "../captions/srt.js";
 import { ScriptSchema, type Script } from "../render/script-schema.js";
 import type { LLMProvider } from "../script/types.js";
@@ -112,6 +112,17 @@ export async function buildCreativeScript(
     sceneTexts,
     srtContent,
   });
+
+  // Verify timeline sanity
+  const sanity = validateTimelineSanity({
+    sceneBoundaries: alignment.sceneBoundaries,
+    totalDurationSec: audioDurationSec,
+    sceneCount: plannedScenes.length,
+    isOutroLast: true,
+  });
+  if (!sanity.valid) {
+    log.warn(`[Creative Builder] Timeline sanity warning: ${sanity.errors.join("; ")}`);
+  }
 
   // Generate captions SRT string
   const finalSrt = srtContent && srtContent.trim() ? srtContent.trim() : generateSrt(alignment.cues);
