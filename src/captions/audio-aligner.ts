@@ -124,11 +124,8 @@ export async function extractAcousticSpeechSegments(
  * Strictly guarantees boundaries are increasing, within (0, totalDurationSec).
 /**
  * Distributes sentences smoothly across all detected acoustic speech segments.
- * Guarantees:
- * 1. The first sentence starts at the beginning of speech.
- * 2. The last sentence finishes near totalDurationSec (at the end of speech).
- * 3. Every intermediate sentence gets a slice proportional to its word/character weight.
- * 4. Silence pauses between segments are respected.
+ * Uses dynamic programming to align sentence boundaries to real acoustic silence pauses,
+ * ensuring subtitle cues appear synchronously with speech onset (with ~60ms visual lead-in).
  */
 export function distributeSentencesAcoustically(
   sentences: string[],
@@ -142,44 +139,166 @@ export function distributeSentencesAcoustically(
   const validSegs = segments.filter((s) => s.endSec > s.startSec + 0.05);
   const activeSegs = validSegs.length > 0 ? validSegs : [{ startSec: 0, endSec: usableDuration }];
 
-  // Compute sentence weights (word count + length)
-  const sentenceWeights = sentences.map((s) => Math.max(2, s.trim().split(/\s+/).length));
-  const totalWeight = sentenceWeights.reduce((a, b) => a + b, 0);
-
-  // Cumulative proportions: [0, p1, p2, ..., 1.0]
-  const cumFractions: number[] = [0];
-  for (let i = 0; i < sentences.length; i++) {
-    cumFractions.push(cumFractions[i] + sentenceWeights[i] / totalWeight);
+  if (sentences.length === 1) {
+    const startSec = Math.max(0, activeSegs[0].startSec - 0.06);
+    const endSec = Math.min(usableDuration, activeSegs[activeSegs.length - 1].endSec + 0.1);
+    const dur = endSec - startSec;
+    return [{
+      id: 1,
+      startMs: Math.round(startSec * 1000),
+      endMs: Math.round(endSec * 1000),
+      startSec: Math.round(startSec * 1000) / 1000,
+      endSec: Math.round(endSec * 1000) / 1000,
+      text: sentences[0],
+      words: estimateWordTimings(sentences[0], dur, Math.round(startSec * 1000)),
+      accuracy: "low",
+    }];
   }
-  cumFractions[sentences.length] = 1.0;
 
-  // Total active speech seconds across all speech intervals
+  // Extract all acoustic silence pauses between consecutive segments
+  interface CandidatePause {
+    index: number;
+    pauseStart: number;
+    pauseEnd: number;
+    pauseDur: number;
+    cumSpeechBefore: number;
+  }
+
+  const pauses: CandidatePause[] = [];
+  let cumSpeech = 0;
+  for (let i = 0; i < activeSegs.length - 1; i++) {
+    cumSpeech += (activeSegs[i].endSec - activeSegs[i].startSec);
+    const pauseDur = activeSegs[i + 1].startSec - activeSegs[i].endSec;
+    pauses.push({
+      index: i,
+      pauseStart: activeSegs[i].endSec,
+      pauseEnd: activeSegs[i + 1].startSec,
+      pauseDur,
+      cumSpeechBefore: cumSpeech,
+    });
+  }
+
+  const weights = sentences.map((s) => Math.max(2, s.trim().split(/\s+/).length));
+  const totalWeight = weights.reduce((a, b) => a + b, 0);
   const totalSpeechSec = activeSegs.reduce((sum, s) => sum + (s.endSec - s.startSec), 0);
 
-  // Maps a fraction [0, 1] to a physical timestamp within activeSegs
-  function getTimeAtFraction(frac: number): number {
-    if (frac <= 0) return activeSegs[0].startSec;
-    if (frac >= 1) return activeSegs[activeSegs.length - 1].endSec;
+  // Check if we have enough distinct acoustic pauses to align sentence boundaries directly
+  const neededBoundaries = sentences.length - 1;
+  let chosenBoundaries: { startSec: number; endSec: number }[] | null = null;
 
-    const targetActiveSec = frac * totalSpeechSec;
-    let accumulated = 0;
-    for (const seg of activeSegs) {
-      const segDur = seg.endSec - seg.startSec;
-      if (accumulated + segDur >= targetActiveSec) {
-        const ratio = (targetActiveSec - accumulated) / segDur;
-        return Math.min(usableDuration, seg.startSec + ratio * segDur);
-      }
-      accumulated += segDur;
+  if (pauses.length >= neededBoundaries) {
+    // Target speech progress for each sentence boundary
+    let curW = 0;
+    const targets: number[] = [];
+    for (let i = 0; i < neededBoundaries; i++) {
+      curW += weights[i];
+      targets.push((curW / totalWeight) * totalSpeechSec);
     }
-    return activeSegs[activeSegs.length - 1].endSec;
+
+    // Dynamic programming to match target speech progress with actual acoustic pauses
+    const S = targets.length;
+    const P = pauses.length;
+    const dp = Array.from({ length: S + 1 }, () => Array(P).fill(Infinity));
+    const parent = Array.from({ length: S + 1 }, () => Array(P).fill(-1));
+
+    for (let p = 0; p < P; p++) {
+      const timeDiff = Math.abs(pauses[p].cumSpeechBefore - targets[0]);
+      const durBonus = Math.min(0.8, pauses[p].pauseDur) * 4.0;
+      dp[1][p] = timeDiff * 1.5 - durBonus;
+    }
+
+    for (let s = 2; s <= S; s++) {
+      for (let p = s - 1; p < P; p++) {
+        const timeDiff = Math.abs(pauses[p].cumSpeechBefore - targets[s - 1]);
+        const durBonus = Math.min(0.8, pauses[p].pauseDur) * 4.0;
+        const cost = timeDiff * 1.5 - durBonus;
+
+        let minPrev = Infinity;
+        let bestPrevP = -1;
+        for (let prevP = s - 2; prevP < p; prevP++) {
+          if (dp[s - 1][prevP] < minPrev) {
+            minPrev = dp[s - 1][prevP];
+            bestPrevP = prevP;
+          }
+        }
+        dp[s][p] = minPrev + cost;
+        parent[s][p] = bestPrevP;
+      }
+    }
+
+    let bestP = S - 1;
+    let minTotal = dp[S][bestP];
+    for (let p = S; p < P; p++) {
+      if (dp[S][p] < minTotal) {
+        minTotal = dp[S][p];
+        bestP = p;
+      }
+    }
+
+    if (minTotal < Infinity) {
+      const selectedPauses: CandidatePause[] = [];
+      let curr = bestP;
+      for (let s = S; s >= 1; s--) {
+        selectedPauses.unshift(pauses[curr]);
+        curr = parent[s][curr];
+      }
+
+      chosenBoundaries = [];
+      for (let i = 0; i < sentences.length; i++) {
+        const isFirst = i === 0;
+        const isLast = i === sentences.length - 1;
+        // 60ms subtle visual lead-in so subtitles appear right as voice starts
+        const rawStart = isFirst ? activeSegs[0].startSec : selectedPauses[i - 1].pauseEnd;
+        const rawEnd = isLast ? activeSegs[activeSegs.length - 1].endSec : selectedPauses[i].pauseStart;
+
+        const startSec = isFirst ? 0 : Math.max(0, rawStart - 0.06);
+        const endSec = Math.min(usableDuration, rawEnd + 0.08);
+        chosenBoundaries.push({ startSec, endSec });
+      }
+    }
+  }
+
+  // Fallback: cumulative active speech fraction if pauses could not be matched
+  if (!chosenBoundaries) {
+    const cumFractions: number[] = [0];
+    for (let i = 0; i < sentences.length; i++) {
+      cumFractions.push(cumFractions[i] + weights[i] / totalWeight);
+    }
+    cumFractions[sentences.length] = 1.0;
+
+    function getTimeAtFraction(frac: number): number {
+      if (frac <= 0) return activeSegs[0].startSec;
+      if (frac >= 1) return activeSegs[activeSegs.length - 1].endSec;
+
+      const targetActiveSec = frac * totalSpeechSec;
+      let accumulated = 0;
+      for (const seg of activeSegs) {
+        const segDur = seg.endSec - seg.startSec;
+        if (accumulated + segDur >= targetActiveSec) {
+          const ratio = (targetActiveSec - accumulated) / segDur;
+          return Math.min(usableDuration, seg.startSec + ratio * segDur);
+        }
+        accumulated += segDur;
+      }
+      return activeSegs[activeSegs.length - 1].endSec;
+    }
+
+    chosenBoundaries = [];
+    for (let i = 0; i < sentences.length; i++) {
+      const isFirst = i === 0;
+      const rawStart = getTimeAtFraction(cumFractions[i]);
+      const rawEnd = getTimeAtFraction(cumFractions[i + 1]);
+      const startSec = isFirst ? 0 : Math.max(0, rawStart - 0.06);
+      const endSec = Math.min(usableDuration, rawEnd);
+      chosenBoundaries.push({ startSec, endSec });
+    }
   }
 
   const cues: CaptionCue[] = [];
   let prevEnd = 0;
 
   for (let i = 0; i < sentences.length; i++) {
-    let startSec = getTimeAtFraction(cumFractions[i]);
-    let endSec = getTimeAtFraction(cumFractions[i + 1]);
+    let { startSec, endSec } = chosenBoundaries[i];
 
     if (startSec < prevEnd) {
       startSec = prevEnd;
