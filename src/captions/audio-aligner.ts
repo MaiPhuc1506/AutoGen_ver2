@@ -15,9 +15,10 @@ export interface SpeechSegment {
 export interface AlignmentResult {
   cues: CaptionCue[];
   sceneBoundaries: number[];
+  transcript?: string;
   timingQuality: {
-    source: "imported-srt" | "acoustic-speech-segments" | "fallback-segments";
-    wordAccuracy: "low" | "high";
+    source: "imported-srt" | "acoustic-speech-segments" | "fallback-segments" | "stt-transcription";
+    wordAccuracy: "low" | "high" | "model-estimated";
     cueAccuracy: "verified" | "acoustic-verified" | "unverified";
     sceneTiming: "audio-mapped";
     mismatchWarning?: string;
@@ -498,27 +499,32 @@ export function mapScenesToAudioTimestamps(
   return boundaries;
 }
 
+export interface AlignCreativeAudioParams {
+  audioPath: string;
+  totalDurationSec: number;
+  transcript?: string;
+  sceneTexts?: string[];
+  srtContent?: string;
+  sttResult?: import("./stt.js").SttResult;
+}
+
 /**
  * Main audio & subtitle alignment orchestrator for Creative Mode.
  */
-export async function alignCreativeAudioAndSubtitles(params: {
-  audioPath: string;
-  totalDurationSec: number;
-  transcript: string;
-  sceneTexts: string[];
-  srtContent?: string;
-}): Promise<AlignmentResult> {
-  const { audioPath, totalDurationSec, transcript, sceneTexts, srtContent } = params;
+export async function alignCreativeAudioAndSubtitles(
+  params: AlignCreativeAudioParams
+): Promise<AlignmentResult> {
+  const { audioPath, totalDurationSec, transcript, sceneTexts = [], srtContent, sttResult } = params;
 
   // Case 1: SRT is provided
   if (srtContent && srtContent.trim()) {
     const rawCues = parseSrt(srtContent.trim());
     if (rawCues.length > 0) {
       const srtCombinedText = rawCues.map((c) => c.text).join(" ");
-      const overlap = calculateTextOverlap(transcript, srtCombinedText);
+      const overlap = transcript ? calculateTextOverlap(transcript, srtCombinedText) : 1.0;
       let mismatchWarning: string | undefined;
 
-      if (overlap < 0.65) {
+      if (transcript && overlap < 0.65) {
         mismatchWarning = `Cảnh báo: Lời đọc kịch bản chỉ khớp ${(overlap * 100).toFixed(0)}% với nội dung phụ đề SRT. Phụ đề có thể lệch nghĩa so với giọng đọc.`;
         log.warn(mismatchWarning);
       }
@@ -531,12 +537,14 @@ export async function alignCreativeAudioAndSubtitles(params: {
         endMs: Math.min(Math.round(totalDurationSec * 1000), c.endMs),
       }));
 
-      const sceneBoundaries = mapScenesToAudioTimestamps(sceneTexts, cues, totalDurationSec);
-      validateTimelineSanity({ sceneBoundaries, totalDurationSec, sceneCount: sceneTexts.length });
+      const effectiveSceneTexts = sceneTexts.length > 0 ? sceneTexts : cues.slice(0, 8).map((c) => c.text);
+      const sceneBoundaries = mapScenesToAudioTimestamps(effectiveSceneTexts, cues, totalDurationSec);
+      validateTimelineSanity({ sceneBoundaries, totalDurationSec, sceneCount: effectiveSceneTexts.length });
 
       return {
         cues,
         sceneBoundaries,
+        transcript: transcript || srtCombinedText,
         timingQuality: {
           source: "imported-srt",
           wordAccuracy: "low",
@@ -549,24 +557,125 @@ export async function alignCreativeAudioAndSubtitles(params: {
     }
   }
 
-  // Case 2: SRT is missing -> Acoustic Speech Activity Detection across ALL audio
-  log.info(`[Creative Mode] No SRT provided. Performing acoustic speech segment detection across ${totalDurationSec.toFixed(2)}s...`);
+  // Case 2: STT result is provided
+  if (sttResult && sttResult.segments && sttResult.segments.length > 0) {
+    let mismatchWarning: string | undefined;
+    if (transcript && transcript.trim()) {
+      const overlap = calculateTextOverlap(transcript, sttResult.text);
+      if (overlap < 0.65) {
+        mismatchWarning = `Cảnh báo: Lời đọc kịch bản chỉ khớp ${(overlap * 100).toFixed(0)}% với âm thanh nhận diện từ audio. Vui lòng kiểm tra lại file audio hoặc kịch bản.`;
+        log.warn(`[STT Alignment] ${mismatchWarning}`);
+      }
+    }
+
+    const minWords = 2;
+    const maxWords = 5;
+    const maxChars = 34;
+    const cues: CaptionCue[] = [];
+
+    for (const seg of sttResult.segments) {
+      const segStart = seg.startSec;
+      const segEnd = Math.min(totalDurationSec, seg.endSec);
+      const segDur = Math.max(0.2, segEnd - segStart);
+      const segWords = seg.text.trim().split(/\s+/).filter(Boolean);
+
+      if (segWords.length <= 6 && seg.text.length <= maxChars) {
+        cues.push({
+          id: cues.length + 1,
+          startMs: Math.round(segStart * 1000),
+          endMs: Math.round(segEnd * 1000),
+          startSec: Math.round(segStart * 1000) / 1000,
+          endSec: Math.round(segEnd * 1000) / 1000,
+          text: seg.text,
+          words: estimateWordTimings(seg.text, segDur, Math.round(segStart * 1000)),
+          accuracy: sttResult.wordAccuracy === "model-estimated" ? "model-estimated" : "low",
+        });
+        continue;
+      }
+
+      // Chunk long segment into balanced 3-5 word cues
+      const estimatedWords = estimateWordTimings(seg.text, segDur, Math.round(segStart * 1000));
+      let wIdx = 0;
+      const groups: typeof estimatedWords[] = [];
+      while (wIdx < estimatedWords.length) {
+        const remaining = estimatedWords.length - wIdx;
+        if (remaining <= maxWords && estimatedWords.slice(wIdx).map(w => w.text).join(" ").length <= maxChars) {
+          groups.push(estimatedWords.slice(wIdx));
+          break;
+        }
+        let take = maxWords;
+        if (remaining - take < minWords) {
+          take = Math.ceil(remaining / 2);
+        }
+        for (let k = minWords; k <= take && wIdx + k < estimatedWords.length; k++) {
+          if (/[.,!?;:]$/.test(estimatedWords[wIdx + k - 1].text) && (remaining - k >= minWords || remaining - k === 0)) {
+            take = k;
+            break;
+          }
+        }
+        groups.push(estimatedWords.slice(wIdx, wIdx + take));
+        wIdx += take;
+      }
+
+      for (let g = 0; g < groups.length; g++) {
+        const grp = groups[g];
+        const isFirstGrp = g === 0;
+        const isLastGrp = g === groups.length - 1;
+        const cueStartMs = isFirstGrp ? Math.round(segStart * 1000) : grp[0].startMs;
+        const cueEndMs = isLastGrp ? Math.round(segEnd * 1000) : grp[grp.length - 1].endMs;
+
+        cues.push({
+          id: cues.length + 1,
+          startMs: cueStartMs,
+          endMs: cueEndMs,
+          startSec: Math.round(cueStartMs) / 1000,
+          endSec: Math.round(cueEndMs) / 1000,
+          text: grp.map(w => w.text).join(" "),
+          words: grp,
+          accuracy: sttResult.wordAccuracy === "model-estimated" ? "model-estimated" : "low",
+        });
+      }
+    }
+
+    const effectiveSceneTexts = sceneTexts.length > 0 ? sceneTexts : cues.slice(0, 8).map(c => c.text);
+    const sceneBoundaries = mapScenesToAudioTimestamps(effectiveSceneTexts, cues, totalDurationSec);
+    validateTimelineSanity({ sceneBoundaries, totalDurationSec, sceneCount: effectiveSceneTexts.length });
+
+    return {
+      cues,
+      sceneBoundaries,
+      transcript: transcript || sttResult.text,
+      timingQuality: {
+        source: "stt-transcription",
+        wordAccuracy: sttResult.wordAccuracy,
+        cueAccuracy: "unverified",
+        sceneTiming: "audio-mapped",
+        mismatchWarning,
+      },
+      highlightMode: "accurate-only",
+    };
+  }
+
+  // Case 3: SRT & STT are missing -> Acoustic Speech Activity Detection across ALL audio
+  log.info(`[Creative Mode] Performing acoustic speech segment detection across ${totalDurationSec.toFixed(2)}s...`);
   const segments = await extractAcousticSpeechSegments(audioPath, totalDurationSec);
 
   // Divide transcript into sentences
-  const sentences = transcript
+  const rawText = transcript?.trim() || "Nội dung video tự động.";
+  const sentences = rawText
     .split(/(?<=[.!?])\s+|\n+/)
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
 
   const cues = distributeSentencesAcoustically(sentences, segments, totalDurationSec);
-  const sceneBoundaries = mapScenesToAudioTimestamps(sceneTexts, cues, totalDurationSec);
+  const effectiveSceneTexts = sceneTexts.length > 0 ? sceneTexts : cues.slice(0, 8).map((c) => c.text);
+  const sceneBoundaries = mapScenesToAudioTimestamps(effectiveSceneTexts, cues, totalDurationSec);
 
   // Validate timeline sanity
   const sanity = validateTimelineSanity({
     sceneBoundaries,
     totalDurationSec,
-    sceneCount: sceneTexts.length,
+    sceneCount: effectiveSceneTexts.length,
     isOutroLast: true,
   });
   if (!sanity.valid) {
@@ -576,6 +685,7 @@ export async function alignCreativeAudioAndSubtitles(params: {
   return {
     cues,
     sceneBoundaries,
+    transcript: rawText,
     timingQuality: {
       source: "acoustic-speech-segments",
       wordAccuracy: "low",

@@ -163,8 +163,7 @@ studioRouter.post('/preview', async (req, res) => {
 studioRouter.post('/creative-build', async (req, res) => {
   try {
     const { url, transcript, audioUploadId, srtContent, templatePack, channelName } = req.body;
-    if (!transcript?.trim()) throw new Error('Cần cung cấp kịch bản lời đọc (transcript).');
-    if (!audioUploadId) throw new Error('Cần tải lên file MP3 âm thanh.');
+    if (!audioUploadId) throw new Error('Cần tải lên file MP3/WAV âm thanh.');
 
     let llmProvider: any = null;
     try {
@@ -182,7 +181,7 @@ studioRouter.post('/creative-build', async (req, res) => {
 
     const result = await buildCreativeScript({
       url: url || '',
-      transcript: transcript.trim(),
+      transcript: transcript?.trim() || undefined,
       audioUploadId,
       srtContent: srtContent?.trim(),
       templatePack,
@@ -195,6 +194,7 @@ studioRouter.post('/creative-build', async (req, res) => {
       script: result.script,
       alignment: result.alignment,
       sourceTitle: result.sourceTitle,
+      transcript: result.transcript,
     });
   } catch (err: any) {
     res.status(400).json({ error: err.message });

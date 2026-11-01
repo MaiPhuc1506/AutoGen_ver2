@@ -2225,12 +2225,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   btnSubmitCreative?.addEventListener("click", async () => {
-    const transcript = creativeTranscript.value.trim();
-    if (!transcript) {
-      showToast("Vui lòng dán kịch bản lời đọc (voice script)!");
-      creativeTranscript.focus();
-      return;
-    }
+    const transcript = creativeTranscript ? creativeTranscript.value.trim() : "";
 
     if (!uploadedAudioData && !creativeAudioFile.files.length) {
       showToast("Vui lòng chọn file âm thanh MP3/WAV!");
@@ -2240,7 +2235,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const origBtnHtml = btnSubmitCreative.innerHTML;
     btnSubmitCreative.disabled = true;
-    btnSubmitCreative.innerHTML = `<span>⏳</span><span>Đang chuẩn bị dữ liệu kịch bản & audio...</span>`;
+    btnSubmitCreative.innerHTML = transcript
+      ? `<span>⏳</span><span>Đang chuẩn bị dữ liệu kịch bản & audio...</span>`
+      : `<span>🎙️</span><span>Đang nhận diện giọng nói tiếng Việt từ Audio...</span>`;
 
     try {
       // 1. Ensure audio is uploaded
@@ -2270,7 +2267,9 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       // 3. Call AI Visual Planner & Builder
-      btnSubmitCreative.innerHTML = `<span>🧠</span><span>AI Visual Planner đang chọn bố cục...</span>`;
+      btnSubmitCreative.innerHTML = transcript
+        ? `<span>🧠</span><span>AI Visual Planner đang chọn bố cục...</span>`
+        : `<span>🎙️</span><span>Đang phân tích Speech-to-Text & bố cục...</span>`;
       const buildRes = await fetch("/api/studio/creative-build", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2286,6 +2285,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const buildData = await buildRes.json();
       if (!buildRes.ok) throw new Error(buildData.error || "Lỗi tạo bản dựng Creative");
+
+      // Auto-fill recognized transcript into textarea if user left it blank
+      if (!transcript && buildData.transcript && creativeTranscript) {
+        creativeTranscript.value = buildData.transcript;
+      }
 
       if (buildData.alignment?.timingQuality?.mismatchWarning) {
         showToast(buildData.alignment.timingQuality.mismatchWarning);
