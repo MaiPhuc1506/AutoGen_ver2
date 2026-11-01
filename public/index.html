@@ -92,6 +92,10 @@
             <span class="tab-icon">🛠️</span>
             <span>Chỉnh Sửa Kịch Bản (JSON)</span>
           </button>
+          <button class="tab-btn" id="tabCreative" data-tab="creative">
+            <span class="tab-icon">✨</span>
+            <span>Creative Mode (Script + MP3)</span>
+          </button>
         </div>
 
         <section class="voice-studio" aria-label="Giọng đọc và phong cách">
@@ -334,6 +338,68 @@
               <span>Duyệt & Chỉnh Kịch Bản Này</span>
             </button>
           </div>
+        </div>
+
+        <!-- Tab 4: Creative Mode (100% Automated) -->
+        <div class="tab-pane" id="paneCreative">
+          <form id="formCreativeMode" onsubmit="return false;">
+            <div class="form-group">
+              <label for="creativeUrl">Link GitHub Repository hoặc Bài báo (URL)</label>
+              <div class="input-with-action">
+                <input type="url" id="creativeUrl" placeholder="https://github.com/owner/repo hoặc link bài viết..." />
+              </div>
+              <span class="field-hint">Hệ thống sẽ tự động quét thông tin nguồn, chụp screenshot thật và lấy logo dự án.</span>
+            </div>
+
+            <div class="form-group">
+              <label for="creativeTranscript">Kịch bản lời đọc (Voice Script do ChatGPT viết) <span class="required">*</span></label>
+              <textarea id="creativeTranscript" rows="6" placeholder="Dán toàn bộ lời đọc kịch bản do ChatGPT viết vào đây..."></textarea>
+              <span class="field-hint">Lời đọc giữ nguyên 100% để khớp hoàn hảo với audio thu âm. AI Visual Planner sẽ phân tích nội dung để chọn bố cục hình ảnh phù hợp.</span>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group col-6">
+                <label for="creativeAudioFile">File âm thanh MP3 / WAV (từ ElevenLabs) <span class="required">*</span></label>
+                <input type="file" id="creativeAudioFile" accept="audio/mpeg,audio/wav,.mp3,.wav" />
+                <span class="field-hint" id="creativeAudioStatus">Chưa chọn file (tối đa 30 MB).</span>
+              </div>
+              <div class="form-group col-6">
+                <label for="creativeSrtFile">File phụ đề SRT (Tùy chọn)</label>
+                <input type="file" id="creativeSrtFile" accept=".srt" />
+                <span class="field-hint" id="creativeSrtStatus">Nếu có SRT, phụ đề sẽ hiển thị theo cue chính xác. Nếu không, hệ thống tự động căn chỉnh theo khoảng ngắt âm thanh thực tế.</span>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group col-6">
+                <label for="creativeStylePack">Phong cách thiết kế (Style Pack)</label>
+                <select id="creativeStylePack">
+                  <option value="reference" selected>Studio tối · Theo video mẫu (reference)</option>
+                  <option value="hud">Cyberpunk HUD (hud)</option>
+                  <option value="aurora-glass">Aurora & Glass (glass)</option>
+                  <option value="pixel">Pixel Art (pixel)</option>
+                  <option value="synthwave">Synthwave Neon (synth)</option>
+                  <option value="bauhaus">Geometric Bauhaus (bauhaus)</option>
+                  <option value="liquid">Liquid Motion (liquid)</option>
+                  <option value="collage">Collage Cut-out (collage)</option>
+                  <option value="sticker">Sticker Explainer (sticker)</option>
+                </select>
+              </div>
+              <div class="form-group col-6">
+                <label for="creativeChannel">Tên kênh hiển thị</label>
+                <input type="text" id="creativeChannel" value="DevPeek36" />
+              </div>
+            </div>
+
+            <div id="creativeStatusAlert" class="alert-box" style="display: none; margin-bottom: 15px;"></div>
+
+            <div class="form-actions">
+              <button type="button" class="btn btn-primary btn-glow" id="btnSubmitCreative">
+                <span class="icon">🎬</span>
+                <span>Tạo Video Creative (100% Tự Động)</span>
+              </button>
+            </div>
+          </form>
         </div>
       </section>
 

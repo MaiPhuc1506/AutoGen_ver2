@@ -2139,6 +2139,110 @@ document.addEventListener("DOMContentLoaded", () => {
     btn.addEventListener("click", openLlmModal);
   });
 
+  // ── Creative Mode (100% Automated) ──────────────────────────────────────
+  const creativeUrl = document.getElementById("creativeUrl");
+  const creativeTranscript = document.getElementById("creativeTranscript");
+  const creativeAudioFile = document.getElementById("creativeAudioFile");
+  const creativeSrtFile = document.getElementById("creativeSrtFile");
+  const creativeAudioStatus = document.getElementById("creativeAudioStatus");
+  const creativeSrtStatus = document.getElementById("creativeSrtStatus");
+  const creativeStylePack = document.getElementById("creativeStylePack");
+  const creativeChannel = document.getElementById("creativeChannel");
+  const btnSubmitCreative = document.getElementById("btnSubmitCreative");
+  const creativeStatusAlert = document.getElementById("creativeStatusAlert");
+
+  creativeAudioFile?.addEventListener("change", () => {
+    if (creativeAudioFile.files.length) {
+      const f = creativeAudioFile.files[0];
+      creativeAudioStatus.textContent = `Đã chọn: ${f.name} (${(f.size / 1024 / 1024).toFixed(2)} MB)`;
+    } else {
+      creativeAudioStatus.textContent = "Chưa chọn file (tối đa 30 MB).";
+    }
+  });
+
+  creativeSrtFile?.addEventListener("change", () => {
+    if (creativeSrtFile.files.length) {
+      creativeSrtStatus.textContent = `Đã chọn phụ đề: ${creativeSrtFile.files[0].name}`;
+    } else {
+      creativeSrtStatus.textContent = "Nếu có SRT, phụ đề sẽ hiển thị theo cue chính xác. Nếu không, hệ thống tự động căn chỉnh theo khoảng ngắt âm thanh thực tế.";
+    }
+  });
+
+  btnSubmitCreative?.addEventListener("click", async () => {
+    const transcript = creativeTranscript.value.trim();
+    if (!transcript) {
+      showToast("Vui lòng dán kịch bản lời đọc (voice script)!");
+      creativeTranscript.focus();
+      return;
+    }
+
+    if (!creativeAudioFile.files.length) {
+      showToast("Vui lòng chọn file âm thanh MP3/WAV!");
+      creativeAudioFile.focus();
+      return;
+    }
+
+    const origBtnHtml = btnSubmitCreative.innerHTML;
+    btnSubmitCreative.disabled = true;
+    btnSubmitCreative.innerHTML = `<span>⏳</span><span>Đang tải audio & lập kế hoạch hình ảnh...</span>`;
+
+    try {
+      // 1. Upload audio file
+      const audioFile = creativeAudioFile.files[0];
+      const audioBytes = await audioFile.arrayBuffer();
+      const uploadRes = await fetch("/api/studio/uploads", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/octet-stream",
+          "x-filename": audioFile.name,
+        },
+        body: audioBytes,
+      });
+
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok) throw new Error(uploadData.error || "Không thể tải lên file âm thanh");
+
+      // 2. Read SRT if provided
+      let srtContent = undefined;
+      if (creativeSrtFile.files.length) {
+        srtContent = await creativeSrtFile.files[0].text();
+      }
+
+      // 3. Call AI Visual Planner & Builder
+      btnSubmitCreative.innerHTML = `<span>🧠</span><span>AI Visual Planner đang chọn bố cục...</span>`;
+      const buildRes = await fetch("/api/studio/creative-build", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: creativeUrl?.value.trim() || "",
+          transcript,
+          audioUploadId: uploadData.uploadId,
+          srtContent,
+          templatePack: creativeStylePack?.value || "reference",
+          channelName: creativeChannel?.value.trim() || "DevPeek36",
+        }),
+      });
+
+      const buildData = await buildRes.json();
+      if (!buildRes.ok) throw new Error(buildData.error || "Lỗi tạo bản dựng Creative");
+
+      if (buildData.alignment?.timingQuality?.mismatchWarning) {
+        showToast(buildData.alignment.timingQuality.mismatchWarning);
+      }
+
+      // 4. Launch Render Pipeline (Automated 1-click)
+      btnSubmitCreative.innerHTML = `<span>🚀</span><span>Khởi động tiến trình render MP4...</span>`;
+      await launchPipeline({ script: buildData.script });
+      showToast("Bản dựng Creative Mode đã khởi chạy thành công!");
+    } catch (err) {
+      console.error(err);
+      showToast(`Lỗi: ${err.message}`);
+    } finally {
+      btnSubmitCreative.disabled = false;
+      btnSubmitCreative.innerHTML = origBtnHtml;
+    }
+  });
+
   // Initial Fetch
   fetchVideoList();
   loadProjectsList();
