@@ -2214,10 +2214,34 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  creativeSrtFile?.addEventListener("change", () => {
+  creativeSrtFile?.addEventListener("change", async () => {
     if (creativeSrtFile.files.length) {
-      creativeSrtStatus.textContent = `✅ Đã chọn phụ đề: ${creativeSrtFile.files[0].name}`;
+      const file = creativeSrtFile.files[0];
+      creativeSrtStatus.textContent = `✅ Đã chọn phụ đề: ${file.name}`;
       creativeSrtStatus.style.color = "#52c41a";
+
+      try {
+        const text = await file.text();
+        const extracted = text
+          .replace(/^\uFEFF/, "")
+          .replace(/\r\n/g, "\n")
+          .split(/\n\n+/)
+          .map(block => {
+            const lines = block.trim().split("\n");
+            const content = lines.filter(l => !/^\d+$/.test(l.trim()) && !l.includes("-->"));
+            return content.join(" ").trim();
+          })
+          .filter(Boolean)
+          .join(" ");
+
+        if (extracted && (!creativeTranscript.value || !creativeTranscript.value.trim())) {
+          creativeTranscript.value = extracted;
+          creativeSrtStatus.textContent = `✅ Đã chọn: ${file.name} (Tự động lấy lời thoại từ SRT)`;
+          showToast("Đã tự động trích xuất kịch bản từ file SRT!");
+        }
+      } catch (err) {
+        console.warn("Could not parse SRT preview:", err);
+      }
     } else {
       creativeSrtStatus.textContent = "Nếu có SRT, phụ đề sẽ hiển thị theo cue chính xác. Nếu không, hệ thống tự động căn chỉnh theo khoảng ngắt âm thanh thực tế.";
       creativeSrtStatus.style.color = "";

@@ -215,5 +215,43 @@ describe("Audio-Driven STT & Alignment System (Phase 2)", () => {
       expect(res.script.scenes.length).toBeGreaterThan(0);
       expect(res.alignment.timingQuality.source).toBe("stt-transcription");
     }, 15000);
+
+    it("extracts transcript directly from SRT without requiring script or STT", async () => {
+      const { buildCreativeScript } = await import("../studio/creative-builder.js");
+      const { FakeLLMProvider } = await import("../script/llm-provider.js");
+      const fakeStt = new FakeSttProvider();
+
+      const validUuid = "12345678-1234-4234-8234-123456789def";
+      const uploads = await import("../studio/uploads.js");
+      vi.spyOn(uploads, "readUpload").mockResolvedValueOnce({
+        uploadId: validUuid,
+        path: "dummy.mp3",
+        durationSec: 6.0,
+        name: "test.mp3",
+        size: 1024,
+        createdAt: new Date().toISOString(),
+      });
+
+      const srt = `1
+00:00:00,500 --> 00:00:02,500
+Kronos là một dự án mã nguồn mở.
+
+2
+00:00:03,000 --> 00:00:05,500
+Dành riêng cho thị trường tài chính.`;
+
+      const res = await buildCreativeScript({
+        url: "https://github.com/shiyu-coder/Kronos",
+        audioUploadId: validUuid,
+        srtContent: srt,
+        sttProvider: fakeStt,
+        llmProvider: new FakeLLMProvider(),
+      });
+
+      // STT is NOT called because SRT already has the transcript and timestamps
+      expect(fakeStt.callCount).toBe(0);
+      expect(res.transcript).toContain("Kronos là một dự án mã nguồn mở.");
+      expect(res.alignment.timingQuality.source).toBe("imported-srt");
+    }, 15000);
   });
 });
