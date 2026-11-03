@@ -277,6 +277,22 @@ function renderScene(
       inner = renderPhoneMockupInner(td,mediaRecord);
       layoutName = "phone-mockup";
       break;
+    case "kinetic-headline":
+      inner = `<div class="explainer-content semantic-content"><h1 class="kinetic-title">${escapeHtml(td.headline)}</h1>${td.punchword?`<div class="kinetic-punchword">${escapeHtml(td.punchword)}</div>`:''}${td.subhead?`<p class="kinetic-subhead">${escapeHtml(td.subhead)}</p>`:''}</div>`;
+      layoutName = "kinetic-headline";
+      break;
+    case "quote-card":
+      inner = `<div class="explainer-content semantic-content"><div class="quote-mark">“</div><blockquote class="quote-text">${escapeHtml(td.quote)}</blockquote>${td.author?`<div class="quote-author"><strong>${escapeHtml(td.author)}</strong>${td.role?`<span>${escapeHtml(td.role)}</span>`:''}</div>`:''}</div>`;
+      layoutName = "quote-card";
+      break;
+    case "step-by-step":
+      inner = `<div class="explainer-content semantic-content"><h2 class="explainer-title">${escapeHtml(td.title)}</h2><div class="steps-stack">${td.steps.map((st,i)=>`<div class="step-card"><span class="step-badge">${escapeHtml(st.step||String(i+1).padStart(2,'0'))}</span><div><strong>${escapeHtml(st.label)}</strong>${st.detail?`<p>${escapeHtml(st.detail)}</p>`:''}</div></div>`).join('')}</div></div>`;
+      layoutName = "step-by-step";
+      break;
+    case "visual-focus":
+      inner = `<div class="explainer-content semantic-content"><h2 class="explainer-title">${escapeHtml(td.title)}</h2>${td.subtitle?`<p class="focus-subtitle">${escapeHtml(td.subtitle)}</p>`:''}<div class="focus-frame">${mediaRecord?`<img src="${escapeHtml(mediaRecord.localRelPath)}" alt="" />`:`<div class="focus-placeholder">FOCUS AREA</div>`}</div>${td.caption?`<p class="focus-caption">${escapeHtml(td.caption)}</p>`:''}</div>`;
+      layoutName = "visual-focus";
+      break;
     default: {
       const _never: never = td;
       throw new Error(`Unknown template: ${(_never as any).template}`);
@@ -585,15 +601,20 @@ function buildScene(
     ? `<div class="media-credit-badge">Nguồn: ${escapeHtml(sourceLabel(mediaRecord.credit))}</div>`
     : "";
 
-  const transType = scene.transition?.type || "cut";
+  const transType = scene.transitionPreset || scene.transition?.type || "cut";
   const transDur = scene.transition?.duration ?? 0.3;
+  const eventsAttr = scene.visualEvents && scene.visualEvents.length > 0 ? ` data-visual-events="${escapeHtml(JSON.stringify(scene.visualEvents))}"` : "";
+  const motionPreset = scene.motionPreset || "explanatory";
+  const motionIntensity = scene.motionIntensity || "medium";
 
   return `
 <div class="scene clip" id="scene-${scene.id}"
      data-start="${start.toFixed(2)}" data-duration="${duration.toFixed(2)}" data-active="0"
      data-layout="${layoutName}" data-media="${presentation}"
      data-transition="${transType}"
-     data-transition-duration="${transDur.toFixed(2)}">
+     data-transition-duration="${transDur.toFixed(2)}"
+     data-motion-preset="${motionPreset}"
+     data-motion-intensity="${motionIntensity}"${eventsAttr}>
   ${mediaHtml}
   ${innerHtml}
   ${creditHtml}

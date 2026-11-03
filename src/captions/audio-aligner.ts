@@ -20,10 +20,33 @@ export interface AlignmentResult {
     source: "imported-srt" | "acoustic-speech-segments" | "fallback-segments" | "stt-transcription";
     wordAccuracy: "low" | "high" | "model-estimated";
     cueAccuracy: "verified" | "acoustic-verified" | "unverified";
-    sceneTiming: "audio-mapped";
+    sceneTiming: "audio-mapped" | "srt-sliced";
     mismatchWarning?: string;
+    warnings?: string[];
   };
   highlightMode: "accurate-only" | "estimated";
+}
+
+export interface SceneCueGrouping {
+  startCueId: number;
+  endCueId: number;
+}
+
+export interface SlicedSceneBoundary {
+  sceneIndex: number;
+  startCueId: number;
+  endCueId: number;
+  startSec: number;
+  endSec: number;
+  durationSec: number;
+  cueCount: number;
+  text: string;
+}
+
+export interface SrtSceneSlicingResult {
+  scenes: SlicedSceneBoundary[];
+  sceneBoundaries: number[];
+  warnings: string[];
 }
 
 /**
@@ -499,11 +522,136 @@ export function mapScenesToAudioTimestamps(
   return boundaries;
 }
 
+/**
+ * Slices scenes strictly anchored to SRT cue boundaries without splitting cues.
+ * Guarantees no gaps, no overlaps, and flags abnormally long cues.
+ */
+export function sliceScenesFromSrtCues(
+  cues: CaptionCue[],
+  groupings?: SceneCueGrouping[],
+  totalDurationSec?: number
+): SrtSceneSlicingResult {
+  if (cues.length === 0) {
+    return { scenes: [], sceneBoundaries: [], warnings: [] };
+  }
+
+  const warnings: string[] = [];
+  const cueMap = new Map<number, CaptionCue>();
+  for (const c of cues) {
+    cueMap.set(c.id, c);
+    const cueDur = c.endSec - c.startSec;
+    if (cueDur > 12.0) {
+      warnings.push(
+        `Cảnh báo: Cue #${c.id} có thời lượng dài bất thường (${cueDur.toFixed(1)}s). Giữ nguyên cue theo nguyên tắc không tự cắt phỏng đoán khi chưa có word alignment.`
+      );
+    }
+  }
+
+  const effectiveTotalDur = totalDurationSec || cues[cues.length - 1].endSec;
+  let normalizedGroupings: SceneCueGrouping[] = [];
+
+  if (Array.isArray(groupings) && groupings.length > 0) {
+    const sorted = [...groupings].sort((a, b) => a.startCueId - b.startCueId);
+    let expectedStart = cues[0].id;
+
+    for (let i = 0; i < sorted.length; i++) {
+      let gStart = sorted[i].startCueId;
+      let gEnd = sorted[i].endCueId;
+
+      if (gStart !== expectedStart) {
+        gStart = expectedStart;
+      }
+      if (gEnd < gStart) {
+        gEnd = gStart;
+      }
+      if (i === sorted.length - 1) {
+        gEnd = cues[cues.length - 1].id;
+      }
+
+      normalizedGroupings.push({ startCueId: gStart, endCueId: gEnd });
+      expectedStart = gEnd + 1;
+      if (expectedStart > cues[cues.length - 1].id) {
+        break;
+      }
+    }
+
+    if (normalizedGroupings.length > 0) {
+      normalizedGroupings[normalizedGroupings.length - 1].endCueId = cues[cues.length - 1].id;
+    }
+  }
+
+  // Fallback: If no groupings or empty, partition cues sequentially
+  if (normalizedGroupings.length === 0) {
+    const targetSceneCount = Math.max(2, Math.min(8, Math.ceil(cues.length / 3)));
+    const chunkSize = Math.ceil(cues.length / targetSceneCount);
+    let curIdx = 0;
+
+    for (let s = 0; s < targetSceneCount && curIdx < cues.length; s++) {
+      const startId = cues[curIdx].id;
+      const endIdx = s === targetSceneCount - 1 ? cues.length - 1 : Math.min(cues.length - 1, curIdx + chunkSize - 1);
+      const endId = cues[endIdx].id;
+      normalizedGroupings.push({ startCueId: startId, endCueId: endId });
+      curIdx = endIdx + 1;
+    }
+  }
+
+  const slicedScenes: SlicedSceneBoundary[] = [];
+  const boundaries: number[] = [];
+
+  let prevEndSec = 0;
+  for (let sIdx = 0; sIdx < normalizedGroupings.length; sIdx++) {
+    const grp = normalizedGroupings[sIdx];
+    const isFirst = sIdx === 0;
+    const isLast = sIdx === normalizedGroupings.length - 1;
+
+    const firstCue = cueMap.get(grp.startCueId) || cues[0];
+    const lastCue = cueMap.get(grp.endCueId) || cues[cues.length - 1];
+
+    const sceneCues = cues.filter((c) => c.id >= grp.startCueId && c.id <= grp.endCueId);
+    const sceneText = sceneCues.map((c) => c.text).join(" ");
+
+    // Continuity: Scene 0 starts at 0, subsequent scenes start exactly at previous end
+    const startSec = isFirst ? 0 : prevEndSec;
+    let endSec: number;
+
+    if (isLast) {
+      endSec = Math.max(startSec + 0.5, effectiveTotalDur);
+    } else {
+      const cueEnd = lastCue.endSec;
+      endSec = Math.max(startSec + 0.5, Math.min(effectiveTotalDur, cueEnd));
+    }
+
+    prevEndSec = endSec;
+
+    slicedScenes.push({
+      sceneIndex: sIdx,
+      startCueId: grp.startCueId,
+      endCueId: grp.endCueId,
+      startSec: Math.round(startSec * 1000) / 1000,
+      endSec: Math.round(endSec * 1000) / 1000,
+      durationSec: Math.round((endSec - startSec) * 1000) / 1000,
+      cueCount: sceneCues.length,
+      text: sceneText,
+    });
+
+    if (!isLast) {
+      boundaries.push(Math.round(endSec * 1000) / 1000);
+    }
+  }
+
+  return {
+    scenes: slicedScenes,
+    sceneBoundaries: boundaries,
+    warnings,
+  };
+}
+
 export interface AlignCreativeAudioParams {
   audioPath: string;
   totalDurationSec: number;
   transcript?: string;
   sceneTexts?: string[];
+  sceneGroupings?: SceneCueGrouping[];
   srtContent?: string;
   sttResult?: import("./stt.js").SttResult;
 }
@@ -514,7 +662,7 @@ export interface AlignCreativeAudioParams {
 export async function alignCreativeAudioAndSubtitles(
   params: AlignCreativeAudioParams
 ): Promise<AlignmentResult> {
-  const { audioPath, totalDurationSec, transcript, sceneTexts = [], srtContent, sttResult } = params;
+  const { audioPath, totalDurationSec, transcript, sceneTexts = [], sceneGroupings, srtContent, sttResult } = params;
 
   // Case 1: SRT is provided
   if (srtContent && srtContent.trim()) {
@@ -537,6 +685,29 @@ export async function alignCreativeAudioAndSubtitles(
         endMs: Math.min(Math.round(totalDurationSec * 1000), c.endMs),
       }));
 
+      // Task A: When sceneGroupings are provided from LLM or deterministic cue grouper, use sliceScenesFromSrtCues
+      if (sceneGroupings && sceneGroupings.length > 0) {
+        const slicing = sliceScenesFromSrtCues(cues, sceneGroupings, totalDurationSec);
+        const sceneBoundaries = slicing.sceneBoundaries;
+        validateTimelineSanity({ sceneBoundaries, totalDurationSec, sceneCount: slicing.scenes.length });
+
+        return {
+          cues,
+          sceneBoundaries,
+          transcript: transcript || srtCombinedText,
+          timingQuality: {
+            source: "imported-srt",
+            wordAccuracy: "low",
+            cueAccuracy: "unverified",
+            sceneTiming: "srt-sliced",
+            mismatchWarning: mismatchWarning || (slicing.warnings.length > 0 ? slicing.warnings.join("; ") : undefined),
+            warnings: slicing.warnings,
+          },
+          highlightMode: "accurate-only",
+        };
+      }
+
+      // Backward compatible fallback: mapScenesToAudioTimestamps
       const effectiveSceneTexts = sceneTexts.length > 0 ? sceneTexts : cues.slice(0, 8).map((c) => c.text);
       const sceneBoundaries = mapScenesToAudioTimestamps(effectiveSceneTexts, cues, totalDurationSec);
       validateTimelineSanity({ sceneBoundaries, totalDurationSec, sceneCount: effectiveSceneTexts.length });
@@ -647,7 +818,7 @@ export async function alignCreativeAudioAndSubtitles(
       transcript: transcript || sttResult.text,
       timingQuality: {
         source: "stt-transcription",
-        wordAccuracy: sttResult.wordAccuracy,
+        wordAccuracy: sttResult.wordAccuracy === "model-estimated" ? "model-estimated" : "low",
         cueAccuracy: "unverified",
         sceneTiming: "audio-mapped",
         mismatchWarning,

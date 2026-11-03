@@ -6,6 +6,8 @@ import { cleanLlmJson } from "../script/generator.js";
 import { normalizeText } from "../captions/audio-aligner.js";
 import { log } from "../utils/logger.js";
 import type { VisualAsset } from "./visuals.js";
+import type { CaptionCue } from "../captions/types.js";
+import { evaluateSceneDiversity, optimizeSceneDiversity, type DiversityReport } from "./diversity.js";
 
 export interface CreativePlannerParams {
   transcript: string;
@@ -14,6 +16,7 @@ export interface CreativePlannerParams {
   availableAssets: VisualAsset[];
   llmProvider?: LLMProvider | null;
   channelName?: string;
+  srtCues?: CaptionCue[];
 }
 
 /**
@@ -83,30 +86,43 @@ export function condenseVisualText(
 
 const CREATIVE_PLANNER_SYSTEM_PROMPT = `
 Bạn là Đạo diễn Hình ảnh & Chuyển động (AI Visual Director) cho video công nghệ ngắn 9:16 (TikTok/Reels/Shorts).
-Nhiệm vụ: Bạn nhận được kịch bản lời đọc (Voice Script) và danh sách tài nguyên hình ảnh thực tế (ASSETS ĐANG CÓ). Bạn phải phân tích ngữ nghĩa từng câu để chọn bố cục thị giác và đồ họa minh chứng phù hợp nhất.
+Nhiệm vụ: Bạn nhận được kịch bản lời đọc (Voice Script), danh sách tài nguyên hình ảnh thực tế (ASSETS ĐANG CÓ), và tùy chọn DANH SÁCH CUES TỪ SRT.
+Bạn phải phân tích ngữ nghĩa từng phân đoạn để chọn bố cục thị giác, phân loại mục đích nội dung và chuyển động phù hợp nhất.
 
 QUY TẮC BẮT BUỘC:
-1. GIỮ NGUYÊN 100% LỜI ĐỌC (VOICE TEXT):
-   - Tuyệt đối KHÔNG thay đổi, KHÔNG cắt xén, KHÔNG thêm bớt câu chữ trong trường "voiceText".
-   - Khi nối trường "voiceText" của tất cả các cảnh theo thứ tự lại, phải khớp 100% kịch bản gốc.
+1. NGUYÊN TẮC PHÂN CẢNH VỚI SRT CUES (KHI CÓ DANH SÁCH CUES):
+   - Mỗi scene BẮT BUỘC được tạo từ một nhóm cue SRT liên tiếp bằng 2 trường: "startCueId" và "endCueId" (số nguyên dương).
+   - Cue sau phải nối tiếp ngay sau cue trước: Scene 1 (ví dụ 1 đến 3), Scene 2 (4 đến 6)...
+   - Tuyệt đối KHÔNG tự tạo timestamp giây (startSec/endSec).
+   - Không được để chồng lấn (overlap) và không được tạo khoảng trống (gap) giữa các cue.
+   - Không chia cắt giữa chừng một cue.
 
-2. TÁCH BIỆT HOÀN TOÀN GIỮA LỜI ĐỌC VÀ CHỮ TRÊN MÀN HÌNH (VISUAL TEXT):
-   - Phụ đề (captions) chạy bên dưới đã hiển thị toàn bộ lời nói của người thuyết minh.
-   - Chữ hiển thị trên card (Visual Text) CHỈ LÀ TIÊU ĐỀ THỊ GIÁC NGẮN GỌN (Punchy Visual Cues), TUYỆT ĐỐI KHÔNG COPY NGUYÊN VĂN CÂU NÓI!
-   - Quy tắc độ dài nghiêm ngặt:
-     * Hook headline: 3–6 từ (VD: "AI ĐỌC BIỂU ĐỒ BITCOIN?", "KRONOS AI DỰ BÁO TÀI CHÍNH").
-     * Headline scene / Callout statement: 2–5 từ (VD: "45+ SÀN GIAO DỊCH", "NẾN GIÁ → TOKEN", "DỰ BÁO ≠ KIẾM TIỀN").
-     * Subhead / Context: Tối đa 8 từ (VD: "Mô hình ngôn ngữ cho chuỗi thời gian").
-     * Bullets (feature-list): 2–6 từ (VD: "Model Mini & Base", "Code Python dự báo").
-     * Nodes (data-flow): label 2-4 từ, detail 3-5 từ.
-   - Mỗi scene chỉ có một thông điệp thị giác chính. KHÔNG cố hiển thị toàn bộ thông tin của lời đọc lên scene.
-    
-3. CẤU TRÚC PHÂN CẢNH VÀ TRƯỜNG "type":
-   - Cảnh 1 (đầu tiên): BẮT BUỘC "type": "hook"
-   - Cảnh cuối cùng: BẮT BUỘC "type": "outro"
-   - Tất cả các cảnh ở giữa: BẮT BUỘC "type": "body" (TUYỆT ĐỐI KHÔNG dùng type "intro", "feature", "code", "warning").
+2. PHÂN LOẠI NGỮ NGHĨA NỘI DUNG (semanticIntent):
+   Mỗi cảnh BẮT BUỘC chỉ định đúng 1 trường "semanticIntent" phản ánh nội dung có thật:
+   * "hook": Mở đầu kích thích tò mò (Chỉ dùng cho cảnh 1).
+   * "explanation": Giải thích khái niệm, cơ chế, luồng hoạt động hoặc tính năng.
+   * "statistic": Con số ấn tượng. CHỈ ĐƯỢC CHỌN KHI CÂU NÓI CÓ CHỨA SỐ LIỆU THỰC TẾ (%, triệu, x, sàn, sao...). TUYỆT ĐỐI KHÔNG TỰ BỊA CON SỐ.
+   * "comparison": So sánh đối chiếu (Trước vs Sau, Thử nghiệm vs Thực tế). CHỈ CHỌN KHI CÓ TỪ NGỮ SO SÁNH THẬT.
+   * "demonstration": Minh họa demo giao diện hoặc đoạn code kỹ thuật thực tế.
+   * "warning": Cảnh báo rủi ro, lưu ý thị trường, hạn chế kỹ thuật.
+   * "conclusion": Tổng kết nhận định cốt lõi.
+   * "cta": Kêu gọi hành động, theo dõi kênh (Chỉ dùng cho cảnh cuối).
 
-4. BẢNG TEMPLATE CHUẨN (CHỈ ĐƯỢC CHỌN TRONG CÁC TEMPLATE DƯỚI ĐÂY):
+3. CHỈ ĐỊNH CHUYỂN ĐỘNG & SỰ KIỆN THỊ GIÁC (MOTION & VISUAL EVENTS):
+   - "motionPreset": chọn trong ["subtle", "energetic", "dramatic", "explanatory", "minimal"] (mặc định "explanatory").
+   - "motionIntensity": chọn trong ["low", "medium", "high"] (mặc định "medium").
+   - "visualEvents": danh sách sự kiện kích hoạt theo cue (tối đa 3 sự kiện/cảnh):
+     [
+       {
+         "targetCueId": 2,
+         "eventType": "highlight", // "reveal" | "highlight" | "pulse" | "focus" | "shimmer" | "bounce"
+         "targetElement": "heading", // "heading" | "subhead" | "media" | "card" | "badge" | "bullet" | "metric"
+         "timingSource": "cue-start" // "cue-start" | "cue-end" | "cue-middle" | "scene-start"
+       }
+     ]
+   - AN TOÀN TUYỆT ĐỐI: KHÔNG xuất mã JavaScript, GSAP code hay HTML script tùy ý. Chỉ sử dụng đúng các giá trị enum quy định ở trên.
+
+4. BẢNG TEMPLATE CHUẨN (CHỈ CHỌN TEMPLATE PHÙ HỢP NỘI DUNG THẬT):
    * "hook" (Chỉ dùng cho cảnh 1):
      { "template": "hook", "headline": "TIÊU ĐỀ 3-6 TỪ", "subhead": "Nguồn hoặc tóm tắt tối đa 8 từ", "kenBurns": "zoom-in" }
    * "data-flow" (Kiến trúc, luồng dữ liệu, pipeline mô hình, ví dụ: Tokenizer -> Transformer -> Dự báo):
@@ -130,23 +146,29 @@ QUY TẮC BẮT BUỘC:
    * "outro" (Chỉ dùng cho cảnh cuối):
      { "template": "outro", "ctaTop": "Khám phá repo ngay", "channelName": "DevPeek36", "source": "github.com" }
 
-5. GÁN MEDIA THỰC TẾ (TẬN DỤNG ASSETS ĐANG CÓ):
-   - Khi cảnh đề cập đến ảnh sơ đồ (overview), dự báo (prediction), hoặc kết quả backtest, HÃY gán vào trường "media":
-     "media": {
-       "type": "image",
-       "src": "previewUrl_chính_xác_trong_danh_sách",
-       "fit": "cover",
-       "fx": "kenburns",
-       "presentation": "card"
-     }
-   - KHÔNG dùng cùng 1 screenshot cho nhiều cảnh liên tiếp. Nếu không có ảnh thích hợp, dùng visual templates đồ họa (data-flow, code-window, worked-example, stat-hero).
-   - "presentation" có thể là "card" (hiển thị khung cửa sổ browser mockup tinh tế) hoặc "background" (làm hình nền phóng to).
+5. TÁCH BIỆT HOÀN TOÀN GIỮA LỜI ĐỌC VÀ CHỮ TRÊN MÀN HÌNH (VISUAL TEXT):
+   - Phụ đề (captions) chạy bên dưới đã hiển thị toàn bộ lời nói của người thuyết minh.
+   - Chữ hiển thị trên card (Visual Text) CHỈ LÀ TIÊU ĐỀ THỊ GIÁC NGẮN GỌN (Punchy Visual Cues), TUYỆT ĐỐI KHÔNG COPY NGUYÊN VĂN CÂU NÓI!
+   - Quy tắc độ dài nghiêm ngặt:
+     * Hook headline: 3–6 từ (VD: "AI ĐỌC BIỂU ĐỒ BITCOIN?").
+     * Headline scene / Callout statement: 2–5 từ (VD: "45+ SÀN GIAO DỊCH", "DỰ BÁO ≠ KIẾM TIỀN").
+     * Subhead / Context: Tối đa 8 từ.
+     * Bullets (feature-list): 2–6 từ.
 
 6. ĐỊNH DẠNG ĐẦU RA:
    Chỉ trả về JSON thuần túy:
    {
      "scenes": [
-       { "id": "scene-1", "type": "hook", "voiceText": "...", "templateData": { ... }, "media": { ... } }
+       {
+         "id": "scene-1",
+         "type": "hook",
+         "startCueId": 1,
+         "endCueId": 2,
+         "semanticIntent": "hook",
+         "motionPreset": "energetic",
+         "motionIntensity": "high",
+         "templateData": { "template": "hook", "headline": "...", "subhead": "..." }
+       }
      ]
    }
 `.trim();
@@ -157,7 +179,8 @@ QUY TẮC BẮT BUỘC:
 export function repairAndNormalizeLlmPlan(
   rawScenes: any[],
   availableAssets: VisualAsset[],
-  originalTranscript: string
+  originalTranscript: string,
+  srtCues?: CaptionCue[]
 ): any[] {
   if (!Array.isArray(rawScenes)) return [];
 
@@ -172,6 +195,47 @@ export function repairAndNormalizeLlmPlan(
     );
   };
 
+  // Normalize cue ranges if srtCues are present
+  let normalizedCueGroupings: Array<{ startCueId: number; endCueId: number }> | undefined;
+  if (Array.isArray(srtCues) && srtCues.length > 0) {
+    const candidateGroupings = rawScenes
+      .map((s) => ({
+        startCueId: Number(s.startCueId ?? s.cueRange?.startCueId),
+        endCueId: Number(s.endCueId ?? s.cueRange?.endCueId),
+      }))
+      .filter((g) => Number.isInteger(g.startCueId) && Number.isInteger(g.endCueId) && g.startCueId > 0 && g.endCueId >= g.startCueId);
+
+    if (candidateGroupings.length === rawScenes.length) {
+      let expectedStart = srtCues[0].id;
+      normalizedCueGroupings = [];
+      for (let i = 0; i < candidateGroupings.length; i++) {
+        let gStart = candidateGroupings[i].startCueId;
+        let gEnd = candidateGroupings[i].endCueId;
+        if (gStart !== expectedStart) gStart = expectedStart;
+        if (gEnd < gStart) gEnd = gStart;
+        if (i === candidateGroupings.length - 1) gEnd = srtCues[srtCues.length - 1].id;
+        normalizedCueGroupings.push({ startCueId: gStart, endCueId: gEnd });
+        expectedStart = gEnd + 1;
+        if (expectedStart > srtCues[srtCues.length - 1].id) break;
+      }
+      if (normalizedCueGroupings.length > 0) {
+        normalizedCueGroupings[normalizedCueGroupings.length - 1].endCueId = srtCues[srtCues.length - 1].id;
+      }
+    } else {
+      // Deterministic partitioning across rawScenes
+      const targetCount = Math.max(2, Math.min(rawScenes.length, srtCues.length));
+      const chunkSize = Math.ceil(srtCues.length / targetCount);
+      normalizedCueGroupings = [];
+      let cur = 0;
+      for (let s = 0; s < targetCount && cur < srtCues.length; s++) {
+        const startId = srtCues[cur].id;
+        const endIdx = s === targetCount - 1 ? srtCues.length - 1 : Math.min(srtCues.length - 1, cur + chunkSize - 1);
+        normalizedCueGroupings.push({ startCueId: startId, endCueId: srtCues[endIdx].id });
+        cur = endIdx + 1;
+      }
+    }
+  }
+
   const repaired = rawScenes.map((raw, idx) => {
     const s: any = { ...raw };
     s.id = `scene-${idx + 1}`;
@@ -184,6 +248,18 @@ export function repairAndNormalizeLlmPlan(
     } else {
       s.type = "body";
     }
+
+    // Assign cueRange and voiceText if srtCues are present
+    if (normalizedCueGroupings && normalizedCueGroupings[idx]) {
+      const grp = normalizedCueGroupings[idx];
+      s.cueRange = { startCueId: grp.startCueId, endCueId: grp.endCueId };
+      const matched = srtCues!.filter((c) => c.id >= grp.startCueId && c.id <= grp.endCueId);
+      if (matched.length > 0) {
+        s.voiceText = matched.map((c) => c.text).join(" ");
+      }
+    }
+
+    const voiceText = s.voiceText || "";
 
     // 2. Normalize templateData
     let td = s.templateData ? { ...s.templateData } : {};
@@ -204,7 +280,7 @@ export function repairAndNormalizeLlmPlan(
       }
       td = {
         template: "callout",
-        statement: condenseVisualText(td.caption || td.title || td.statement || s.voiceText, 5, "TIÊU ĐIỂM CÔNG NGHỆ"),
+        statement: condenseVisualText(td.caption || td.title || td.statement || voiceText, 5, "TIÊU ĐIỂM CÔNG NGHỆ"),
         tag: "MINH HỌA",
       };
     } else if (tName === "code-file" || tName === "code") {
@@ -231,7 +307,7 @@ export function repairAndNormalizeLlmPlan(
     if (s.type === "hook") {
       td = {
         template: "hook",
-        headline: condenseVisualText(td.headline || td.title || s.voiceText, 5, "CÔNG NGHỆ MỚI").toUpperCase(),
+        headline: condenseVisualText(td.headline || td.title || voiceText, 5, "CÔNG NGHỆ MỚI").toUpperCase(),
         subhead: td.subhead ? condenseVisualText(td.subhead, 7, "Mã nguồn mở") : undefined,
         kenBurns: "zoom-in",
       };
@@ -278,7 +354,7 @@ export function repairAndNormalizeLlmPlan(
           title: condenseVisualText(td.title || "MÃ NGUỒN PYTHON", 4, "CODE PYTHON").toUpperCase(),
           language: String(td.language || "python").slice(0, 20),
           code: lines.join("\n"),
-          note: td.note ? condenseVisualText(td.note, 6, "Hỗ trợ fine-tune") : undefined,
+          note: td.note ? condenseVisualText(td.note, 6, "Hỗ trợ tùy biến") : undefined,
         };
       } else if (td.template === "comparison") {
         td = {
@@ -296,15 +372,24 @@ export function repairAndNormalizeLlmPlan(
           },
         };
       } else if (td.template === "stat-hero") {
-        const numMatch = s.voiceText.match(/\b\d+([.,]\d+)?(%|x|k|M|GB|TB|sao|\+)?\b/i);
-        td = {
-          template: "stat-hero",
-          value: String(td.value || (numMatch ? numMatch[0] : "45+")).slice(0, 16),
-          label: condenseVisualText(td.label || "THÔNG SỐ NỔI BẬT", 4, "CHỈ SỐ TOÀN CẦU").toUpperCase(),
-          context: td.context ? condenseVisualText(td.context, 6, "Dữ liệu toàn cầu") : undefined,
-        };
+        const numMatch = voiceText.match(/\b\d+([.,]\d+)?(%|x|k|M|GB|TB|sao|\+)?\b/i);
+        if (numMatch) {
+          td = {
+            template: "stat-hero",
+            value: String(td.value || numMatch[0]).slice(0, 16),
+            label: condenseVisualText(td.label || "THÔNG SỐ NỔI BẬT", 4, "CHỈ SỐ TOÀN CẦU").toUpperCase(),
+            context: td.context ? condenseVisualText(td.context, 6, "Dữ liệu toàn cầu") : undefined,
+          };
+        } else {
+          // Guard: No numbers in text -> Demote to callout to avoid hallucinating stats
+          td = {
+            template: "callout",
+            statement: condenseVisualText(td.label || voiceText, 5, "TIÊU ĐIỂM CÔNG NGHỆ"),
+            tag: "TIÊU ĐIỂM",
+          };
+        }
       } else if (td.template === "feature-list") {
-        const rawBullets = Array.isArray(td.bullets) ? td.bullets : [s.voiceText];
+        const rawBullets = Array.isArray(td.bullets) ? td.bullets : [voiceText];
         const bullets = rawBullets.slice(0, 3).map((b: any) => condenseVisualText(b, 5, "Hỗ trợ mã nguồn mở"));
         td = {
           template: "feature-list",
@@ -312,10 +397,9 @@ export function repairAndNormalizeLlmPlan(
           bullets: bullets.length >= 2 ? bullets : [...bullets, "Hỗ trợ mã nguồn mở"],
         };
       } else {
-        // Fallback to callout with punchy 2-5 word statement
         td = {
           template: "callout",
-          statement: condenseVisualText(td.statement || s.voiceText, 5, "TIÊU ĐIỂM CÔNG NGHỆ"),
+          statement: condenseVisualText(td.statement || voiceText, 5, "TIÊU ĐIỂM CÔNG NGHỆ"),
           tag: condenseVisualText(td.tag || "ĐIỂM CỐT LÕI", 3, "LƯU Ý"),
         };
       }
@@ -323,18 +407,171 @@ export function repairAndNormalizeLlmPlan(
 
     s.templateData = td;
 
-    // Check media resolution
+    // 3. Normalize semanticIntent
+    const validIntents = new Set(["hook", "explanation", "statistic", "comparison", "demonstration", "warning", "conclusion", "cta"]);
+    if (s.type === "hook") {
+      s.semanticIntent = "hook";
+    } else if (s.type === "outro") {
+      s.semanticIntent = "cta";
+    } else if (validIntents.has(s.semanticIntent)) {
+      if (s.semanticIntent === "statistic" && td.template !== "stat-hero") {
+        s.semanticIntent = "explanation";
+      }
+    } else {
+      if (td.template === "stat-hero") s.semanticIntent = "statistic";
+      else if (td.template === "comparison") s.semanticIntent = "comparison";
+      else if (td.template === "code-window" || td.template === "phone-mockup") s.semanticIntent = "demonstration";
+      else if (td.template === "callout" && /rủi ro|nhiễu|lưu ý|cẩn trọng|thất bại/i.test(voiceText)) s.semanticIntent = "warning";
+      else s.semanticIntent = "explanation";
+    }
+
+    // 4. Normalize motionPreset & motionIntensity
+    const validPresets = new Set(["subtle", "energetic", "dramatic", "explanatory", "minimal", "calm", "dynamic"]);
+    s.motionPreset = validPresets.has(s.motionPreset) ? s.motionPreset : (s.type === "hook" ? "energetic" : s.type === "outro" ? "dramatic" : "explanatory");
+
+    const validIntensities = new Set(["low", "medium", "high"]);
+    s.motionIntensity = validIntensities.has(s.motionIntensity) ? s.motionIntensity : (s.type === "hook" ? "high" : "medium");
+
+    // 5. Normalize visualEvents
+    const validEventTypes = new Set([
+      "reveal",
+      "stagger-reveal",
+      "keyword-pop",
+      "number-count",
+      "highlight-sweep",
+      "diagram-step",
+      "comparison-reveal",
+      "focus-shift",
+      "subtle-pulse",
+      "highlight",
+      "pulse",
+      "focus",
+      "shimmer",
+      "bounce",
+    ]);
+    const validTimings = new Set(["cue-start", "cue-end", "cue-middle", "scene-start", "explicit-sec"]);
+
+    if (Array.isArray(s.visualEvents) && s.visualEvents.length > 0) {
+      s.visualEvents = s.visualEvents
+        .filter((ev: any) => ev && typeof ev === "object" && validEventTypes.has(ev.eventType))
+        .slice(0, 4)
+        .map((ev: any, evIdx: number) => ({
+          id: `ev-${s.id}-${evIdx + 1}`,
+          targetCueId: Number.isInteger(ev.targetCueId) ? ev.targetCueId : s.cueRange?.startCueId,
+          eventType: ev.eventType,
+          targetElement: String(ev.targetElement || "heading"),
+          timingSource: validTimings.has(ev.timingSource) ? ev.timingSource : "cue-start",
+          atSec: typeof ev.atSec === "number" && ev.atSec >= 0 ? ev.atSec : undefined,
+          durationSec: typeof ev.durationSec === "number" && ev.durationSec > 0 ? Math.min(3, ev.durationSec) : 0.35,
+          motionPreset: s.motionPreset,
+          motionIntensity: s.motionIntensity,
+        }));
+    } else {
+      // Synthesize semantic visual events distributed across the scene's cues for dynamic visual pacing
+      const t = s.templateData.template;
+      const startCue = s.cueRange?.startCueId ?? 1;
+      const endCue = s.cueRange?.endCueId ?? startCue;
+      const cueSpan = Math.max(1, endCue - startCue + 1);
+      const midCue = startCue + Math.floor(cueSpan / 2);
+      const lateCue = startCue + Math.floor((cueSpan * 3) / 4);
+      const autoEvents: any[] = [];
+
+      if (t === "hook" || t === "kinetic-headline") {
+        autoEvents.push(
+          { id: `ev-${s.id}-1`, targetCueId: startCue, eventType: "reveal", targetElement: "media", timingSource: "cue-start", durationSec: 0.35, motionPreset: s.motionPreset, motionIntensity: s.motionIntensity },
+          { id: `ev-${s.id}-2`, targetCueId: Math.min(endCue, startCue + 1), eventType: "keyword-pop", targetElement: "heading", timingSource: "cue-start", durationSec: 0.45, motionPreset: s.motionPreset, motionIntensity: s.motionIntensity }
+        );
+        if (cueSpan >= 4) {
+          autoEvents.push({ id: `ev-${s.id}-3`, targetCueId: midCue, eventType: "highlight-sweep", targetElement: "badge", timingSource: "cue-start", durationSec: 0.5, motionPreset: s.motionPreset, motionIntensity: s.motionIntensity });
+        }
+      } else if (t === "stat-hero") {
+        autoEvents.push(
+          { id: `ev-${s.id}-1`, targetCueId: startCue, eventType: "reveal", targetElement: "card", timingSource: "cue-start", durationSec: 0.35, motionPreset: s.motionPreset, motionIntensity: s.motionIntensity },
+          { id: `ev-${s.id}-2`, targetCueId: midCue, eventType: "number-count", targetElement: "metric", timingSource: "cue-start", durationSec: 0.55, motionPreset: s.motionPreset, motionIntensity: s.motionIntensity },
+          { id: `ev-${s.id}-3`, targetCueId: Math.min(endCue, midCue + 1), eventType: "highlight-sweep", targetElement: "metric", timingSource: "cue-middle", durationSec: 0.6, motionPreset: s.motionPreset, motionIntensity: s.motionIntensity }
+        );
+      } else if (t === "feature-list" || t === "step-by-step") {
+        autoEvents.push(
+          { id: `ev-${s.id}-1`, targetCueId: startCue, eventType: "stagger-reveal", targetElement: "bullet", timingSource: "cue-start", durationSec: 0.4, motionPreset: s.motionPreset, motionIntensity: s.motionIntensity }
+        );
+        if (cueSpan >= 3) {
+          autoEvents.push(
+            { id: `ev-${s.id}-2`, targetCueId: midCue, eventType: "highlight-sweep", targetElement: "bullet", timingSource: "cue-start", durationSec: 0.45, motionPreset: s.motionPreset, motionIntensity: s.motionIntensity }
+          );
+        }
+        if (cueSpan >= 5) {
+          autoEvents.push(
+            { id: `ev-${s.id}-3`, targetCueId: lateCue, eventType: "subtle-pulse", targetElement: "card", timingSource: "cue-start", durationSec: 0.4, motionPreset: s.motionPreset, motionIntensity: s.motionIntensity }
+          );
+        }
+      } else if (t === "comparison") {
+        autoEvents.push(
+          { id: `ev-${s.id}-1`, targetCueId: startCue, eventType: "comparison-reveal", targetElement: "card", timingSource: "cue-start", durationSec: 0.4, motionPreset: s.motionPreset, motionIntensity: s.motionIntensity },
+          { id: `ev-${s.id}-2`, targetCueId: midCue, eventType: "comparison-reveal", targetElement: "card", timingSource: "cue-start", durationSec: 0.4, motionPreset: s.motionPreset, motionIntensity: s.motionIntensity }
+        );
+      } else if (t === "data-flow" || t === "worked-example") {
+        autoEvents.push(
+          { id: `ev-${s.id}-1`, targetCueId: startCue, eventType: "diagram-step", targetElement: "badge", timingSource: "cue-start", durationSec: 0.35, motionPreset: s.motionPreset, motionIntensity: s.motionIntensity }
+        );
+        if (cueSpan >= 3) {
+          autoEvents.push({ id: `ev-${s.id}-2`, targetCueId: midCue, eventType: "highlight-sweep", targetElement: "heading", timingSource: "cue-start", durationSec: 0.45, motionPreset: s.motionPreset, motionIntensity: s.motionIntensity });
+        }
+        if (cueSpan >= 5) {
+          autoEvents.push({ id: `ev-${s.id}-3`, targetCueId: lateCue, eventType: "focus-shift", targetElement: "card", timingSource: "cue-start", durationSec: 0.4, motionPreset: s.motionPreset, motionIntensity: s.motionIntensity });
+        }
+      } else if (t === "callout" || t === "quote-card") {
+        autoEvents.push(
+          { id: `ev-${s.id}-1`, targetCueId: startCue, eventType: "reveal", targetElement: "card", timingSource: "cue-start", durationSec: 0.35, motionPreset: s.motionPreset, motionIntensity: s.motionIntensity },
+          { id: `ev-${s.id}-2`, targetCueId: midCue, eventType: "subtle-pulse", targetElement: "icon", timingSource: "cue-start", durationSec: 0.4, motionPreset: s.motionPreset, motionIntensity: s.motionIntensity }
+        );
+      } else if (t === "visual-focus" || t === "phone-mockup") {
+        autoEvents.push(
+          { id: `ev-${s.id}-1`, targetCueId: startCue, eventType: "reveal", targetElement: "media", timingSource: "cue-start", durationSec: 0.4, motionPreset: s.motionPreset, motionIntensity: s.motionIntensity },
+          { id: `ev-${s.id}-2`, targetCueId: midCue, eventType: "focus-shift", targetElement: "media", timingSource: "cue-start", durationSec: 0.6, motionPreset: s.motionPreset, motionIntensity: s.motionIntensity }
+        );
+      } else {
+        autoEvents.push({ id: `ev-${s.id}-1`, targetCueId: startCue, eventType: "reveal", targetElement: "card", timingSource: "cue-start", durationSec: 0.35, motionPreset: s.motionPreset, motionIntensity: s.motionIntensity });
+      }
+
+      s.visualEvents = autoEvents;
+    }
+
+    // 6. Check media resolution & filter out avatars/logos from body scenes
     if (s.media && typeof s.media === "object") {
       let resolvedSrc = s.media.src;
       const asset = assetByLabelOrKind(resolvedSrc);
       if (asset) resolvedSrc = asset.previewUrl;
-      s.media = {
-        type: s.media.type === "video" ? "video" : s.media.type === "screenshot" ? "screenshot" : "image",
-        src: resolvedSrc,
-        fit: s.media.fit === "contain" ? "contain" : "cover",
-        fx: s.media.fx === "none" ? "none" : "kenburns",
-        presentation: s.media.presentation || "card",
-      };
+
+      // Strict relevance: Never allow owner-avatar or repo-logo on body scenes!
+      if (s.type === "body" && asset && (asset.kind === "owner-avatar" || asset.kind === "repo-logo")) {
+        s.media = undefined;
+      } else {
+        s.media = {
+          type: s.media.type === "video" ? "video" : s.media.type === "screenshot" ? "screenshot" : "image",
+          src: resolvedSrc,
+          fit: s.media.fit === "contain" ? "contain" : "cover",
+          fx: s.media.fx === "none" ? "none" : "kenburns",
+          presentation: s.media.presentation || "card",
+        };
+      }
+    }
+
+    // Guard visual-focus template against avatar
+    if (s.templateData.template === "visual-focus" && s.type === "body") {
+      const vAsset = assetByLabelOrKind(s.templateData.mediaSrc || "");
+      if (vAsset && (vAsset.kind === "owner-avatar" || vAsset.kind === "repo-logo")) {
+        // Demote to step-by-step or callout to avoid showing large avatar in tech explanation
+        s.templateData = {
+          template: "step-by-step",
+          title: "CÁC PHIÊN BẢN & MÃ NGUỒN",
+          steps: [
+            { step: "01", label: "Bản Mini & Small", detail: "Nhẹ, tối ưu thử nghiệm nhanh" },
+            { step: "02", label: "Bản Base", detail: "Độ chính xác chuỗi thời gian tối đa" },
+            { step: "03", label: "Python & Fine-tune", detail: "Chạy dự báo và huấn luyện riêng" },
+          ],
+        };
+        s.media = undefined;
+      }
     }
 
     return s;
@@ -399,51 +636,74 @@ export function deterministicVisualPlanner(
   transcript: string,
   source: SourceContent,
   assets: VisualAsset[],
-  channelName = "DevPeek36"
+  channelName = "DevPeek36",
+  srtCues?: CaptionCue[]
 ): SceneType[] {
   log.info(`[Creative Planner] Generating high-quality semantic fallback visual plan...`);
 
-  // Split transcript into sentences
-  const rawSentences = transcript
-    .split(/(?<=[.!?])\s+|\n+/)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
-
-  const sentences = rawSentences.length > 0 ? rawSentences : [transcript.trim()];
-
-  // Decide scene count (4 to 8 scenes)
-  const sceneCount = Math.max(4, Math.min(8, sentences.length));
-  const chunkSize = Math.ceil(sentences.length / sceneCount);
-
-  const sceneChunks: string[] = [];
-  for (let i = 0; i < sentences.length; i += chunkSize) {
-    sceneChunks.push(sentences.slice(i, i + chunkSize).join(" "));
-  }
-
-  // Ensure at least 4 scenes
-  if (sceneChunks.length < 4) {
-    while (sceneChunks.length < 4) {
-      const longestIdx = sceneChunks.reduce((maxI, chunk, i) => (chunk.length > sceneChunks[maxI].length ? i : maxI), 0);
-      const words = sceneChunks[longestIdx].split(" ");
-      const mid = Math.floor(words.length / 2);
-      sceneChunks.splice(longestIdx, 1, words.slice(0, mid).join(" "), words.slice(mid).join(" "));
-    }
-  }
-
-  // Categorize assets
   const screenshot = assets.find((a) => a.kind === "screenshot");
   const readmeImages = assets.filter((a) => a.kind === "readme-image");
   const logo = assets.find((a) => a.kind === "repo-logo" || a.kind === "owner-avatar");
   const repoName = source.url.includes("github.com") ? source.url.split("/").pop()?.replace(/\.git$/, "") || source.title : source.title;
 
+  interface ChunkInfo {
+    text: string;
+    startCueId?: number;
+    endCueId?: number;
+  }
+
+  const chunks: ChunkInfo[] = [];
+
+  if (Array.isArray(srtCues) && srtCues.length > 0) {
+    const sceneCount = Math.max(4, Math.min(8, Math.ceil(srtCues.length / 3)));
+    const chunkSize = Math.ceil(srtCues.length / sceneCount);
+    let cur = 0;
+    for (let s = 0; s < sceneCount && cur < srtCues.length; s++) {
+      const slice = s === sceneCount - 1 ? srtCues.slice(cur) : srtCues.slice(cur, cur + chunkSize);
+      chunks.push({
+        text: slice.map((c) => c.text).join(" "),
+        startCueId: slice[0].id,
+        endCueId: slice[slice.length - 1].id,
+      });
+      cur += slice.length;
+    }
+  } else {
+    // Split transcript into sentences
+    const rawSentences = transcript
+      .split(/(?<=[.!?])\s+|\n+/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+
+    const sentences = rawSentences.length > 0 ? rawSentences : [transcript.trim()];
+    const sceneCount = Math.max(4, Math.min(8, sentences.length));
+    const chunkSize = Math.ceil(sentences.length / sceneCount);
+
+    for (let i = 0; i < sentences.length; i += chunkSize) {
+      chunks.push({ text: sentences.slice(i, i + chunkSize).join(" ") });
+    }
+
+    if (chunks.length < 4) {
+      while (chunks.length < 4) {
+        const longestIdx = chunks.reduce((maxI, chunk, i) => (chunk.text.length > chunks[maxI].text.length ? i : maxI), 0);
+        const words = chunks[longestIdx].text.split(" ");
+        const mid = Math.floor(words.length / 2);
+        chunks.splice(longestIdx, 1, { text: words.slice(0, mid).join(" ") }, { text: words.slice(mid).join(" ") });
+      }
+    }
+  }
+
   const scenes: SceneType[] = [];
 
-  // Scene 1: Hook with concise punchy headline (3-6 words)
-  const hookHeadline = condenseVisualText(sceneChunks[0], 5, repoName.toUpperCase().slice(0, 28));
+  // Scene 1: Hook
+  const hookHeadline = condenseVisualText(chunks[0].text, 5, repoName.toUpperCase().slice(0, 28));
   scenes.push({
     id: "scene-1",
     type: "hook",
-    voiceText: sceneChunks[0],
+    voiceText: chunks[0].text,
+    semanticIntent: "hook",
+    motionPreset: "energetic",
+    motionIntensity: "high",
+    cueRange: chunks[0].startCueId && chunks[0].endCueId ? { startCueId: chunks[0].startCueId, endCueId: chunks[0].endCueId } : undefined,
     templateData: {
       template: "hook",
       headline: hookHeadline.toUpperCase(),
@@ -453,14 +713,14 @@ export function deterministicVisualPlanner(
     media: logo ? { type: "image", src: logo.previewUrl, fit: "contain", fx: "none", presentation: "logo" } : undefined,
   });
 
-  // Body scenes: Rotate through semantic templates & assign real media assets
+  // Body scenes
   let readmeImgIdx = 0;
-  for (let i = 1; i < sceneChunks.length - 1; i++) {
-    const text = sceneChunks[i];
+  for (let i = 1; i < chunks.length - 1; i++) {
+    const text = chunks[i].text;
     const sId = `scene-${i + 1}`;
     const numMatch = text.match(/\b\d+([.,]\d+)?(%|x|k|M|GB|TB|sao|\+)?\b/i);
+    const cueRange = chunks[i].startCueId && chunks[i].endCueId ? { startCueId: chunks[i].startCueId!, endCueId: chunks[i].endCueId! } : undefined;
 
-    // Pick media for this scene if available
     let sceneMedia = undefined;
     if (i === 1 && screenshot) {
       sceneMedia = { type: "screenshot" as const, src: screenshot.previewUrl, fit: "cover" as const, fx: "kenburns" as const, presentation: "card" as const };
@@ -469,74 +729,72 @@ export function deterministicVisualPlanner(
       sceneMedia = { type: "image" as const, src: img.previewUrl, fit: "cover" as const, fx: "kenburns" as const, presentation: "card" as const };
     }
 
-    // Choose semantic template based on content keywords with concise 2-5 word visual text
     if (numMatch && (text.includes("sàn") || text.includes("dữ liệu") || text.includes("triệu") || text.includes("nghìn"))) {
       scenes.push({
         id: sId,
         type: "body",
         voiceText: text,
+        semanticIntent: "statistic",
+        motionPreset: "energetic",
+        motionIntensity: "high",
+        cueRange,
         templateData: {
           template: "stat-hero",
           value: numMatch[0],
-          label: condenseVisualText(text, 4, "CHỈ SỐ TOÀN CẦU").toUpperCase(),
-          context: source.domain ? `Dữ liệu ${source.domain}` : "Thị trường tài chính",
+          label: condenseVisualText(text, 4, "CHỈ SỐ NỔI BẬT").toUpperCase(),
+          context: "Dữ liệu huấn luyện toàn cầu",
         },
         media: sceneMedia,
       });
-    } else if (text.toLowerCase().includes("token") || text.toLowerCase().includes("chuyển") || text.toLowerCase().includes("nến")) {
+    } else if (text.includes("nến") && text.includes("token")) {
       scenes.push({
         id: sId,
         type: "body",
         voiceText: text,
-        templateData: {
-          template: "worked-example",
-          title: "CÁCH THỨC HOẠT ĐỘNG",
-          input: "Dữ liệu nến OHLCV",
-          operation: "Nến giá → Token",
-          output: "Chuỗi token số hóa",
-          basis: "source-example",
-        },
-        media: sceneMedia,
-      });
-    } else if (text.toLowerCase().includes("transformer") || text.toLowerCase().includes("dự báo") || text.toLowerCase().includes("mô hình")) {
-      scenes.push({
-        id: sId,
-        type: "body",
-        voiceText: text,
+        semanticIntent: "explanation",
+        motionPreset: "explanatory",
+        motionIntensity: "medium",
+        cueRange,
         templateData: {
           template: "data-flow",
-          title: "LUỒNG DỰ BÁO",
+          title: "KIẾN TRÚC MÔ HÌNH",
           nodes: [
-            { label: "Nến OHLCV", detail: "Dữ liệu nến thô" },
-            { label: "Tokenizer", detail: "Mã hóa token" },
-            { label: "Transformer", detail: "Dự báo 24 giờ" },
+            { label: "ĐẦU VÀO", detail: "Dữ liệu nến OHLCV" },
+            { label: "MÃ HÓA", detail: "Nến giá → Token" },
+            { label: "DỰ BÁO", detail: "Dự đoán xu hướng BTC" },
           ],
-          caption: "Mô hình chuỗi thời gian",
+          caption: "Mô hình ngôn ngữ xử lý chuỗi thời gian",
         },
         media: sceneMedia,
       });
-    } else if (text.toLowerCase().includes("code") || text.toLowerCase().includes("python") || text.toLowerCase().includes("fine-tune")) {
+    } else if (text.includes("thử nghiệm") || text.includes("thực tế") || text.includes("nhiễu")) {
       scenes.push({
         id: sId,
         type: "body",
         voiceText: text,
+        semanticIntent: "comparison",
+        motionPreset: "dramatic",
+        motionIntensity: "medium",
+        cueRange,
         templateData: {
-          template: "code-window",
-          title: "CODE PYTHON DỰ BÁO",
-          language: "python",
-          code: "from kronos import KronosModel\n\nmodel = KronosModel.from_pretrained('base')\nforecast = model.predict(btc_usdt_candles)",
-          note: "Hỗ trợ fine-tune",
+          template: "comparison",
+          left: { label: "Thử Nghiệm", value: "Độ chính xác cao", color: "cyan" },
+          right: { label: "Thực Tế", value: "Thị trường nhiễu", color: "purple", winner: false },
         },
         media: sceneMedia,
       });
-    } else if (text.toLowerCase().includes("rủi ro") || text.toLowerCase().includes("nhiễu") || text.toLowerCase().includes("thất bại") || text.toLowerCase().includes("kiếm tiền")) {
+    } else if (text.includes("rủi ro") || text.includes("cẩn trọng") || text.includes("kiếm tiền")) {
       scenes.push({
         id: sId,
         type: "body",
         voiceText: text,
+        semanticIntent: "warning",
+        motionPreset: "subtle",
+        motionIntensity: "medium",
+        cueRange,
         templateData: {
           template: "callout",
-          statement: "DỰ BÁO ≠ KIẾM TIỀN",
+          statement: text.includes("kiếm tiền") ? "DỰ BÁO ≠ KIẾM TIỀN" : "RỦI RO THỊ TRƯỜNG",
           tag: "LƯU Ý RỦI RO",
         },
         media: sceneMedia,
@@ -546,10 +804,15 @@ export function deterministicVisualPlanner(
         id: sId,
         type: "body",
         voiceText: text,
+        semanticIntent: "demonstration",
+        motionPreset: "explanatory",
+        motionIntensity: "medium",
+        cueRange,
         templateData: {
-          template: "callout",
-          statement: condenseVisualText(source.title || repoName, 4, "MÃ NGUỒN MỞ").toUpperCase(),
-          tag: "TIÊU ĐIỂM",
+          template: "phone-mockup",
+          title: condenseVisualText(source.title || repoName, 4, "GIAO DIỆN MINH HỌA").toUpperCase(),
+          screenSrc: screenshot.previewUrl,
+          caption: condenseVisualText(text, 6, "Giao diện kiểm thử"),
         },
         media: sceneMedia,
       });
@@ -560,6 +823,10 @@ export function deterministicVisualPlanner(
         id: sId,
         type: "body",
         voiceText: text,
+        semanticIntent: "explanation",
+        motionPreset: "explanatory",
+        motionIntensity: "medium",
+        cueRange,
         templateData: {
           template: "feature-list",
           title: "CÁC BẢN MODEL",
@@ -571,10 +838,15 @@ export function deterministicVisualPlanner(
   }
 
   // Scene Last: Outro
+  const lastChunk = chunks[chunks.length - 1];
   scenes.push({
-    id: `scene-${sceneChunks.length}`,
+    id: `scene-${chunks.length}`,
     type: "outro",
-    voiceText: sceneChunks[sceneChunks.length - 1],
+    voiceText: lastChunk.text,
+    semanticIntent: "cta",
+    motionPreset: "dramatic",
+    motionIntensity: "medium",
+    cueRange: lastChunk.startCueId && lastChunk.endCueId ? { startCueId: lastChunk.startCueId, endCueId: lastChunk.endCueId } : undefined,
     templateData: {
       template: "outro",
       ctaTop: "Khám phá repo ngay",
@@ -590,7 +862,7 @@ export function deterministicVisualPlanner(
  * Main AI Visual Planner entrypoint for Creative Mode.
  */
 export async function planCreativeVisuals(params: CreativePlannerParams): Promise<SceneType[]> {
-  const { transcript, url, source, availableAssets, llmProvider, channelName } = params;
+  const { transcript, url, source, availableAssets, llmProvider, channelName, srtCues } = params;
 
   if (llmProvider) {
     try {
@@ -600,11 +872,19 @@ export async function planCreativeVisuals(params: CreativePlannerParams): Promis
         .map((a) => `- [${a.kind}] id: "${a.id}", label: "${a.label}", url: "${a.previewUrl}"`)
         .join("\n");
 
+      let cueDescription = "";
+      if (Array.isArray(srtCues) && srtCues.length > 0) {
+        cueDescription = `\nDANH SÁCH CUES TỪ FILE SRT (${srtCues.length} cues):\n` +
+          srtCues.map((c) => `[Cue ${c.id}] (${c.startSec.toFixed(2)}s -> ${c.endSec.toFixed(2)}s): "${c.text}"`).join("\n") +
+          `\n\nCHÚ Ý QUAN TRỌNG: Hãy phân chia kịch bản theo đúng các Cue SRT trên. Mỗi scene bắt buộc có trường 'startCueId' và 'endCueId'. Không tự tạo timestamp giây.`;
+      }
+
       const userPrompt = `
-NỘI DUNG KỊCH BẢN CHỮ (DO CHATGPT VIẾT):
+NỘI DUNG KỊCH BẢN CHỮ:
 """
 ${transcript.trim()}
 """
+${cueDescription}
 
 THÔNG TIN NGUỒN CÔNG KHAI:
 - URL: ${url}
@@ -617,7 +897,7 @@ ${assetDescriptions || "(Chưa có screenshot hay logo tải sẵn; chỉ dùng 
 
 YÊU CẦU:
 Hãy phân tích ngữ nghĩa kịch bản trên và trả về đúng 1 object JSON có dạng: { "scenes": [ ... ] }.
-Đảm bảo giữ nguyên vẹn 100% câu chữ của kịch bản giọng đọc, không lặp template liên tiếp một cách máy móc, và gán media thật phù hợp.
+Đảm bảo giữ nguyên vẹn 100% câu chữ của kịch bản giọng đọc, không lặp template liên tiếp một cách máy móc, gán semanticIntent và motionPreset phù hợp.
 `.trim();
 
       const rawLlmResponse = await llmProvider.generate(CREATIVE_PLANNER_SYSTEM_PROMPT, userPrompt);
@@ -625,13 +905,26 @@ Hãy phân tích ngữ nghĩa kịch bản trên và trả về đúng 1 object 
       const parsed = JSON.parse(cleanedJson);
 
       const candidateScenes = parsed.scenes || parsed;
-      const repairedScenes = repairAndNormalizeLlmPlan(candidateScenes, availableAssets, transcript);
-      return validateVisualPlan(repairedScenes, transcript);
+      const repairedScenes = repairAndNormalizeLlmPlan(candidateScenes, availableAssets, transcript, srtCues);
+      const validatedScenes = validateVisualPlan(repairedScenes, transcript);
+
+      // Task B: Apply diversity scoring & optimization
+      const { scenes: diverseScenes, report: diversityReport } = optimizeSceneDiversity(validatedScenes, availableAssets, srtCues);
+      log.info(`[Creative Planner] Scene diversity score: ${diversityReport.diversityScore}/100 (isDiverse: ${diversityReport.isDiverse})`);
+      if (diversityReport.warnings.length > 0) {
+        log.warn(`[Creative Planner] Diversity warnings: ${diversityReport.warnings.join("; ")}`);
+      }
+
+      return diverseScenes;
     } catch (err: any) {
       log.warn(`[Creative Planner] LLM visual planning failed: ${err.message}. Falling back to deterministic plan.`);
     }
   }
 
-  // Fallback to high-quality deterministic plan
-  return deterministicVisualPlanner(transcript, source, availableAssets, channelName);
+  // Fallback to high-quality deterministic plan with normalized visual events
+  const deterministicScenes = deterministicVisualPlanner(transcript, source, availableAssets, channelName, srtCues);
+  const normalizedFallback = repairAndNormalizeLlmPlan(deterministicScenes, availableAssets, transcript, srtCues);
+  const { scenes: diverseFallback, report } = optimizeSceneDiversity(normalizedFallback, availableAssets, srtCues);
+  log.info(`[Creative Planner] Deterministic diversity score: ${report.diversityScore}/100`);
+  return diverseFallback;
 }

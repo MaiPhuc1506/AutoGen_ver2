@@ -134,6 +134,45 @@ const CodeWindowData = z.object({
   code: z.string().min(1).max(600).refine(s => s.split("\n").length <= 10, "Code tối đa 10 dòng"), note: z.string().max(70).optional(),
 });
 
+const KineticHeadlineData = z.object({
+  template: z.literal("kinetic-headline"),
+  headline: z.string().min(1).max(80),
+  punchword: z.string().max(30).optional(),
+  subhead: z.string().max(90).optional(),
+  theme: z.enum(["cyber", "gold", "mint", "crimson"]).optional().default("mint"),
+});
+
+const QuoteCardData = z.object({
+  template: z.literal("quote-card"),
+  quote: z.string().min(1).max(200),
+  author: z.string().max(50).optional(),
+  role: z.string().max(60).optional(),
+  source: z.string().max(60).optional(),
+});
+
+const StepByStepData = z.object({
+  template: z.literal("step-by-step"),
+  title: z.string().min(1).max(50),
+  steps: z.array(z.object({
+    step: z.string().max(10),
+    label: z.string().min(1).max(40),
+    detail: z.string().max(90).optional(),
+  })).min(2).max(4),
+});
+
+const VisualFocusData = z.object({
+  template: z.literal("visual-focus"),
+  title: z.string().min(1).max(50),
+  subtitle: z.string().max(80).optional(),
+  focusArea: z.object({
+    x: z.number().min(0).max(100),
+    y: z.number().min(0).max(100),
+    scale: z.number().min(1).max(3).default(1.5),
+  }).optional(),
+  mediaSrc: z.string().optional(),
+  caption: z.string().max(90).optional(),
+});
+
 export const TemplateData = z.discriminatedUnion("template", [
   DataFlowData,
   ExampleData,
@@ -151,6 +190,10 @@ export const TemplateData = z.discriminatedUnion("template", [
   PriceTagData,
   ImageGalleryData,
   PhoneMockupData,
+  KineticHeadlineData,
+  QuoteCardData,
+  StepByStepData,
+  VisualFocusData,
 ]);
 
 export type TemplateDataType = z.infer<typeof TemplateData>;
@@ -187,9 +230,21 @@ export const MediaSpec = z.object({
 
 export type MediaSpecType = z.infer<typeof MediaSpec>;
 
-// ── Transition schema (M5) ─────────────────────────────────────────────────
+// ── Transition schema (M5 & Smart Transitions) ─────────────────────────────
+export const TransitionPresetSchema = z.enum([
+  "clean-cut",
+  "directional-slide",
+  "subtle-zoom",
+  "masked-reveal",
+  "fade",
+  "cut",
+  "slide",
+  "zoom",
+]);
+export type TransitionPreset = z.infer<typeof TransitionPresetSchema>;
+
 export const TransitionSpec = z.object({
-  type: z.enum(["cut", "fade", "slide", "zoom"]).default("cut"),
+  type: TransitionPresetSchema.default("cut"),
   duration: z.number().min(0).max(2).default(0.3),
 });
 export type TransitionSpecType = z.infer<typeof TransitionSpec>;
@@ -204,6 +259,61 @@ export const BgmSpec = z.object({
 });
 export type BgmSpecType = z.infer<typeof BgmSpec>;
 
+// ── Semantic & Motion Planning Schemas (Phase 1 & Phase 2) ──────────────────
+export const SemanticIntentSchema = z.enum([
+  "hook",
+  "explanation",
+  "statistic",
+  "comparison",
+  "demonstration",
+  "warning",
+  "conclusion",
+  "cta",
+]);
+export type SemanticIntent = z.infer<typeof SemanticIntentSchema>;
+
+export const MotionPresetSchema = z.enum([
+  "subtle",
+  "energetic",
+  "dramatic",
+  "explanatory",
+  "minimal",
+  "calm",
+  "dynamic",
+]);
+export type MotionPreset = z.infer<typeof MotionPresetSchema>;
+
+export const MotionIntensitySchema = z.enum(["low", "medium", "high"]);
+export type MotionIntensity = z.infer<typeof MotionIntensitySchema>;
+
+export const VisualEventSchema = z.object({
+  id: z.string().optional(),
+  targetCueId: z.number().int().positive().optional(),
+  eventType: z.enum([
+    "reveal",
+    "stagger-reveal",
+    "keyword-pop",
+    "number-count",
+    "highlight-sweep",
+    "diagram-step",
+    "comparison-reveal",
+    "focus-shift",
+    "subtle-pulse",
+    "highlight",
+    "pulse",
+    "focus",
+    "shimmer",
+    "bounce",
+  ]),
+  targetElement: z.string().min(1),
+  timingSource: z.enum(["cue-start", "cue-end", "cue-middle", "scene-start", "explicit-sec"]),
+  atSec: z.number().min(0).optional(),
+  durationSec: z.number().min(0.05).max(5).optional(),
+  motionPreset: MotionPresetSchema.optional(),
+  motionIntensity: MotionIntensitySchema.optional(),
+});
+export type VisualEventType = z.infer<typeof VisualEventSchema>;
+
 // ── Scene schema ───────────────────────────────────────────────────────────
 
 export const Scene = z.object({
@@ -214,6 +324,15 @@ export const Scene = z.object({
   githubStarSpokenPrefix:z.string().max(200).optional(),
   githubStarLeadIn:z.boolean().optional(),
   blockTiming: BlockTiming.optional(),
+  semanticIntent: SemanticIntentSchema.optional(),
+  motionPreset: MotionPresetSchema.optional(),
+  motionIntensity: MotionIntensitySchema.optional(),
+  transitionPreset: TransitionPresetSchema.optional(),
+  visualEvents: z.array(VisualEventSchema).max(10).optional(),
+  cueRange: z.object({
+    startCueId: z.number().int().positive(),
+    endCueId: z.number().int().positive(),
+  }).optional(),
   /** Extra source-backed blocks accumulate beneath a reference board. */
   referenceBoard:z.object({
     rows:z.array(z.object({title:z.string().min(1).max(40),detail:z.string().max(65),tone:z.enum(['mint','red','blue','gold','violet']).optional(),badge:z.string().max(12).optional(),disabled:z.boolean().optional()})).max(3).optional(),
@@ -232,7 +351,7 @@ export const Scene = z.object({
   sfx: SfxSpec.optional(),
   /** Optional media asset (image/video/screenshot) for this scene (M2) */
   media: MediaSpec.optional(),
-  /** Optional scene transition (cut, fade, slide, zoom) (M5) */
+  /** Optional scene transition (cut, fade, slide, zoom, clean-cut, masked-reveal, etc.) (M5) */
   transition: TransitionSpec.optional(),
 });
 export type SceneType = z.infer<typeof Scene>;
@@ -286,7 +405,7 @@ export const ScriptSchema = z.object({
     warnings:z.array(z.string().max(240)).max(12).optional(),
   }).optional(),
   visualStyle: z.enum(["classic", "tech-editorial"]).optional(),
-  motionPreset: z.enum(["calm", "dynamic"]).optional(),
+  motionPreset: MotionPresetSchema.optional(),
   soundDesign: z.boolean().optional(),
   colorTheme: z.enum(["teal", "midnight"]).optional(),
   generation: z.object({ mode: z.enum(["ai", "source-only", "imported"]), message: z.string().optional() }).optional(),

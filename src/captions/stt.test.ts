@@ -201,7 +201,7 @@ describe("Audio-Driven STT & Alignment System (Phase 2)", () => {
         name: "test.mp3",
         size: 1024,
         createdAt: new Date().toISOString(),
-      });
+      } as any);
 
       const res = await buildCreativeScript({
         url: "https://github.com/shiyu-coder/Kronos",
@@ -230,7 +230,7 @@ describe("Audio-Driven STT & Alignment System (Phase 2)", () => {
         name: "test.mp3",
         size: 1024,
         createdAt: new Date().toISOString(),
-      });
+      } as any);
 
       const srt = `1
 00:00:00,500 --> 00:00:02,500

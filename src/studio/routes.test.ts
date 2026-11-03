@@ -31,7 +31,7 @@ it('rejects malformed uploads and overlong preview text',async()=>{
 });
 it('serves editable template catalogue and previews the actual workflow/code draft without TTS',async()=>{
   const catalogue=await(await fetch(url+'/api/studio/templates')).json();
-  expect(catalogue.templates).toHaveLength(16);
+  expect(catalogue.templates).toHaveLength(20);
   const script=JSON.parse(await readFile('tests/fixtures/studio-explainer.json','utf8'));
   const response=await fetch(url+'/api/studio/preview-script',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({script})});
   expect(response.status).toBe(200);const html=await response.text();

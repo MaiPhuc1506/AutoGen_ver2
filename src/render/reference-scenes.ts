@@ -67,11 +67,35 @@ export function renderReferenceScene(a:{scene:SceneType;start:number;duration:nu
  case 'price-tag':inner=`<div class="ref-panel" data-ref-enter=".05">${heading('price-product',td.productName)}${td.variant?`<div class="ref-note">${e(td.variant)}</div>`:''}<div class="price-hero-box ref-price">${e(td.price)}</div>${td.note?`<div class="price-note ref-note">${e(td.note)}</div>`:''}</div>`;break;
  case 'image-gallery':inner=`${td.title?`<div class="ref-panel" data-ref-enter=".05">${heading('gallery-title',td.title)}</div>`:''}<div class="ref-gallery count-${td.images.length}">${td.images.map((v,i)=>`<div class="gallery-card">${mediaPanel(a.gallery[i]|| (i===0?media:undefined),'ref-gallery-media')}${v.caption?`<div class="ref-note">${e(v.caption)}</div>`:''}</div>`).join('')}</div>`;break;
  case 'phone-mockup':inner=`${td.title?`<div class="ref-panel" data-ref-enter=".05">${heading('mockup-title',td.title)}</div>`:''}<div class="phone-frame ref-screen">${mediaPanel(media,'ref-screen-media')}</div>${td.caption?`<p class="ref-note">${e(td.caption)}</p>`:''}`;break;
+ case 'kinetic-headline':{
+  const theme = td.theme || 'mint';
+  inner=`<div class="ref-panel ref-kinetic" data-ref-enter=".04"><div class="ref-section-label">${icons.bolt}<span>TIÊU ĐIỂM CHÍNH</span></div><h1 class="kinetic-text">${e(td.headline)}</h1>${td.punchword?`<div class="kinetic-punchword ref-punch-${theme}">${e(td.punchword)}</div>`:''}${td.subhead?`<p class="ref-note kinetic-subhead">${e(td.subhead)}</p>`:''}</div>`;
+  break;
+ }
+ case 'quote-card':{
+  inner=`<div class="ref-panel ref-quote-panel" data-ref-enter=".05"><div class="quote-mark">“</div><blockquote class="quote-body">${e(td.quote)}</blockquote><div class="quote-footer">${td.author?`<strong>${e(td.author)}</strong>`:''}${td.role?`<span>${e(td.role)}</span>`:''}${td.source?`<small>${e(td.source)}</small>`:''}</div></div>`;
+  break;
+ }
+ case 'step-by-step':{
+  inner=`<div class="ref-panel ref-steps-panel" data-ref-enter=".04">${heading('steps-title',td.title)}<div class="ref-step-cards">${td.steps.map((st,i)=>`<div class="ref-step-item" data-step-index="${i}"><span class="ref-step-badge">${e(st.step||String(i+1).padStart(2,'0'))}</span><div class="ref-step-content"><strong>${e(st.label)}</strong>${st.detail?`<p>${e(st.detail)}</p>`:''}</div></div>`).join('')}</div></div>`;
+  break;
+ }
+ case 'visual-focus':{
+  const fArea = td.focusArea || { x: 50, y: 50, scale: 1.5 };
+  const vMedia = mediaPanel(media,'ref-focus-media');
+  inner=`<div class="ref-panel ref-focus-panel" data-ref-enter=".04">${heading('focus-title',td.title)}${td.subtitle?`<div class="ref-section-label">${e(td.subtitle)}</div>`:''}<div class="ref-focus-viewport" data-focus-x="${fArea.x}" data-focus-y="${fArea.y}" data-focus-scale="${fArea.scale}">${vMedia||`<div class="ref-placeholder-viewport"><span class="ref-placeholder-tag">KHUNG TIÊU ĐIỂM UI</span></div>`}</div>${td.caption?`<p class="ref-note focus-caption">${e(td.caption)}</p>`:''}</div>`;
+  break;
+ }
  case 'outro':inner=`<div class="ref-profile tt-card" data-ref-enter=".1"><div class="ref-avatar">${a.channelLogoPath?`<img src="${e(a.channelLogoPath)}" alt="${e(td.channelName)}"/>`:icons.play}</div><strong>${e(td.channelName)}</strong><span>@${e(td.channelName.replace(/^@/,''))}</span><span class="ref-channel-pill">#${e(td.channelName.replace(/[^\p{L}\p{N}]/gu,''))}</span><h2 class="out-cta-top">${e(td.ctaTop)}</h2><p>${e(td.source)}</p></div>`;break;
  }
  const extras=scene.referenceBoard;
  if(extras?.rows?.length)inner+=`<div class="ref-rows">${extras.rows.map((r,i)=>`<div class="ref-extra-row ref-row ref-${r.tone||'mint'}${r.disabled?' ref-disabled':''}"><span class="ref-row-icon">${r.disabled?icons.warn:icons.check}</span><div class="ref-row-copy"><strong>${e(r.title)}</strong><p>${e(r.detail)}</p></div>${r.badge?`<span class="ref-status"><i></i>${e(r.badge)}</span>`:''}</div>`).join('')}</div>`;
  if(extras?.cards?.length)inner+=`<div class="ref-two ref-bottom-cards">${extras.cards.map(r=>`<div class="ref-extra-card ref-cell ref-${r.tone||'mint'}"><small>${e(r.label)}</small><strong>${e(r.value)}</strong>${r.detail?`<p>${e(r.detail)}</p>`:''}</div>`).join('')}</div>`;
- const extraMedia=media&&!['hook','outro','image-gallery','phone-mockup'].includes(td.template)?mediaPanel(media):'';
- return `<div class="scene clip ref-scene" id="scene-${e(scene.id)}" data-start="${a.start.toFixed(2)}" data-duration="${a.duration.toFixed(2)}" data-layout="${td.template}" data-media="${media?.presentation||'none'}" data-transition="cut" data-transition-duration="0"><div class="ref-composition${td.template==='hook'?' ref-hero-composition':''}${td.template==='outro'?' ref-outro-composition':''}${extraMedia?' ref-with-media':''}"><div class="ref-board-canvas">${inner}${extraMedia}</div></div></div>`;
+ const extraMedia=media&&!['hook','outro','image-gallery','phone-mockup','visual-focus'].includes(td.template)?mediaPanel(media):'';
+ const transType = scene.transitionPreset || scene.transition?.type || 'clean-cut';
+ const transDur = scene.transition?.duration ?? 0.3;
+ const eventsAttr = scene.visualEvents && scene.visualEvents.length > 0 ? ` data-visual-events="${e(JSON.stringify(scene.visualEvents))}"` : '';
+ const motionPreset = scene.motionPreset || 'explanatory';
+ const motionIntensity = scene.motionIntensity || 'medium';
+ return `<div class="scene clip ref-scene" id="scene-${e(scene.id)}" data-start="${a.start.toFixed(2)}" data-duration="${a.duration.toFixed(2)}" data-layout="${td.template}" data-media="${media?.presentation||'none'}" data-transition="${transType}" data-transition-duration="${transDur.toFixed(2)}" data-motion-preset="${motionPreset}" data-motion-intensity="${motionIntensity}"${eventsAttr}><div class="ref-composition${td.template==='hook'?' ref-hero-composition':''}${td.template==='outro'?' ref-outro-composition':''}${extraMedia?' ref-with-media':''}"><div class="ref-board-canvas">${inner}${extraMedia}</div></div></div>`;
 }

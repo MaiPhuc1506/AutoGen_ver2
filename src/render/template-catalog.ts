@@ -16,5 +16,9 @@ export const TEMPLATE_CATALOG: { id: TemplateDataType['template']; label: string
   {id:'price-tag',label:'Giá · cần nguồn',data:{template:'price-tag',productName:'Tên sản phẩm',price:'Điền giá từ nguồn'}},
   {id:'image-gallery',label:'Bộ ảnh',data:{template:'image-gallery',title:'Hình ảnh dự án',images:[{src:'about:blank',caption:'Dán URL ảnh'}]}},
   {id:'phone-mockup',label:'Khung điện thoại',data:{template:'phone-mockup',title:'Giao diện',screenSrc:'about:blank',caption:'Dán URL screenshot vào screenSrc'}},
+  {id:'kinetic-headline',label:'Kinetic Typography · Tiêu đề động',data:{template:'kinetic-headline',headline:'TIÊU ĐỀ NỔI BẬT',punchword:'ĐỘT PHÁ',subhead:'Nội dung quan trọng từ nguồn',theme:'mint'}},
+  {id:'quote-card',label:'Thẻ trích dẫn · Đánh giá',data:{template:'quote-card',quote:'Trích dẫn nguyên văn từ tài liệu nguồn',author:'Tác giả / Nhà phát triển',role:'Tech Lead'}},
+  {id:'step-by-step',label:'Từng bước thực hiện',data:{template:'step-by-step',title:'Quy trình thực hiện',steps:[{step:'01',label:'Chuẩn bị',detail:'Dữ liệu đầu vào'},{step:'02',label:'Thực thi',detail:'Xử lý tự động'},{step:'03',label:'Kết quả',detail:'Hoàn tất'}]}},
+  {id:'visual-focus',label:'Focus thị giác · Zoom UI',data:{template:'visual-focus',title:'Chi tiết giao diện',subtitle:'Vùng tính năng cốt lõi',focusArea:{x:50,y:50,scale:1.5},caption:'Minh họa trực quan'}},
   {id:'outro',label:'Kết thúc',data:{template:'outro',ctaTop:'Xem repo để tìm hiểu',channelName:'Kênh của bạn',source:'github.com'}},
 ];

@@ -28,16 +28,18 @@ window.__timelines["news-video"] = tl;
     const dur   = parseFloat(scene.dataset.duration);
     const layout = scene.dataset.layout;
 
-    // Scene visibility & transition (M5)
-    const transType = scene.dataset.transition || "cut";
+    // Scene visibility & transition (Smart Transitions)
+    const transType = scene.dataset.transition || "clean-cut";
     const transDur  = parseFloat(scene.dataset.transitionDuration || "0.3");
 
     if (transType === "fade") {
       tl.fromTo(scene, { opacity: 0 }, { opacity: 1, duration: transDur }, start);
-    } else if (transType === "slide") {
-      tl.fromTo(scene, { x: 1080, opacity: 1 }, { x: 0, opacity: 1, duration: transDur }, start);
-    } else if (transType === "zoom") {
-      tl.fromTo(scene, { scale: 1.15, opacity: 0 }, { scale: 1.0, opacity: 1, duration: transDur }, start);
+    } else if (transType === "slide" || transType === "directional-slide") {
+      tl.fromTo(scene, { x: 1080, opacity: 1 }, { x: 0, opacity: 1, duration: transDur, ease: "power2.out" }, start);
+    } else if (transType === "zoom" || transType === "subtle-zoom") {
+      tl.fromTo(scene, { scale: 1.08, opacity: 0 }, { scale: 1.0, opacity: 1, duration: transDur, ease: "power2.out" }, start);
+    } else if (transType === "masked-reveal") {
+      tl.fromTo(scene, { clipPath: "polygon(0 0, 0 0, 0 100%, 0 100%)", opacity: 1 }, { clipPath: "polygon(0 0, 100% 0, 100% 100%, 0 100%)", opacity: 1, duration: transDur, ease: "power2.out" }, start);
     } else {
       tl.set(scene, { opacity: 1 }, start);
     }
@@ -45,6 +47,7 @@ window.__timelines["news-video"] = tl;
 
     if(document.body.classList.contains('reference-design')){
       animateReference(scene,tl,start,dur);
+      executeVisualEvents(scene,tl,start,dur);
       return;
     }
 
@@ -133,6 +136,7 @@ window.__timelines["news-video"] = tl;
     } else if (layout === "phone-mockup") {
       animatePhoneMockup(scene, tl, start);
     }
+    executeVisualEvents(scene, tl, start, dur);
   });
 
   // All motion is seekable: no random values, intervals or wall-clock animation.
@@ -190,33 +194,244 @@ window.__timelines["news-video"] = tl;
         tl.fromTo(mediaImg, {scale: 1}, {scale: 1.035, duration: mediaDur, ease: 'none'}, at);
       }
     });
-    const starBadge=scene.querySelector('.ref-github-stars');
-    if(starBadge){
-      const beat=start+Number(starBadge.dataset.revealAt??starBadge.dataset.refEnter??.03);
-      const steps=starBadge.querySelectorAll('[data-star-step]');
-      steps.forEach((el,i)=>{
-        tl.set(el,{opacity:0},0);
-        tl.set(el,{opacity:1},beat+.08+i*.065);
-        if(i<steps.length-1)tl.set(el,{opacity:0},beat+.08+(i+1)*.065);
-      });
-      tl.fromTo(starBadge.querySelector('.ref-star-icon'),{rotation:-100,scale:.25},{rotation:0,scale:1,duration:.5,ease:'back.out(1.4)'},beat);
-      starBadge.querySelectorAll('.ref-star-spark').forEach((el,i)=>{
-        tl.fromTo(el,{opacity:0,scale:0,rotation:-35},{opacity:1,scale:1,rotation:30,duration:.2},beat+.25+i*.08);
-        tl.to(el,{opacity:0,scale:.3,duration:.25},beat+.55+i*.08);
-      });
-      tl.fromTo(starBadge,{boxShadow:'0 0 0px #e9b84c00'},{boxShadow:'0 0 65px #e9b84c30',duration:.4,yoyo:true,repeat:1},beat+.15);
-    }
-    const name=scene.querySelector('.ref-product-name');
-    if(name){
-      const cycles=Math.max(1,Math.floor(dur/2));
-      tl.fromTo(name,{backgroundPosition:'100% 0%'},{backgroundPosition:'0% 0%',duration:dur/cycles,repeat:cycles-1,ease:'none'},start);
-      // Fit longer product names without moving the repository/benefit pills.
-      const count=name.textContent.length;
-      if(count>12)name.style.setProperty('font-size',Math.max(52,110*12/count)+'px','important');
+    // Hook progression: 0-3s structured visual story
+    const isHook = scene.dataset.layout === 'hook';
+    const name = scene.querySelector('.ref-product-name');
+    const repoPill = scene.querySelector('.ref-repo-pill');
+    const benefit = scene.querySelector('.ref-benefit');
+    const glass = scene.querySelector('.ref-glass');
+    const starBadge = scene.querySelector('.ref-github-stars');
+
+    if (isHook) {
+      // Phase 1 (0.0s - 0.6s): Glass container & product icon scale in
+      if (glass) {
+        tl.fromTo(glass,
+          { opacity: 0, scale: 0.88, y: 35, filter: 'blur(6px)' },
+          { opacity: 1, scale: 1.0, y: 0, filter: 'blur(0px)', duration: 0.55, ease: 'back.out(1.2)' },
+          start + 0.08
+        );
+      }
+      // Phase 2 (0.8s - 1.6s): Headline punch pop in
+      if (name) {
+        tl.fromTo(name,
+          { opacity: 0, scale: 0.9, y: 24 },
+          { opacity: 1, scale: 1.0, y: 0, duration: 0.45, ease: 'back.out(1.3)' },
+          start + 0.85
+        );
+        const cycles = Math.max(1, Math.floor(dur / 2));
+        tl.fromTo(name, { backgroundPosition: '100% 0%' }, { backgroundPosition: '0% 0%', duration: dur / cycles, repeat: cycles - 1, ease: 'none' }, start + 0.85);
+        const count = name.textContent.length;
+        if (count > 12) name.style.setProperty('font-size', Math.max(52, 110 * 12 / count) + 'px', 'important');
+      }
+      // Phase 3 (1.8s - 2.8s): Proof & repo pill reveal
+      if (repoPill) {
+        tl.fromTo(repoPill, { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.35, ease: 'power2.out' }, start + 1.8);
+      }
+      if (benefit) {
+        tl.fromTo(benefit, { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.35, ease: 'power2.out' }, start + 2.0);
+      }
+      if (starBadge) {
+        const beat = start + 1.85;
+        const steps = starBadge.querySelectorAll('[data-star-step]');
+        steps.forEach((el, i) => {
+          tl.set(el, { opacity: 0 }, 0);
+          tl.set(el, { opacity: 1 }, beat + 0.08 + i * 0.065);
+          if (i < steps.length - 1) tl.set(el, { opacity: 0 }, beat + 0.08 + (i + 1) * 0.065);
+        });
+        tl.fromTo(starBadge.querySelector('.ref-star-icon'), { rotation: -100, scale: 0.25 }, { rotation: 0, scale: 1, duration: 0.5, ease: 'back.out(1.4)' }, beat);
+        starBadge.querySelectorAll('.ref-star-spark').forEach((el, i) => {
+          tl.fromTo(el, { opacity: 0, scale: 0, rotation: -35 }, { opacity: 1, scale: 1, rotation: 30, duration: 0.2 }, beat + 0.25 + i * 0.08);
+          tl.to(el, { opacity: 0, scale: 0.3, duration: 0.25 }, beat + 0.55 + i * 0.08);
+        });
+        tl.fromTo(starBadge, { boxShadow: '0 0 0px #e9b84c00' }, { boxShadow: '0 0 65px #e9b84c30', duration: 0.4, yoyo: true, repeat: 1 }, beat + 0.15);
+      }
+    } else {
+      if (name) {
+        const cycles = Math.max(1, Math.floor(dur / 2));
+        tl.fromTo(name, { backgroundPosition: '100% 0%' }, { backgroundPosition: '0% 0%', duration: dur / cycles, repeat: cycles - 1, ease: 'none' }, start);
+        const count = name.textContent.length;
+        if (count > 12) name.style.setProperty('font-size', Math.max(52, 110 * 12 / count) + 'px', 'important');
+      }
     }
     scene.querySelectorAll('.ref-connector i,.ref-status i,.ref-code-status>i').forEach((el,i)=>{
       tl.fromTo(el,{opacity:.4,scale:.8},{opacity:1,scale:1.12,duration:.7,repeat:Math.max(0,Math.floor(dur/.7)-1),yoyo:true,ease:'sine.inOut'},start+(i%2)*.1);
     });
+
+    // Callout secondary motion: subtle entrance & icon pop (no vibration)
+    const calloutIcon = scene.querySelector('.ref-warning .ref-row-icon');
+    if (calloutIcon) {
+      tl.fromTo(calloutIcon, { scale: 0.8, opacity: 0 }, { scale: 1.0, opacity: 1, duration: 0.35, ease: 'back.out(1.5)' }, start + 0.12);
+    }
+
+    // Worked Example: sequential 1 Input -> 2 Operation -> 3 Output
+    const workedNodes = scene.querySelectorAll('.ref-two .ref-cell, .ref-board-canvas > .ref-cell');
+    if (workedNodes.length >= 3) {
+      tl.fromTo(workedNodes[0], { opacity: 0, y: 25 }, { opacity: 1, y: 0, duration: 0.35, ease: 'power2.out' }, start + 0.1);
+      tl.fromTo(workedNodes[1], { opacity: 0, y: 25 }, { opacity: 1, y: 0, duration: 0.35, ease: 'power2.out' }, start + 0.35);
+      tl.fromTo(workedNodes[2], { opacity: 0, y: 25 }, { opacity: 1, y: 0, duration: 0.35, ease: 'power2.out' }, start + 0.65);
+    }
+
+    // Phone Mockup & Visual Focus subtle pan/zoom
+    const mockupScreen = scene.querySelector('.phone-frame img, .ref-screen img');
+    if (mockupScreen) {
+      tl.fromTo(mockupScreen, { scale: 1.0, y: 0 }, { scale: 1.04, y: -12, duration: dur * 0.9, ease: 'none' }, start + 0.1);
+    }
+    const focusVp = scene.querySelector('.ref-focus-viewport');
+    if (focusVp) {
+      const fx = parseFloat(focusVp.dataset.focusX || "50");
+      const fy = parseFloat(focusVp.dataset.focusY || "50");
+      const fScale = parseFloat(focusVp.dataset.focusScale || "1.3");
+      const focusImg = focusVp.querySelector('img, video');
+      if (focusImg) {
+        const transX = (50 - fx) * 1.5;
+        const transY = (50 - fy) * 1.5;
+        tl.fromTo(focusImg, { scale: 1.0, x: 0, y: 0 }, { scale: fScale, x: transX, y: transY, duration: Math.max(0.6, dur * 0.75), ease: 'power2.out' }, start + 0.15);
+      }
+    }
+
+    // Kinetic Headline punchword pop
+    const punch = scene.querySelector('.kinetic-punchword');
+    if (punch) {
+      tl.fromTo(punch, { scale: 0.5, opacity: 0 }, { scale: 1.0, opacity: 1, duration: 0.45, ease: 'back.out(1.6)' }, start + 0.12);
+    }
+
+    // Quote Card mark & text
+    const quoteMark = scene.querySelector('.quote-mark');
+    if (quoteMark) {
+      tl.fromTo(quoteMark, { y: -25, opacity: 0 }, { y: 0, opacity: 0.7, duration: 0.4, ease: 'back.out(1.2)' }, start + 0.08);
+    }
+    const quoteBody = scene.querySelector('.quote-body');
+    if (quoteBody) {
+      tl.fromTo(quoteBody, { opacity: 0, y: 15 }, { opacity: 1, y: 0, duration: 0.45, ease: 'power2.out' }, start + 0.22);
+    }
+
+    // Step by step items
+    const stepItems = scene.querySelectorAll('.ref-step-item');
+    stepItems.forEach((st, i) => {
+      const at = start + 0.12 + i * Math.min(0.4, dur / (stepItems.length + 1));
+      tl.fromTo(st, { opacity: 0, x: -30 }, { opacity: 1, x: 0, duration: 0.35, ease: 'power2.out' }, at);
+      const b = st.querySelector('.ref-step-badge');
+      if (b) tl.fromTo(b, { scale: 0.7 }, { scale: 1.0, duration: 0.3, ease: 'back.out(1.5)' }, at + 0.08);
+    });
+
+    // Comparison sides
+    const cmpCells = scene.querySelectorAll('.ref-two.ref-comparison .ref-cell, .ref-two .cmp-card');
+    if (cmpCells.length >= 2) {
+      tl.fromTo(cmpCells[0], { opacity: 0, x: -35 }, { opacity: 1, x: 0, duration: 0.38, ease: 'power2.out' }, start + 0.1);
+      tl.fromTo(cmpCells[1], { opacity: 0, x: 35 }, { opacity: 1, x: 0, duration: 0.38, ease: 'power2.out' }, start + 0.45);
+    }
+
+    // Feature list staggered bullets
+    const featBullets = scene.querySelectorAll('.ref-rows .ref-row.feat-bullet');
+    if (featBullets.length > 0) {
+      featBullets.forEach((b, i) => {
+        const at = start + 0.15 + i * Math.min(0.35, dur / (featBullets.length + 1));
+        tl.fromTo(b, { opacity: 0, x: -25 }, { opacity: 1, x: 0, duration: 0.32, ease: 'power2.out' }, at);
+      });
+    }
+  }
+
+  // ── VISUAL BEAT ENGINE ───────────────────────────────────────────────────
+  function executeVisualEvents(scene, tl, start, dur) {
+    if (!scene.dataset.visualEvents) return;
+    try {
+      const events = JSON.parse(scene.dataset.visualEvents);
+      if (!Array.isArray(events)) return;
+
+      events.forEach((ev, evIdx) => {
+        const aliasMap = {
+          heading: ".ref-section-title, .hook-headline, .explainer-title, .kinetic-text, h1, h2",
+          subhead: ".hook-subhead, .ref-note, .kinetic-subhead",
+          media: ".ref-media img, .scene-media-img, .ref-focus-media, img",
+          card: ".ref-panel, .ref-cell, .feat-card, .callout-card, .ref-quote-panel",
+          badge: ".ref-status, .ref-repo-pill, .ref-step-badge, .ref-section-label",
+          bullet: ".ref-row, .feat-bullet, .ref-step-item",
+          metric: ".stat-value, .ref-stat-value, .stat-digit",
+          icon: ".ref-row-icon, .ref-stat-icon, .quote-mark, svg",
+        };
+        const sel = aliasMap[ev.targetElement] || (ev.targetElement.startsWith(".") || ev.targetElement.startsWith("#") ? ev.targetElement : `.${ev.targetElement}`);
+        const allMatching = Array.from(scene.querySelectorAll(sel));
+        if (allMatching.length === 0) return;
+
+        // Distribute multi-beat events across items (e.g. bullet 1, bullet 2, bullet 3)
+        const target = allMatching[evIdx % allMatching.length];
+        if (!target) return;
+
+        const at = start + Math.min(dur - 0.2, Math.max(0.1, ev.atSec ?? 0.2));
+        const evDur = Math.min(dur - (at - start), Math.max(0.2, ev.durationSec ?? 0.45));
+        const intensity = ev.motionIntensity || scene.dataset.motionIntensity || "medium";
+        const mult = intensity === "high" ? 1.25 : intensity === "low" ? 0.75 : 1.0;
+
+        switch (ev.eventType) {
+          case "reveal":
+            tl.fromTo(target, { opacity: 0, y: 20 * mult }, { opacity: 1, y: 0, duration: evDur, ease: "power2.out" }, at);
+            break;
+          case "stagger-reveal": {
+            const children = Array.from(target.children);
+            if (children.length > 0) {
+              const step = Math.min(0.25, evDur / children.length);
+              children.forEach((c, ci) => {
+                tl.fromTo(c, { opacity: 0, y: 15 * mult }, { opacity: 1, y: 0, duration: step * 0.9, ease: "power2.out" }, at + ci * step);
+              });
+            } else {
+              tl.fromTo(target, { opacity: 0, y: 15 * mult }, { opacity: 1, y: 0, duration: evDur, ease: "power2.out" }, at);
+            }
+            break;
+          }
+          case "keyword-pop":
+            tl.fromTo(target,
+              { scale: 1.0 },
+              { scale: 1.08 * mult, filter: "drop-shadow(0 0 20px rgba(116, 232, 196, 0.75))", duration: evDur * 0.45, yoyo: true, repeat: 1, ease: "back.out(2)" },
+              at
+            );
+            break;
+          case "number-count":
+            tl.fromTo(target,
+              { scale: 0.85, filter: "brightness(0.9)" },
+              { scale: 1.1 * mult, filter: "brightness(1.3) drop-shadow(0 0 25px rgba(116, 232, 196, 0.8))", duration: evDur * 0.45, yoyo: true, repeat: 1, ease: "back.out(1.8)" },
+              at
+            );
+            break;
+          case "highlight-sweep":
+            tl.fromTo(target,
+              { borderColor: "rgba(116, 232, 196, 0.25)", boxShadow: "0 0 0px rgba(116, 232, 196, 0)" },
+              { borderColor: "rgba(116, 232, 196, 0.95)", boxShadow: "0 0 35px rgba(116, 232, 196, 0.45)", scale: 1.03, duration: evDur * 0.5, yoyo: true, repeat: 1, ease: "power2.inOut" },
+              at
+            );
+            break;
+          case "diagram-step":
+            tl.fromTo(target,
+              { scale: 0.96, borderColor: "rgba(116, 232, 196, 0.2)" },
+              { scale: 1.05 * mult, borderColor: "rgba(116, 232, 196, 0.95)", boxShadow: "0 0 30px rgba(116, 232, 196, 0.4)", duration: evDur * 0.45, yoyo: true, repeat: 1, ease: "power2.out" },
+              at
+            );
+            break;
+          case "comparison-reveal":
+            tl.fromTo(target, { opacity: 0.4, y: 15 }, { opacity: 1.0, y: 0, scale: 1.02, duration: evDur, ease: "power2.out" }, at);
+            break;
+          case "focus-shift":
+            tl.fromTo(target,
+              { scale: 1.0 },
+              { scale: 1.04 * mult, filter: "contrast(1.15)", duration: evDur * 0.5, yoyo: true, repeat: 1, ease: "power2.inOut" },
+              at
+            );
+            break;
+          case "subtle-pulse":
+          case "pulse":
+            tl.fromTo(target,
+              { scale: 1.0 },
+              { scale: 1.05 * mult, filter: "brightness(1.2)", duration: evDur * 0.5, yoyo: true, repeat: 1, ease: "sine.inOut" },
+              at
+            );
+            break;
+          default:
+            tl.fromTo(target, { opacity: 0.6 }, { opacity: 1, duration: evDur }, at);
+            break;
+        }
+      });
+    } catch (e) {
+      // safe fallback
+    }
   }
   function animateDynamic(scene, tl, start, dur) {
     animateEditorial(scene, tl, start, dur);

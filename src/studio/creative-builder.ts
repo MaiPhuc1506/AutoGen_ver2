@@ -55,13 +55,14 @@ export async function buildCreativeScript(
 
   let activeTranscript = transcript?.trim() || "";
   let sttResult: SttResult | undefined;
+  let parsedSrtCues: import("../captions/types.js").CaptionCue[] | undefined;
 
-  // 1. If SRT is provided and transcript is empty: auto-extract transcript directly from SRT!
-  if (!activeTranscript && srtContent && srtContent.trim()) {
+  // 1. If SRT is provided: parse cues and auto-extract transcript if transcript was omitted
+  if (srtContent && srtContent.trim()) {
     try {
-      const srtCues = parseSrt(srtContent.trim());
-      if (srtCues.length > 0) {
-        activeTranscript = srtCues.map((c) => c.text.trim()).join(" ");
+      parsedSrtCues = parseSrt(srtContent.trim());
+      if (!activeTranscript && parsedSrtCues.length > 0) {
+        activeTranscript = parsedSrtCues.map((c) => c.text.trim()).join(" ");
         log.info(`[Creative Builder] Extracted transcript (${activeTranscript.length} chars) directly from uploaded SRT file.`);
       }
     } catch (e: any) {
@@ -133,7 +134,7 @@ export async function buildCreativeScript(
     }
   }
 
-  // 3. Plan scenes using AI Visual Planner (with safe fallback)
+  // 3. Plan scenes using AI Visual Planner (with SRT cue-level awareness)
   const plannedScenes = await planCreativeVisuals({
     transcript: activeTranscript,
     url,
@@ -141,15 +142,21 @@ export async function buildCreativeScript(
     availableAssets,
     llmProvider,
     channelName,
+    srtCues: parsedSrtCues,
   });
 
-  // 4. Align Audio and Subtitles
+  // 4. Align Audio and Subtitles using SRT cue groupings
   const sceneTexts = plannedScenes.map((s) => s.voiceText);
+  const sceneGroupings = plannedScenes
+    .map((s) => s.cueRange)
+    .filter((g): g is { startCueId: number; endCueId: number } => Boolean(g && g.startCueId && g.endCueId));
+
   const alignment = await alignCreativeAudioAndSubtitles({
     audioPath: audioInfo.path,
     totalDurationSec: audioDurationSec,
     transcript: activeTranscript,
     sceneTexts,
+    sceneGroupings: sceneGroupings.length === plannedScenes.length ? sceneGroupings : undefined,
     srtContent,
     sttResult,
   });
@@ -175,7 +182,7 @@ export async function buildCreativeScript(
     directingMode: "auto",
     templatePack: templatePack || "reference",
     visualStyle: "tech-editorial",
-    motionPreset: "calm",
+    motionPreset: plannedScenes[0]?.motionPreset || "explanatory",
     soundDesign: true,
     fitDuration: false, // Never alter tempo of uploaded ElevenLabs audio
     explanationLevel: audioDurationSec <= 60 ? "quick" : audioDurationSec <= 90 ? "standard" : "detailed",
@@ -216,6 +223,14 @@ export async function buildCreativeScript(
   const logo = availableAssets.find((a) => a.kind === "repo-logo" || a.kind === "owner-avatar");
   if (logo) {
     rawScript.metadata.logoAssetId = logo.id;
+  }
+
+  // Sync canonical timeline from SRT cues & scenes
+  if (alignment.cues.length > 0) {
+    const { buildCanonicalTimelineFromSrt } = await import("../timeline/builder.js");
+    const canonicalState = buildCanonicalTimelineFromSrt(rawScript, alignment.cues, audioDurationSec);
+    rawScript.timeline = canonicalState.script.timeline;
+    rawScript.scenes = canonicalState.script.scenes;
   }
 
   // Validate via ScriptSchema

@@ -13,6 +13,7 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import pLimit from "p-limit";
 import { ScriptSchema, type Script } from "./render/script-schema.js";
+import { runPreRenderQc } from "./qc/qc-engine.js";
 import { loadConfig } from "./config.js";
 import { fetchImage } from "./assets/image-fetcher.js";
 import { getDurationSec, concatWithSilence, mixSfxOntoVoice, mixBgmWithVoice, type SfxMixSpec } from "./assets/audio-tools.js";
@@ -392,6 +393,24 @@ export async function runPipeline(scriptPath: string): Promise<void> {
   }
   await writeFile(join(outputDir,'styles.css'),await readFile(join(outputDir,'styles.css'),'utf8')+'\n'+await readFile(join(TPL_DIR,'styles.follow-card.css'),'utf8'));
   await copyFile(join(TPL_DIR, "animations.js"), join(outputDir, "animations.js"));
+
+  // STEP 6.5: Quality Control Engine Validation
+  const qcReport = runPreRenderQc({
+    script,
+    totalDurationSec: totalAudioSec,
+    cues: allCues,
+    renderedHtml: html,
+  });
+  await writeFile(join(outputDir, "qc-report.json"), JSON.stringify(qcReport, null, 2), "utf8");
+  if (!qcReport.passed) {
+    const errorDetails = qcReport.blockingErrors.join("\n - ");
+    log.error(`QC Engine BLOCKED rendering due to critical issues:\n - ${errorDetails}`);
+    throw new Error(`QC Engine BLOCKED rendering (${qcReport.blockingCount} critical errors):\n - ${errorDetails}`);
+  }
+  if (qcReport.warnings.length > 0) {
+    log.warn(`QC Engine Warnings (${qcReport.warnings.length}):\n - ${qcReport.warnings.join("\n - ")}`);
+  }
+  log.info(`QC Engine passed with score: ${qcReport.score}/100.`);
 
   // STEP 7
   log.step(7, TOTAL_STEPS, "Render with hyperframes");

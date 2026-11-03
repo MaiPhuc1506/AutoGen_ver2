@@ -1,6 +1,6 @@
 import type { Script, TimelineSpecType } from "../render/script-schema.js";
 
-export type TimelineTrackType = "scene" | "voice" | "bgm" | "caption";
+export type TimelineTrackType = "scene" | "voice" | "bgm" | "caption" | "event";
 
 export interface TimelineClip {
   id: string;
@@ -8,6 +8,7 @@ export interface TimelineClip {
   trackType: TimelineTrackType;
   sceneId?: string;
   cueIndex?: number;
+  eventId?: string;
   start: number; // in seconds
   duration: number; // in seconds
   offset?: number; // trim start offset in source asset, in seconds
